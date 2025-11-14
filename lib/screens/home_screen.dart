@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import '../services/supabase_service.dart';
+import '../tabs/map_tab.dart';
+import '../tabs/feed_tab.dart';
+import '../tabs/profile_tab.dart';
+import '../tabs/rewards_tab.dart';
+import '../tabs/settings_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -9,93 +13,68 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String? _displayName;
-  bool _isLoading = true;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadDisplayName();
   }
 
-  Future<void> _loadDisplayName() async {
-    final user = SupabaseService.getCurrentUser();
-    if (user != null) {
-      final displayName = await SupabaseService.getUserDisplayName(user.id);
-      if (mounted) {
-        setState(() {
-          _displayName = displayName;
-          _isLoading = false;
-        });
-      }
-    }
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
-  Future<void> _signOut() async {
-    try {
-      await SupabaseService.signOut();
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sign out error: $error')),
-        );
-      }
+  Widget _buildTabContent() {
+    switch (_selectedIndex) {
+      case 0:
+        return const MapTab();
+      case 1:
+        return const FeedTab();
+      case 2:
+        return const ProfileTab();
+      case 3:
+        return const RewardsTab();
+      case 4:
+        return const SettingsTab();
+      default:
+        return const MapTab();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = SupabaseService.getCurrentUser();
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home'),
-        actions: [
-          IconButton(
-            onPressed: _signOut,
-            icon: const Icon(Icons.logout),
+      body: _buildTabContent(),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.location_on),
+            label: 'Map',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.feed),
+            label: 'Feed',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.card_giftcard),
+            label: 'Rewards',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Welcome!',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              if (_isLoading)
-                const CircularProgressIndicator()
-              else ...[
-                if (_displayName != null) ...[
-                  Text(
-                    _displayName!,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                Text(
-                  'You are signed in as:',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  user?.email ?? 'Unknown',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: _signOut,
-                child: const Text('Sign Out'),
-              ),
-            ],
-          ),
-        ),
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.deepPurple,
+        unselectedItemColor: Colors.grey,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
       ),
     );
   }
