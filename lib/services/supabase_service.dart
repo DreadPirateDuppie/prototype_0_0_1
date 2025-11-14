@@ -15,12 +15,17 @@ class SupabaseService {
 
   // Get user display name
   static Future<String?> getUserDisplayName(String userId) async {
-    final response = await _client
-        .from('user_profiles')
-        .select('display_name')
-        .eq('id', userId)
-        .maybeSingle();
-    return response?['display_name'];
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('display_name')
+          .eq('id', userId)
+          .maybeSingle();
+      return response?['display_name'];
+    } catch (e) {
+      print('⚠ Display name fetch error (table may not exist): $e');
+      return null;
+    }
   }
 
   // Save user display name
@@ -28,10 +33,15 @@ class SupabaseService {
     String userId,
     String displayName,
   ) async {
-    await _client.from('user_profiles').upsert({
-      'id': userId,
-      'display_name': displayName,
-    });
+    try {
+      await _client.from('user_profiles').upsert({
+        'id': userId,
+        'display_name': displayName,
+      });
+    } catch (e) {
+      print('⚠ Display name save error (table may not exist): $e');
+      // Silently fail - table may not exist yet
+    }
   }
 
   // Sign up with email and password
@@ -54,10 +64,17 @@ class SupabaseService {
 
   // Sign in with email and password
   static Future<AuthResponse> signIn(String email, String password) async {
-    return await _client.auth.signInWithPassword(
-      email: email,
-      password: password,
-    );
+    try {
+      final response = await _client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      print('✓ Sign in successful: ${response.user?.email}');
+      return response;
+    } catch (e) {
+      print('✗ Sign in error: $e');
+      rethrow;
+    }
   }
 
   // Sign in with Google via Supabase

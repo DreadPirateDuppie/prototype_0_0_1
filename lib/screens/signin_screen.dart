@@ -23,6 +23,13 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _signIn() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter both email and password';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -33,13 +40,12 @@ class _SignInScreenState extends State<SignInScreen> {
         _emailController.text,
         _passwordController.text,
       );
+      // Success - AuthWrapper will handle navigation
+      // Keep loading state while transitioning
     } catch (error) {
-      setState(() {
-        _errorMessage = error.toString();
-      });
-    } finally {
       if (mounted) {
         setState(() {
+          _errorMessage = error.toString().replaceAll('Exception: ', '');
           _isLoading = false;
         });
       }
@@ -54,15 +60,12 @@ class _SignInScreenState extends State<SignInScreen> {
 
     try {
       await SupabaseService.signInWithGoogle();
+      // Success - AuthWrapper will handle navigation
+      // Keep loading state while transitioning
     } catch (error) {
       if (mounted) {
         setState(() {
-          _errorMessage = error.toString();
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
+          _errorMessage = error.toString().replaceAll('Exception: ', '');
           _isLoading = false;
         });
       }
@@ -101,6 +104,11 @@ class _SignInScreenState extends State<SignInScreen> {
                 _errorMessage!,
                 style: const TextStyle(color: Colors.red),
               ),
+            if (_isLoading)
+              ...[
+                const SizedBox(height: 16),
+                const Text('Signing in...'),
+              ],
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _isLoading ? null : _signIn,
