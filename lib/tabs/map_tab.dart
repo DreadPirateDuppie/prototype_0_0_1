@@ -242,6 +242,39 @@ class _MapTabState extends State<MapTab> {
               child: const CircularProgressIndicator(),
             ),
           ),
+        // Zoom buttons
+        Positioned(
+          bottom: 100,
+          right: 16,
+          child: Column(
+            children: [
+              FloatingActionButton(
+                mini: true,
+                onPressed: () {
+                  mapController.move(
+                    mapController.camera.center,
+                    mapController.camera.zoom + 1,
+                  );
+                },
+                backgroundColor: Colors.deepPurple,
+                child: const Icon(Icons.add),
+              ),
+              const SizedBox(height: 8),
+              FloatingActionButton(
+                mini: true,
+                onPressed: () {
+                  mapController.move(
+                    mapController.camera.center,
+                    mapController.camera.zoom - 1,
+                  );
+                },
+                backgroundColor: Colors.deepPurple,
+                child: const Icon(Icons.remove),
+              ),
+            ],
+          ),
+        ),
+        // Pin placement button
         Positioned(
           bottom: 16,
           right: 16,
