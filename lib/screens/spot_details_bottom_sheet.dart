@@ -128,26 +128,12 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          currentPost.userName ?? 'Unknown User',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (currentPost.userEmail != null)
-                          Text(
-                            currentPost.userEmail!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
+                    child: Text(
+                      currentPost.userName ?? 'Unknown User',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],

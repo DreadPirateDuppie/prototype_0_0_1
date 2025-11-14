@@ -95,26 +95,12 @@ class _FeedTabState extends State<FeedTab> {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    post.userName ?? 'Unknown User',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  if (post.userEmail != null)
-                                    Text(
-                                      post.userEmail!,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey[600],
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                ],
+                              child: Text(
+                                post.userName ?? 'Unknown User',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],

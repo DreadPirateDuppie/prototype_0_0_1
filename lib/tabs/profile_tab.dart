@@ -168,26 +168,12 @@ class _ProfileTabState extends State<ProfileTab> {
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            post.userName ?? 'Unknown User',
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          if (post.userEmail != null)
-                                            Text(
-                                              post.userEmail!,
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.grey[600],
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                        ],
+                                      child: Text(
+                                        post.userName ?? 'Unknown User',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ],
