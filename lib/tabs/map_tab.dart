@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
+import '../widgets/ad_banner.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -231,12 +232,16 @@ class _MapTabState extends State<MapTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    return Column(
       children: [
-        FlutterMap(
-          mapController: mapController,
-          options: MapOptions(
-            initialCenter: currentLocation,
+        const AdBanner(),
+        Expanded(
+          child: Stack(
+            children: [
+              FlutterMap(
+                mapController: mapController,
+                options: MapOptions(
+                  initialCenter: currentLocation,
             initialZoom: 13.0,
             minZoom: 5.0,
             maxZoom: 18.0,
@@ -304,6 +309,9 @@ class _MapTabState extends State<MapTab> {
             onPressed: _togglePinMode,
             backgroundColor: _isPinMode ? Colors.red : Colors.deepPurple,
             child: Icon(_isPinMode ? Icons.close : Icons.location_on),
+          ),
+        ),
+            ],
           ),
         ),
       ],
