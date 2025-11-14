@@ -232,22 +232,23 @@ class _MapTabState extends State<MapTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Stack(
       children: [
-        const AdBanner(),
-        Expanded(
-          child: Stack(
-            children: [
-              FlutterMap(
-                mapController: mapController,
-                options: MapOptions(
-                  initialCenter: currentLocation,
-            initialZoom: 13.0,
-            minZoom: 5.0,
-            maxZoom: 18.0,
-            onTap: (tapPosition, point) => _handleMapTap(point),
-          ),
+        Column(
           children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  FlutterMap(
+                    mapController: mapController,
+                    options: MapOptions(
+                      initialCenter: currentLocation,
+                initialZoom: 13.0,
+                minZoom: 5.0,
+                maxZoom: 18.0,
+                onTap: (tapPosition, point) => _handleMapTap(point),
+              ),
+              children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.example.prototype_0_0_1',
@@ -311,8 +312,17 @@ class _MapTabState extends State<MapTab> {
             child: Icon(_isPinMode ? Icons.close : Icons.location_on),
           ),
         ),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        // Ad banner overlay at the top
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: const AdBanner(),
         ),
       ],
     );
