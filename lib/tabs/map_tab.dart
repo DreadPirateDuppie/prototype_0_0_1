@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 
 class MapTab extends StatefulWidget {
@@ -10,18 +11,15 @@ class MapTab extends StatefulWidget {
 }
 
 class _MapTabState extends State<MapTab> {
-  late GoogleMapController mapController;
-  Set<Marker> markers = {};
+  late MapController mapController;
+  List<Marker> markers = [];
+  LatLng currentLocation = const LatLng(37.7749, -122.4194); // Default: SF
   bool _isLoading = true;
-
-  final CameraPosition _initialPosition = const CameraPosition(
-    target: LatLng(37.7749, -122.4194), // San Francisco
-    zoom: 14.0,
-  );
 
   @override
   void initState() {
     super.initState();
+    mapController = MapController();
     _getCurrentLocation();
     _addSampleMarkers();
   }
@@ -41,26 +39,21 @@ class _MapTabState extends State<MapTab> {
       );
 
       if (mounted) {
-        final newPosition = CameraPosition(
-          target: LatLng(position.latitude, position.longitude),
-          zoom: 14.0,
-        );
-
-        mapController.animateCamera(
-          CameraUpdate.newCameraPosition(newPosition),
-        );
-
+        final newLocation = LatLng(position.latitude, position.longitude);
         setState(() {
+          currentLocation = newLocation;
           _isLoading = false;
         });
 
+        // Animate to current location
+        mapController.move(newLocation, 14.0);
+
         // Add marker at current location
-        _addMarker(
-          position.latitude,
-          position.longitude,
+        _addMarkerToList(
+          newLocation,
           'Your Location',
           'You are here',
-          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+          Colors.blue,
         );
       }
     } catch (e) {
@@ -76,65 +69,94 @@ class _MapTabState extends State<MapTab> {
   }
 
   void _addSampleMarkers() {
-    // Add some sample markers around San Francisco
-    _addMarker(
-      37.7749,
-      -122.4194,
+    // Add sample markers around San Francisco
+    _addMarkerToList(
+      const LatLng(37.7749, -122.4194),
       'Downtown SF',
       'City Center',
-      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+      Colors.red,
     );
-    _addMarker(
-      37.8044,
-      -122.2712,
+    _addMarkerToList(
+      const LatLng(37.8044, -122.2712),
       'Golden Gate Bridge',
       'Famous landmark',
-      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+      Colors.orange,
     );
-    _addMarker(
-      37.7694,
-      -122.4862,
+    _addMarkerToList(
+      const LatLng(37.7694, -122.4862),
       'Ocean Beach',
       'Beautiful beach',
-      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      Colors.green,
     );
   }
 
-  void _addMarker(
-    double latitude,
-    double longitude,
+  void _addMarkerToList(
+    LatLng location,
     String title,
-    String snippet,
-    BitmapDescriptor icon,
+    String subtitle,
+    Color color,
   ) {
-    final marker = Marker(
-      markerId: MarkerId('${latitude}_$longitude'),
-      position: LatLng(latitude, longitude),
-      infoWindow: InfoWindow(title: title, snippet: snippet),
-      icon: icon,
-    );
-
     setState(() {
-      markers.add(marker);
+      markers.add(
+        Marker(
+          point: location,
+          width: 40,
+          height: 40,
+          child: GestureDetector(
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(subtitle),
+                    ],
+                  ),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(Icons.location_on, color: Colors.white, size: 20),
+            ),
+          ),
+        ),
+      );
     });
-  }
-
-  void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
   }
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        GoogleMap(
-          onMapCreated: _onMapCreated,
-          initialCameraPosition: _initialPosition,
-          markers: markers,
-          myLocationEnabled: true,
-          myLocationButtonEnabled: true,
-          zoomControlsEnabled: true,
-          compassEnabled: true,
+        FlutterMap(
+          mapController: mapController,
+          options: MapOptions(
+            initialCenter: currentLocation,
+            initialZoom: 13.0,
+            minZoom: 5.0,
+            maxZoom: 18.0,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.prototype_0_0_1',
+              maxZoom: 19,
+            ),
+            MarkerLayer(
+              markers: markers,
+            ),
+          ],
         ),
         if (_isLoading)
           Center(
