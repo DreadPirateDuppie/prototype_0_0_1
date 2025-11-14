@@ -8,6 +8,9 @@ class MapPost {
   final DateTime createdAt;
   final int likes;
   final String? photoUrl;
+  final double popularityRating;
+  final double securityRating;
+  final double qualityRating;
 
   MapPost({
     this.id,
@@ -19,6 +22,9 @@ class MapPost {
     required this.createdAt,
     this.likes = 0,
     this.photoUrl,
+    this.popularityRating = 0.0,
+    this.securityRating = 0.0,
+    this.qualityRating = 0.0,
   });
 
   Map<String, dynamic> toMap() {
@@ -31,6 +37,9 @@ class MapPost {
       'created_at': createdAt.toIso8601String(),
       'likes': likes,
       'photo_url': photoUrl,
+      'popularity_rating': popularityRating,
+      'security_rating': securityRating,
+      'quality_rating': qualityRating,
     };
   }
 
@@ -45,6 +54,9 @@ class MapPost {
       createdAt: DateTime.parse(map['created_at'] as String),
       likes: map['likes'] as int? ?? 0,
       photoUrl: map['photo_url'] as String?,
+      popularityRating: (map['popularity_rating'] as num?)?.toDouble() ?? 0.0,
+      securityRating: (map['security_rating'] as num?)?.toDouble() ?? 0.0,
+      qualityRating: (map['quality_rating'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

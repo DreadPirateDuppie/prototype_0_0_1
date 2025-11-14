@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
+import '../screens/spot_details_bottom_sheet.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -17,8 +18,10 @@ class _MapTabState extends State<MapTab> {
   late MapController mapController;
   List<Marker> markers = [];
   List<MapPost> userPosts = [];
+  Map<String, MapPost> markerPostMap = {}; // Map marker location to post
   LatLng currentLocation = const LatLng(37.7749, -122.4194); // Default: SF
   bool _isLoading = true;
+  bool _isPinMode = false;
 
   @override
   void initState() {
@@ -54,6 +57,7 @@ class _MapTabState extends State<MapTab> {
         post.description,
         Colors.purple,
         postId: post.id,
+        post: post,
       );
     }
   }
@@ -130,7 +134,13 @@ class _MapTabState extends State<MapTab> {
     String subtitle,
     Color color, {
     String? postId,
+    MapPost? post,
   }) {
+    final key = '${location.latitude},${location.longitude}';
+    if (post != null) {
+      markerPostMap[key] = post;
+    }
+
     setState(() {
       markers.add(
         Marker(
@@ -139,22 +149,36 @@ class _MapTabState extends State<MapTab> {
           height: 40,
           child: GestureDetector(
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(subtitle),
-                    ],
+              if (post != null) {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                   ),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+                  builder: (context) => SpotDetailsBottomSheet(
+                    post: post,
+                    onClose: () => Navigator.pop(context),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(subtitle),
+                      ],
+                    ),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
             },
             child: Container(
               decoration: BoxDecoration(
@@ -169,8 +193,6 @@ class _MapTabState extends State<MapTab> {
       );
     });
   }
-
-  bool _isPinMode = false;
 
   void _togglePinMode() {
     setState(() {
