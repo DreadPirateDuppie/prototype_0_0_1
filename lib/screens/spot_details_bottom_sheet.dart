@@ -1,15 +1,63 @@
 import 'package:flutter/material.dart';
 import '../models/post.dart';
+import '../screens/edit_post_dialog.dart';
+import '../services/supabase_service.dart';
 
-class SpotDetailsBottomSheet extends StatelessWidget {
+class SpotDetailsBottomSheet extends StatefulWidget {
   final MapPost post;
   final VoidCallback onClose;
+  final VoidCallback? onPostUpdated;
 
   const SpotDetailsBottomSheet({
     super.key,
     required this.post,
     required this.onClose,
+    this.onPostUpdated,
   });
+
+  @override
+  State<SpotDetailsBottomSheet> createState() => _SpotDetailsBottomSheetState();
+}
+
+class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
+  late MapPost currentPost;
+
+  @override
+  void initState() {
+    super.initState();
+    currentPost = widget.post;
+  }
+
+  bool get _isOwnPost {
+    final user = SupabaseService.getCurrentUser();
+    return user != null && user.id == currentPost.userId;
+  }
+
+  void _showEditDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => EditPostDialog(
+        post: currentPost,
+        onPostUpdated: () async {
+          // Refresh the post data
+          try {
+            final updatedPosts = await SupabaseService.getAllMapPosts();
+            final updated = updatedPosts.firstWhere(
+              (p) => p.id == currentPost.id,
+              orElse: () => currentPost,
+            );
+            setState(() {
+              currentPost = updated;
+            });
+            widget.onPostUpdated?.call();
+            Navigator.of(context).pop();
+          } catch (e) {
+            // Silently fail
+          }
+        },
+      ),
+    );
+  }
 
   Widget _buildStarRating(double rating, String label) {
     return Column(
@@ -55,7 +103,7 @@ class SpotDetailsBottomSheet extends StatelessWidget {
                 alignment: Alignment.topRight,
                 child: IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: onClose,
+                  onPressed: widget.onClose,
                 ),
               ),
 
@@ -66,10 +114,10 @@ class SpotDetailsBottomSheet extends StatelessWidget {
                     radius: 24,
                     backgroundColor: Colors.deepPurple,
                     child: Text(
-                      (post.userName?.isNotEmpty ?? false)
-                          ? post.userName![0].toUpperCase()
-                          : (post.userEmail?.isNotEmpty ?? false)
-                              ? post.userEmail![0].toUpperCase()
+                      (currentPost.userName?.isNotEmpty ?? false)
+                          ? currentPost.userName![0].toUpperCase()
+                          : (currentPost.userEmail?.isNotEmpty ?? false)
+                              ? currentPost.userEmail![0].toUpperCase()
                               : '?',
                       style: const TextStyle(
                         color: Colors.white,
@@ -84,15 +132,15 @@ class SpotDetailsBottomSheet extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          post.userName ?? 'Unknown User',
+                          currentPost.userName ?? 'Unknown User',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (post.userEmail != null)
+                        if (currentPost.userEmail != null)
                           Text(
-                            post.userEmail!,
+                            currentPost.userEmail!,
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[600],
@@ -108,7 +156,7 @@ class SpotDetailsBottomSheet extends StatelessWidget {
 
               // Title
               Text(
-                post.title,
+                currentPost.title,
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -117,11 +165,11 @@ class SpotDetailsBottomSheet extends StatelessWidget {
               const SizedBox(height: 8),
 
               // Photo if available
-              if (post.photoUrl != null) ...[
+              if (currentPost.photoUrl != null) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.network(
-                    post.photoUrl!,
+                    currentPost.photoUrl!,
                     height: 200,
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -141,7 +189,7 @@ class SpotDetailsBottomSheet extends StatelessWidget {
 
               // Description
               Text(
-                post.description,
+                currentPost.description,
                 style: const TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 16),
@@ -168,15 +216,15 @@ class SpotDetailsBottomSheet extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         _buildStarRating(
-                          post.popularityRating,
+                          currentPost.popularityRating,
                           'Popularity',
                         ),
                         _buildStarRating(
-                          post.securityRating,
+                          currentPost.securityRating,
                           'Security',
                         ),
                         _buildStarRating(
-                          post.qualityRating,
+                          currentPost.qualityRating,
                           'Quality',
                         ),
                       ],
@@ -193,7 +241,7 @@ class SpotDetailsBottomSheet extends StatelessWidget {
                   const Icon(Icons.location_on, size: 16, color: Colors.grey),
                   const SizedBox(width: 8),
                   Text(
-                    '${post.latitude.toStringAsFixed(4)}, ${post.longitude.toStringAsFixed(4)}',
+                    '${currentPost.latitude.toStringAsFixed(4)}, ${currentPost.longitude.toStringAsFixed(4)}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -209,7 +257,7 @@ class SpotDetailsBottomSheet extends StatelessWidget {
                   const Icon(Icons.access_time, size: 16, color: Colors.grey),
                   const SizedBox(width: 8),
                   Text(
-                    post.createdAt.toString().substring(0, 16),
+                    currentPost.createdAt.toString().substring(0, 16),
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -225,7 +273,7 @@ class SpotDetailsBottomSheet extends StatelessWidget {
                   Expanded(
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.favorite),
-                      label: Text('${post.likes} Likes'),
+                      label: Text('${currentPost.likes} Likes'),
                       onPressed: () {},
                     ),
                   ),
@@ -247,6 +295,17 @@ class SpotDetailsBottomSheet extends StatelessWidget {
                   ),
                 ],
               ),
+              if (_isOwnPost) ...[
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Edit Post'),
+                  onPressed: _showEditDialog,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(40),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

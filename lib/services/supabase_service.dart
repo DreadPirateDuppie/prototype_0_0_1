@@ -202,6 +202,33 @@ class SupabaseService {
       // Silently fail
     }
   }
+
+  // Update a map post
+  static Future<MapPost?> updateMapPost({
+    required String postId,
+    required String title,
+    required String description,
+    String? photoUrl,
+  }) async {
+    try {
+      final updateData = {
+        'title': title,
+        'description': description,
+        if (photoUrl != null) 'photo_url': photoUrl,
+      };
+
+      final response = await _client
+          .from('map_posts')
+          .update(updateData)
+          .eq('id', postId)
+          .select()
+          .single();
+
+      return MapPost.fromMap(response);
+    } catch (e) {
+      throw Exception('Failed to update post: $e');
+    }
+  }
 }
 
 

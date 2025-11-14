@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
+import '../screens/edit_post_dialog.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -32,6 +33,19 @@ class _ProfileTabState extends State<ProfileTab> {
         _refreshPosts();
       });
     }
+  }
+
+  Future<void> _editPost(MapPost post) async {
+    showDialog(
+      context: context,
+      builder: (context) => EditPostDialog(
+        post: post,
+        onPostUpdated: () {
+          _refreshPosts();
+          setState(() {});
+        },
+      ),
+    );
   }
 
   @override
@@ -226,17 +240,33 @@ class _ProfileTabState extends State<ProfileTab> {
                                       '❤️ ${post.likes}',
                                       style: const TextStyle(fontSize: 12),
                                     ),
-                                    ElevatedButton.icon(
-                                      onPressed: () => _deletePost(post.id!),
-                                      icon: const Icon(Icons.delete, size: 16),
-                                      label: const Text('Delete'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
+                                    Row(
+                                      children: [
+                                        ElevatedButton.icon(
+                                          onPressed: () => _editPost(post),
+                                          icon: const Icon(Icons.edit, size: 16),
+                                          label: const Text('Edit'),
+                                          style: ElevatedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        const SizedBox(width: 8),
+                                        ElevatedButton.icon(
+                                          onPressed: () => _deletePost(post.id!),
+                                          icon: const Icon(Icons.delete, size: 16),
+                                          label: const Text('Delete'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
