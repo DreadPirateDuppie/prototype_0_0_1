@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
+import '../providers/theme_provider.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -10,7 +12,6 @@ class SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<SettingsTab> {
   bool _notificationsEnabled = true;
-  bool _darkModeEnabled = false;
 
   Future<void> _handleSignOut() async {
     try {
@@ -53,11 +54,9 @@ class _SettingsTabState extends State<SettingsTab> {
           SwitchListTile(
             title: const Text('Dark Mode'),
             subtitle: const Text('Enable dark theme'),
-            value: _darkModeEnabled,
+            value: context.watch<ThemeProvider>().isDarkMode,
             onChanged: (value) {
-              setState(() {
-                _darkModeEnabled = value;
-              });
+              context.read<ThemeProvider>().toggleDarkMode();
             },
           ),
           const Divider(),
