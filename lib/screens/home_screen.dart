@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -13,9 +13,11 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await SupabaseService.signOut();
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign out error: $error')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sign out error: $error')),
+        );
+      }
     }
   }
 

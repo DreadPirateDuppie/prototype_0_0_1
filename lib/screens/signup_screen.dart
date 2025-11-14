@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 
 class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({Key? key}) : super(key: key);
+  const SignUpScreen({super.key});
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -64,11 +64,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Sign Up')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
             TextField(
               controller: _emailController,
               decoration: const InputDecoration(
@@ -114,6 +115,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
