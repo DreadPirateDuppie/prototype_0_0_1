@@ -170,12 +170,39 @@ class _MapTabState extends State<MapTab> {
     });
   }
 
+  bool _isPinMode = false;
+
+  void _togglePinMode() {
+    setState(() {
+      _isPinMode = !_isPinMode;
+    });
+    if (_isPinMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tap on the map to place a pin'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _handleMapTap(LatLng location) {
+    if (_isPinMode) {
+      _showAddPostDialog(location);
+    }
+  }
+
   void _showAddPostDialog(LatLng location) {
     showDialog(
       context: context,
       builder: (context) => AddPostDialog(
         location: location,
-        onPostAdded: _loadUserPosts,
+        onPostAdded: () {
+          _loadUserPosts();
+          setState(() {
+            _isPinMode = false;
+          });
+        },
       ),
     );
   }
@@ -184,50 +211,25 @@ class _MapTabState extends State<MapTab> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        GestureDetector(
-          onLongPressStart: (details) {
-            // Get the map controller to convert screen coordinates to lat/lng
-            final mapBox = context.findRenderObject() as RenderBox?;
-            if (mapBox != null) {
-              final tapPosition = details.localPosition;
-              final mapSize = mapBox.size;
-              
-              // Get the visible bounds from the map
-              final bounds = mapController.camera.visibleBounds;
-              
-              // Simple conversion - calculate lat/lng from tap position
-              final mapCenter = mapController.camera.center;
-              final latPerPixel = (bounds.north - bounds.south) / mapSize.height;
-              final lngPerPixel = (bounds.east - bounds.west) / mapSize.width;
-              
-              final centerPixel = Offset(mapSize.width / 2, mapSize.height / 2);
-              final deltaPixels = tapPosition - centerPixel;
-              
-              final newLat = mapCenter.latitude - (deltaPixels.dy * latPerPixel);
-              final newLng = mapCenter.longitude + (deltaPixels.dx * lngPerPixel);
-              
-              _showAddPostDialog(LatLng(newLat, newLng));
-            }
-          },
-          child: FlutterMap(
-            mapController: mapController,
-            options: MapOptions(
-              initialCenter: currentLocation,
-              initialZoom: 13.0,
-              minZoom: 5.0,
-              maxZoom: 18.0,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.prototype_0_0_1',
-                maxZoom: 19,
-              ),
-              MarkerLayer(
-                markers: markers,
-              ),
-            ],
+        FlutterMap(
+          mapController: mapController,
+          options: MapOptions(
+            initialCenter: currentLocation,
+            initialZoom: 13.0,
+            minZoom: 5.0,
+            maxZoom: 18.0,
+            onTap: (tapPosition, point) => _handleMapTap(point),
           ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.prototype_0_0_1',
+              maxZoom: 19,
+            ),
+            MarkerLayer(
+              markers: markers,
+            ),
+          ],
         ),
         if (_isLoading)
           Center(
@@ -240,6 +242,15 @@ class _MapTabState extends State<MapTab> {
               child: const CircularProgressIndicator(),
             ),
           ),
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: FloatingActionButton(
+            onPressed: _togglePinMode,
+            backgroundColor: _isPinMode ? Colors.red : Colors.deepPurple,
+            child: Icon(_isPinMode ? Icons.close : Icons.location_on),
+          ),
+        ),
       ],
     );
   }
