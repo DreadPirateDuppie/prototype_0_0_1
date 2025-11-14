@@ -10,6 +10,7 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
+  final _displayNameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
@@ -18,6 +19,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   void dispose() {
     _emailController.dispose();
+    _displayNameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -40,6 +42,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       await SupabaseService.signUp(
         _emailController.text,
         _passwordController.text,
+        displayName: _displayNameController.text,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -77,6 +80,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _displayNameController,
+              decoration: const InputDecoration(
+                labelText: 'Display Name',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(

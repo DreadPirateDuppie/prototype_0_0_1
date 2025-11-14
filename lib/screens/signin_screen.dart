@@ -46,6 +46,29 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await SupabaseService.signInWithGoogle();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = error.toString();
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,6 +111,16 @@ class _SignInScreenState extends State<SignInScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Text('Sign In'),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _isLoading ? null : _signInWithGoogle,
+              icon: const Icon(Icons.account_circle),
+              label: const Text('Sign in with Google'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black87,
+              ),
             ),
             const SizedBox(height: 16),
             TextButton(

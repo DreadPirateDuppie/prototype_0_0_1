@@ -9,6 +9,28 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  String? _displayName;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDisplayName();
+  }
+
+  Future<void> _loadDisplayName() async {
+    final user = SupabaseService.getCurrentUser();
+    if (user != null) {
+      final displayName = await SupabaseService.getUserDisplayName(user.id);
+      if (mounted) {
+        setState(() {
+          _displayName = displayName;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _signOut() async {
     try {
       await SupabaseService.signOut();
@@ -46,15 +68,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              Text(
-                'You are signed in as:',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                user?.email ?? 'Unknown',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              if (_isLoading)
+                const CircularProgressIndicator()
+              else ...[
+                if (_displayName != null) ...[
+                  Text(
+                    _displayName!,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Text(
+                  'You are signed in as:',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  user?.email ?? 'Unknown',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: _signOut,
