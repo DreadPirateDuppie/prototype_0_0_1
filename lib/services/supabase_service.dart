@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import '../models/post.dart';
+import '../models/user_points.dart';
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -227,6 +228,56 @@ class SupabaseService {
       return MapPost.fromMap(response);
     } catch (e) {
       throw Exception('Failed to update post: $e');
+    }
+  }
+
+  // Get user points
+  static Future<UserPoints> getUserPoints(String userId) async {
+    try {
+      final response = await _client
+          .from('user_points')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (response == null) {
+        // Create initial points record if it doesn't exist
+        final newPoints = UserPoints(userId: userId, points: 0);
+        await _client.from('user_points').insert(newPoints.toMap());
+        return newPoints;
+      }
+
+      return UserPoints.fromMap(response);
+    } catch (e) {
+      // Return default points if table doesn't exist
+      return UserPoints(userId: userId, points: 0);
+    }
+  }
+
+  // Update user points after wheel spin
+  static Future<UserPoints> updatePointsAfterSpin(
+    String userId,
+    int pointsToAdd,
+  ) async {
+    try {
+      final currentPoints = await getUserPoints(userId);
+      final newPoints = currentPoints.points + pointsToAdd;
+      
+      final updateData = {
+        'user_id': userId,
+        'points': newPoints,
+        'last_spin_date': DateTime.now().toIso8601String(),
+      };
+
+      await _client.from('user_points').upsert(updateData);
+
+      return UserPoints(
+        userId: userId,
+        points: newPoints,
+        lastSpinDate: DateTime.now(),
+      );
+    } catch (e) {
+      throw Exception('Failed to update points: $e');
     }
   }
 }
