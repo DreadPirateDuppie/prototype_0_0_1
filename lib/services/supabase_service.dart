@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
 import '../models/post.dart';
 
 class SupabaseService {
@@ -94,6 +95,28 @@ class SupabaseService {
     return _client.auth.onAuthStateChange;
   }
 
+  // Upload post image to Supabase storage
+  static Future<String> uploadPostImage(File imageFile, String userId) async {
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filename = 'post_${userId}_$timestamp.jpg';
+      
+      final bytes = await imageFile.readAsBytes();
+      await _client.storage.from('post_images').uploadBinary(
+        filename,
+        bytes,
+        fileOptions: const FileOptions(contentType: 'image/jpeg'),
+      );
+
+      final publicUrl = _client.storage
+          .from('post_images')
+          .getPublicUrl(filename);
+      return publicUrl;
+    } catch (e) {
+      throw Exception('Failed to upload image: $e');
+    }
+  }
+
   // Create a map post
   static Future<MapPost?> createMapPost({
     required String userId,
@@ -101,6 +124,7 @@ class SupabaseService {
     required double longitude,
     required String title,
     required String description,
+    String? photoUrl,
   }) async {
     try {
       final response = await _client.from('map_posts').insert({
@@ -111,12 +135,12 @@ class SupabaseService {
         'description': description,
         'created_at': DateTime.now().toIso8601String(),
         'likes': 0,
+        'photo_url': photoUrl,
       }).select().single();
 
       return MapPost.fromMap(response);
     } catch (e) {
-      // Table may not exist yet
-      return null;
+      throw Exception('Failed to create post: $e');
     }
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../services/supabase_service.dart';
 
 class AddPostDialog extends StatefulWidget {
@@ -20,12 +22,31 @@ class _AddPostDialogState extends State<AddPostDialog> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   bool _isLoading = false;
+  File? _selectedImage;
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _createPost() async {
@@ -43,12 +64,21 @@ class _AddPostDialogState extends State<AddPostDialog> {
     try {
       final user = SupabaseService.getCurrentUser();
       if (user != null) {
+        String? photoUrl;
+        if (_selectedImage != null) {
+          photoUrl = await SupabaseService.uploadPostImage(
+            _selectedImage!,
+            user.id,
+          );
+        }
+
         await SupabaseService.createMapPost(
           userId: user.id,
           latitude: widget.location.latitude,
           longitude: widget.location.longitude,
           title: _titleController.text,
           description: _descriptionController.text,
+          photoUrl: photoUrl,
         );
 
         if (mounted) {
@@ -103,6 +133,24 @@ class _AddPostDialogState extends State<AddPostDialog> {
               ),
               maxLines: 3,
               enabled: !_isLoading,
+            ),
+            const SizedBox(height: 12),
+            if (_selectedImage != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  _selectedImage!,
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            ElevatedButton.icon(
+              onPressed: _isLoading ? null : _pickImage,
+              icon: const Icon(Icons.image),
+              label: Text(_selectedImage != null ? 'Change Photo' : 'Add Photo'),
             ),
           ],
         ),
