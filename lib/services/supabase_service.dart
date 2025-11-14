@@ -23,7 +23,7 @@ class SupabaseService {
           .maybeSingle();
       return response?['display_name'];
     } catch (e) {
-      print('⚠ Display name fetch error (table may not exist): $e');
+      // Silently fail - table may not exist yet
       return null;
     }
   }
@@ -39,7 +39,6 @@ class SupabaseService {
         'display_name': displayName,
       });
     } catch (e) {
-      print('⚠ Display name save error (table may not exist): $e');
       // Silently fail - table may not exist yet
     }
   }
@@ -69,10 +68,8 @@ class SupabaseService {
         email: email,
         password: password,
       );
-      print('✓ Sign in successful: ${response.user?.email}');
       return response;
     } catch (e) {
-      print('✗ Sign in error: $e');
       rethrow;
     }
   }
