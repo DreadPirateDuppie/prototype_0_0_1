@@ -1,6 +1,8 @@
 class MapPost {
   final String? id;
   final String userId;
+  final String? userName;
+  final String? userEmail;
   final double latitude;
   final double longitude;
   final String title;
@@ -15,6 +17,8 @@ class MapPost {
   MapPost({
     this.id,
     required this.userId,
+    this.userName,
+    this.userEmail,
     required this.latitude,
     required this.longitude,
     required this.title,
@@ -30,6 +34,8 @@ class MapPost {
   Map<String, dynamic> toMap() {
     return {
       'user_id': userId,
+      'user_name': userName,
+      'user_email': userEmail,
       'latitude': latitude,
       'longitude': longitude,
       'title': title,
@@ -47,6 +53,8 @@ class MapPost {
     return MapPost(
       id: map['id'] as String?,
       userId: map['user_id'] as String,
+      userName: map['user_name'] as String?,
+      userEmail: map['user_email'] as String?,
       latitude: map['latitude'] as double,
       longitude: map['longitude'] as double,
       title: map['title'] as String,

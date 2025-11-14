@@ -125,10 +125,14 @@ class SupabaseService {
     required String title,
     required String description,
     String? photoUrl,
+    String? userName,
+    String? userEmail,
   }) async {
     try {
       final response = await _client.from('map_posts').insert({
         'user_id': userId,
+        'user_name': userName,
+        'user_email': userEmail,
         'latitude': latitude,
         'longitude': longitude,
         'title': title,

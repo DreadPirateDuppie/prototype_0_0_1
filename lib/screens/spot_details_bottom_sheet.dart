@@ -59,6 +59,53 @@ class SpotDetailsBottomSheet extends StatelessWidget {
                 ),
               ),
 
+              // User info
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Colors.deepPurple,
+                    child: Text(
+                      (post.userName?.isNotEmpty ?? false)
+                          ? post.userName![0].toUpperCase()
+                          : (post.userEmail?.isNotEmpty ?? false)
+                              ? post.userEmail![0].toUpperCase()
+                              : '?',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.userName ?? 'Unknown User',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (post.userEmail != null)
+                          Text(
+                            post.userEmail!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
               // Title
               Text(
                 post.title,

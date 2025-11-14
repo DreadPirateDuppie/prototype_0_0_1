@@ -133,6 +133,52 @@ class _ProfileTabState extends State<ProfileTab> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // User info header
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: Colors.deepPurple,
+                                      child: Text(
+                                        (post.userName?.isNotEmpty ?? false)
+                                            ? post.userName![0].toUpperCase()
+                                            : (post.userEmail?.isNotEmpty ?? false)
+                                                ? post.userEmail![0].toUpperCase()
+                                                : '?',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            post.userName ?? 'Unknown User',
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          if (post.userEmail != null)
+                                            Text(
+                                              post.userEmail!,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.grey[600],
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
                                 if (post.photoUrl != null) ...[
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(8),

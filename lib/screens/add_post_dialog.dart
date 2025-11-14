@@ -74,6 +74,8 @@ class _AddPostDialogState extends State<AddPostDialog> {
 
         await SupabaseService.createMapPost(
           userId: user.id,
+          userName: user.userMetadata?['display_name'] as String?,
+          userEmail: user.email,
           latitude: widget.location.latitude,
           longitude: widget.location.longitude,
           title: _titleController.text,
