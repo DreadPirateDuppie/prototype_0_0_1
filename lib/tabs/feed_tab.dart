@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
+import '../widgets/star_rating_display.dart';
 
 class FeedTab extends StatefulWidget {
   const FeedTab({super.key});
@@ -151,6 +152,12 @@ class _FeedTabState extends State<FeedTab> {
                               Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Colors.grey,
                                   ),
+                        ),
+                        const SizedBox(height: 12),
+                        StarRatingDisplay(
+                          popularityRating: post.popularityRating,
+                          securityRating: post.securityRating,
+                          qualityRating: post.qualityRating,
                         ),
                         const SizedBox(height: 12),
                         Row(

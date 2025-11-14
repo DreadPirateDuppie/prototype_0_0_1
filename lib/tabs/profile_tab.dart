@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/edit_post_dialog.dart';
+import '../widgets/star_rating_display.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -216,6 +217,12 @@ class _ProfileTabState extends State<ProfileTab> {
                                 Text(
                                   '${post.latitude.toStringAsFixed(4)}, ${post.longitude.toStringAsFixed(4)}',
                                   style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                const SizedBox(height: 8),
+                                StarRatingDisplay(
+                                  popularityRating: post.popularityRating,
+                                  securityRating: post.securityRating,
+                                  qualityRating: post.qualityRating,
                                 ),
                                 const SizedBox(height: 8),
                                 Row(
