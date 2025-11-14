@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/post.dart';
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -91,6 +92,87 @@ class SupabaseService {
   // Listen to auth state changes
   static Stream<AuthState> authStateChanges() {
     return _client.auth.onAuthStateChange;
+  }
+
+  // Create a map post
+  static Future<MapPost?> createMapPost({
+    required String userId,
+    required double latitude,
+    required double longitude,
+    required String title,
+    required String description,
+  }) async {
+    try {
+      final response = await _client.from('map_posts').insert({
+        'user_id': userId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'title': title,
+        'description': description,
+        'created_at': DateTime.now().toIso8601String(),
+        'likes': 0,
+      }).select().single();
+
+      return MapPost.fromMap(response);
+    } catch (e) {
+      // Table may not exist yet
+      return null;
+    }
+  }
+
+  // Get all map posts
+  static Future<List<MapPost>> getAllMapPosts() async {
+    try {
+      final response = await _client
+          .from('map_posts')
+          .select()
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((post) => MapPost.fromMap(post))
+          .toList();
+    } catch (e) {
+      // Table may not exist yet
+      return [];
+    }
+  }
+
+  // Get user's map posts
+  static Future<List<MapPost>> getUserMapPosts(String userId) async {
+    try {
+      final response = await _client
+          .from('map_posts')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((post) => MapPost.fromMap(post))
+          .toList();
+    } catch (e) {
+      // Table may not exist yet
+      return [];
+    }
+  }
+
+  // Delete a map post
+  static Future<void> deleteMapPost(String postId) async {
+    try {
+      await _client.from('map_posts').delete().eq('id', postId);
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
+  // Like a post
+  static Future<void> likeMapPost(String postId, int currentLikes) async {
+    try {
+      await _client
+          .from('map_posts')
+          .update({'likes': currentLikes + 1}).eq('id', postId);
+    } catch (e) {
+      // Silently fail
+    }
   }
 }
 
