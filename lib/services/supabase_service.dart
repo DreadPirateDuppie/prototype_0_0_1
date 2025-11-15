@@ -231,6 +231,18 @@ class SupabaseService {
     }
   }
 
+  // Update post user name (when display name changes)
+  static Future<void> updatePostUserName(String userId, String userName) async {
+    try {
+      await _client
+          .from('map_posts')
+          .update({'user_name': userName})
+          .eq('user_id', userId);
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
   // Get user points
   static Future<UserPoints> getUserPoints(String userId) async {
     try {

@@ -55,11 +55,20 @@ class _ProfileTabState extends State<ProfileTab> {
   Future<void> _saveDisplayName() async {
     final user = SupabaseService.getCurrentUser();
     if (user != null && _nameController.text.trim().isNotEmpty) {
-      await SupabaseService.saveUserDisplayName(user.id, _nameController.text.trim());
+      final newDisplayName = _nameController.text.trim();
+      await SupabaseService.saveUserDisplayName(user.id, newDisplayName);
+
+      // Update all posts by this user to reflect the new display name
+      await SupabaseService.updatePostUserName(user.id, newDisplayName);
+
       setState(() {
-        _displayName = _nameController.text.trim();
+        _displayName = newDisplayName;
         _isEditingName = false;
       });
+
+      // Refresh posts to show updated display name
+      _refreshPosts();
+      setState(() {});
     }
   }
 

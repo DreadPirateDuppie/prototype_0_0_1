@@ -72,9 +72,12 @@ class _AddPostDialogState extends State<AddPostDialog> {
           );
         }
 
+        // Get the display name from the user_profiles table
+        final displayName = await SupabaseService.getUserDisplayName(user.id);
+
         await SupabaseService.createMapPost(
           userId: user.id,
-          userName: user.userMetadata?['display_name'] as String?,
+          userName: displayName,
           userEmail: user.email,
           latitude: widget.location.latitude,
           longitude: widget.location.longitude,
