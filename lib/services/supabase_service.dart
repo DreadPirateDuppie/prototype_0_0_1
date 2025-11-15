@@ -30,6 +30,54 @@ class SupabaseService {
     }
   }
 
+  // Get current user display name with fallback
+  static Future<String?> getCurrentUserDisplayName() async {
+    final user = getCurrentUser();
+    if (user == null) return null;
+    
+    // Try to get from user metadata first
+    var displayName = user.userMetadata?['display_name'] as String?;
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+    
+    // Try to get from user_profiles table
+    displayName = await getUserDisplayName(user.id);
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+    
+    // Fallback to email prefix
+    return user.email?.split('@').first ?? 'User';
+  }
+
+  // Get user username
+  static Future<String?> getUserUsername(String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('username')
+          .eq('id', userId)
+          .maybeSingle();
+      return response?['username'];
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Check if username is available
+  static Future<bool> isUsernameAvailable(String username) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('id')
+          .eq('username', username);
+      return (response as List).isEmpty;
+    } catch (e) {
+      return true; // Assume available if query fails
+    }
+  }
+
   // Save user display name
   static Future<void> saveUserDisplayName(
     String userId,
@@ -42,6 +90,21 @@ class SupabaseService {
       });
     } catch (e) {
       // Silently fail - table may not exist yet
+    }
+  }
+
+  // Save user username (with uniqueness constraint)
+  static Future<void> saveUserUsername(
+    String userId,
+    String username,
+  ) async {
+    try {
+      await _client.from('user_profiles').upsert({
+        'id': userId,
+        'username': username.toLowerCase().trim(),
+      });
+    } catch (e) {
+      throw Exception('Failed to save username: $e');
     }
   }
 

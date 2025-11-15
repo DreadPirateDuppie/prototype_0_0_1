@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/edit_post_dialog.dart';
+import '../screens/edit_username_dialog.dart';
 import '../widgets/star_rating_display.dart';
 import '../widgets/ad_banner.dart';
 
@@ -14,11 +15,13 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   late Future<List<MapPost>> _userPostsFuture;
+  late Future<String?> _usernameFuture;
 
   @override
   void initState() {
     super.initState();
     _refreshPosts();
+    _refreshUsername();
   }
 
   void _refreshPosts() {
@@ -26,6 +29,27 @@ class _ProfileTabState extends State<ProfileTab> {
     if (user != null) {
       _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
     }
+  }
+
+  void _refreshUsername() {
+    final user = SupabaseService.getCurrentUser();
+    if (user != null) {
+      _usernameFuture = SupabaseService.getUserUsername(user.id);
+    }
+  }
+
+  void _editUsername(String currentUsername) {
+    showDialog(
+      context: context,
+      builder: (context) => EditUsernameDialog(
+        currentUsername: currentUsername,
+        onUsernameSaved: (newUsername) {
+          setState(() {
+            _refreshUsername();
+          });
+        },
+      ),
+    );
   }
 
   Future<void> _deletePost(String postId) async {
@@ -91,6 +115,46 @@ class _ProfileTabState extends State<ProfileTab> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Username',
+                                    style: Theme.of(context).textTheme.labelLarge,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, size: 18),
+                                    onPressed: () {
+                                      _usernameFuture.then((username) {
+                                        _editUsername(username ?? '');
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              FutureBuilder<String?>(
+                                future: _usernameFuture,
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    );
+                                  }
+                                  final username = snapshot.data ?? 'Not set';
+                                  return Text(
+                                    username,
+                                    style:
+                                        Theme.of(context).textTheme.bodyMedium,
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 16),
                               Text(
                                 'Email',
                                 style: Theme.of(context).textTheme.labelLarge,
