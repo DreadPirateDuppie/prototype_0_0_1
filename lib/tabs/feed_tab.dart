@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../widgets/star_rating_display.dart';
-import '../widgets/ad_banner.dart';
 
 class FeedTab extends StatefulWidget {
   const FeedTab({super.key});
@@ -33,11 +32,7 @@ class _FeedTabState extends State<FeedTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Feed')),
-      body: Column(
-        children: [
-          const AdBanner(),
-          Expanded(
-            child: FutureBuilder<List<MapPost>>(
+      body: FutureBuilder<List<MapPost>>(
               future: _allPostsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -192,8 +187,8 @@ class _FeedTabState extends State<FeedTab> {
                 );
               },
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

@@ -292,6 +292,62 @@ class SupabaseService {
       throw Exception('Failed to update post: $e');
     }
   }
+
+  // Rate a map post
+  static Future<void> rateMapPost({
+    required String postId,
+    required double popularityRating,
+    required double securityRating,
+    required double qualityRating,
+  }) async {
+    try {
+      await _client
+          .from('map_posts')
+          .update({
+            'popularity_rating': popularityRating,
+            'security_rating': securityRating,
+            'quality_rating': qualityRating,
+          })
+          .eq('id', postId);
+    } catch (e) {
+      throw Exception('Failed to rate post: $e');
+    }
+  }
+
+  // Report a post for moderation
+  static Future<void> reportPost({
+    required String postId,
+    required String reason,
+    String? details,
+  }) async {
+    try {
+      final user = getCurrentUser();
+      await _client.from('post_reports').insert({
+        'post_id': postId,
+        'reporter_user_id': user?.id,
+        'reason': reason,
+        'details': details,
+        'status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      throw Exception('Failed to report post: $e');
+    }
+  }
+
+  // Get all reported posts (for admin dashboard)
+  static Future<List<Map<String, dynamic>>> getReportedPosts() async {
+    try {
+      final response = await _client
+          .from('post_reports')
+          .select('*, map_posts(*)')
+          .order('created_at', ascending: false);
+
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      return [];
+    }
+  }
 }
 
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/post.dart';
 import '../screens/edit_post_dialog.dart';
+import '../screens/rate_post_dialog.dart';
 import '../services/supabase_service.dart';
 
 class SpotDetailsBottomSheet extends StatefulWidget {
@@ -21,25 +22,11 @@ class SpotDetailsBottomSheet extends StatefulWidget {
 
 class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
   late MapPost currentPost;
-  bool _hasUserLiked = false;
-  Map<String, int>? _userRating;
 
   @override
   void initState() {
     super.initState();
     currentPost = widget.post;
-    _loadUserInteractionData();
-  }
-
-  Future<void> _loadUserInteractionData() async {
-    final hasLiked = await SupabaseService.hasUserLikedPost(currentPost.id!);
-    final userRating = await SupabaseService.getUserRatingForPost(currentPost.id!);
-    if (mounted) {
-      setState(() {
-        _hasUserLiked = hasLiked;
-        _userRating = userRating;
-      });
-    }
   }
 
   bool get _isOwnPost {
@@ -50,7 +37,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
   void _showEditDialog() {
     showDialog(
       context: context,
-      builder: (dialogContext) => EditPostDialog(
+      builder: (context) => EditPostDialog(
         post: currentPost,
         onPostUpdated: () async {
           // Refresh the post data
@@ -60,15 +47,11 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
               (p) => p.id == currentPost.id,
               orElse: () => currentPost,
             );
-            if (mounted) {
-              setState(() {
-                currentPost = updated;
-              });
-              widget.onPostUpdated?.call();
-              if (dialogContext.mounted) {
-                Navigator.of(dialogContext).pop();
-              }
-            }
+            setState(() {
+              currentPost = updated;
+            });
+            widget.onPostUpdated?.call();
+            Navigator.of(context).pop();
           } catch (e) {
             // Silently fail
           }
@@ -77,141 +60,84 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
     );
   }
 
-  Future<void> _toggleLike() async {
-    final liked = await SupabaseService.likeMapPost(currentPost.id!);
-    if (mounted) {
-      setState(() {
-        _hasUserLiked = liked;
-      });
-      // Refresh post data to get updated like count
-      try {
-        final updatedPosts = await SupabaseService.getAllMapPosts();
-        final updated = updatedPosts.firstWhere(
-          (p) => p.id == currentPost.id,
-          orElse: () => currentPost,
-        );
-        if (mounted) {
-          setState(() {
-            currentPost = updated;
-          });
-          widget.onPostUpdated?.call();
-        }
-      } catch (e) {
-        // Silently fail
-      }
-    }
-  }
-
-  void _showRatingDialog() {
-    int popularityRating = _userRating?['popularity'] ?? 3;
-    int securityRating = _userRating?['security'] ?? 3;
-    int qualityRating = _userRating?['quality'] ?? 3;
+  void _showReportDialog() {
+    final reasonController = TextEditingController();
+    final detailsController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (statefulContext, setState) => AlertDialog(
-          title: const Text('Rate this Spot'),
-          content: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.6,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildRatingRow('Rating', popularityRating, (value) {
-                    setState(() => popularityRating = value);
-                  }),
-                  const SizedBox(height: 16),
-                  _buildRatingRow('Security', securityRating, (value) {
-                    setState(() => securityRating = value);
-                  }),
-                  const SizedBox(height: 16),
-                  _buildRatingRow('Quality', qualityRating, (value) {
-                    setState(() => qualityRating = value);
-                  }),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                await SupabaseService.rateMapPost(
-                  postId: currentPost.id!,
-                  popularityRating: popularityRating,
-                  securityRating: securityRating,
-                  qualityRating: qualityRating,
-                );
-                if (mounted) {
-                  await _loadUserInteractionData();
-                  // Refresh post data to get updated ratings
-                  try {
-                    final updatedPosts = await SupabaseService.getAllMapPosts();
-                    final updated = updatedPosts.firstWhere(
-                      (p) => p.id == currentPost.id,
-                      orElse: () => currentPost,
-                    );
-                    if (mounted) {
-                      setState(() {
-                        currentPost = updated;
-                      });
-                      widget.onPostUpdated?.call();
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
-                      }
-                    }
-                  } catch (e) {
-                    // Silently fail
-                    if (dialogContext.mounted) {
-                      Navigator.of(dialogContext).pop();
-                    }
-                  }
-                }
-              },
-              child: const Text('Submit Rating'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRatingRow(String label, int currentRating, Function(int) onChanged) {
-    return Row(
-      children: [
-        Expanded(
-          flex: 2,
-          child: Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
-        ),
-        Expanded(
-          flex: 3,
-          child: Row(
+      builder: (context) => AlertDialog(
+        title: const Text('Report Post'),
+        content: SingleChildScrollView(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: List.generate(5, (index) {
-              return IconButton(
-                icon: Icon(
-                  index < currentRating ? Icons.star : Icons.star_border,
-                  color: Colors.amber,
-                  size: 24,
+            children: [
+              const Text('Why are you reporting this post?'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Reason',
+                  hintText: 'e.g., Inappropriate content',
+                  border: OutlineInputBorder(),
                 ),
-                onPressed: () => onChanged(index + 1),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              );
-            }),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: detailsController,
+                decoration: const InputDecoration(
+                  labelText: 'Additional Details (Optional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
           ),
         ),
-        Expanded(
-          flex: 1,
-          child: Text('$currentRating/5'),
-        ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please provide a reason')),
+                );
+                return;
+              }
+
+              try {
+                await SupabaseService.reportPost(
+                  postId: currentPost.id!,
+                  reason: reasonController.text.trim(),
+                  details: detailsController.text.trim().isEmpty
+                      ? null
+                      : detailsController.text.trim(),
+                );
+
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Report submitted successfully'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Submit Report'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -359,7 +285,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                       children: [
                         _buildStarRating(
                           currentPost.popularityRating,
-                          'Rating',
+                          'Popularity',
                         ),
                         _buildStarRating(
                           currentPost.securityRating,
@@ -414,28 +340,65 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      icon: Icon(
-                        Icons.favorite,
-                        color: _hasUserLiked ? Colors.red : null,
-                      ),
-                      label: Text('${currentPost.likes} Likes'),
-                      onPressed: _toggleLike,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
                       icon: const Icon(Icons.star),
                       label: const Text('Rate'),
-                      onPressed: _showRatingDialog,
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => RatePostDialog(
+                            post: currentPost,
+                            onRated: () async {
+                              // Refresh post data
+                              try {
+                                final updatedPosts = await SupabaseService.getAllMapPosts();
+                                final updated = updatedPosts.firstWhere(
+                                  (p) => p.id == currentPost.id,
+                                  orElse: () => currentPost,
+                                );
+                                setState(() {
+                                  currentPost = updated;
+                                });
+                                widget.onPostUpdated?.call();
+                              } catch (e) {
+                                // Silently fail
+                              }
+                            },
+                          ),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
-                      icon: const Icon(Icons.share),
-                      label: const Text('Share'),
-                      onPressed: () {},
+                      icon: const Icon(Icons.flag),
+                      label: const Text('Report'),
+                      onPressed: () {
+                        _showReportDialog();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.favorite),
+                      label: Text('${currentPost.likes}'),
+                      onPressed: () async {
+                        await SupabaseService.likeMapPost(currentPost.id!, currentPost.likes);
+                        // Refresh post data
+                        try {
+                          final updatedPosts = await SupabaseService.getAllMapPosts();
+                          final updated = updatedPosts.firstWhere(
+                            (p) => p.id == currentPost.id,
+                            orElse: () => currentPost,
+                          );
+                          setState(() {
+                            currentPost = updated;
+                          });
+                        } catch (e) {
+                          // Silently fail
+                        }
+                      },
                     ),
                   ),
                 ],

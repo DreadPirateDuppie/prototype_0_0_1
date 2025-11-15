@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/supabase_service.dart';
+import '../services/image_service.dart';
 
 class AddPostDialog extends StatefulWidget {
   final LatLng location;
@@ -36,9 +37,28 @@ class _AddPostDialogState extends State<AddPostDialog> {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
+        // Show loading indicator
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Compressing image...')),
+          );
+        }
+
+        // Compress the image
+        final compressedImage = await ImageService.compressImage(File(image.path));
+        
+        if (compressedImage != null) {
+          setState(() {
+            _selectedImage = compressedImage;
+          });
+          
+          if (mounted) {
+            final sizeMB = await ImageService.getFileSizeMB(compressedImage);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Image ready (${sizeMB.toStringAsFixed(2)} MB)')),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -50,9 +70,19 @@ class _AddPostDialogState extends State<AddPostDialog> {
   }
 
   Future<void> _createPost() async {
-    if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
+    if (_titleController.text.trim().isEmpty || _descriptionController.text.trim().isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Missing Information'),
+          content: const Text('Please fill in both title and description fields.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
       );
       return;
     }

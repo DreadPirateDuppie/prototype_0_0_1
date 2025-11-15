@@ -4,7 +4,6 @@ import '../models/post.dart';
 import '../screens/edit_post_dialog.dart';
 import '../screens/edit_username_dialog.dart';
 import '../widgets/star_rating_display.dart';
-import '../widgets/ad_banner.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -80,11 +79,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
-      body: Column(
-        children: [
-          const AdBanner(),
-          Expanded(
-            child: SingleChildScrollView(
+      body: SingleChildScrollView(
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -346,8 +341,6 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
           ),
-        ],
-      ),
     );
   }
 }

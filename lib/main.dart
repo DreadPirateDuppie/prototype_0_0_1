@@ -3,13 +3,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'screens/signin_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/admin_dashboard_screen.dart';
-import 'services/supabase_service.dart';
 import 'providers/theme_provider.dart';
-import 'providers/error_provider.dart';
+import 'services/error_service.dart';
+import 'services/connectivity_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize error tracking
+  ErrorService.initialize();
 
   // Initialize Supabase with your project URL and anon key
   // Replace these with your actual Supabase credentials
@@ -18,12 +20,12 @@ Future<void> main() async {
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY2RlZG5ieWpka3lqeXN2Y3RtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMzI3NDUsImV4cCI6MjA3ODcwODc0NX0.A9y5TFwhUMKrpiYpQJr_VYfVyyHRH5lpiHLG30Yv4s8',
   );
 
+  // Initialize connectivity monitoring
+  await ConnectivityService.initialize();
+
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => ErrorProvider()),
-      ],
+    ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
       child: const MyApp(),
     ),
   );
@@ -34,47 +36,14 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<ThemeProvider, ErrorProvider>(
-      builder: (context, themeProvider, errorProvider, child) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
         return MaterialApp(
           title: 'Supabase Auth App',
           theme: themeProvider.getLightTheme(),
           darkTheme: themeProvider.getDarkTheme(),
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-          home: Stack(
-            children: [
-              const AuthWrapper(),
-              if (errorProvider.isVisible)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Material(
-                    elevation: 8.0,
-                    child: Container(
-                      color: Colors.red,
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.error, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              errorProvider.errorMessage ?? '',
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.white),
-                            onPressed: errorProvider.hideError,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          home: const AuthWrapper(),
         );
       },
     );
@@ -82,28 +51,8 @@ class MyApp extends StatelessWidget {
 }
 
 // AuthWrapper handles routing based on user authentication state
-class AuthWrapper extends StatefulWidget {
+class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
-
-  @override
-  State<AuthWrapper> createState() => _AuthWrapperState();
-}
-
-class _AuthWrapperState extends State<AuthWrapper> {
-  bool? _isAdmin;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkAdminStatus();
-  }
-
-  Future<void> _checkAdminStatus() async {
-    final isAdmin = await SupabaseService.isCurrentUserAdmin();
-    if (mounted) {
-      setState(() => _isAdmin = isAdmin);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +60,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
         // Check connection state
-        if (snapshot.connectionState == ConnectionState.waiting || _isAdmin == null) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
@@ -121,7 +70,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         final session = snapshot.data?.session;
 
         if (session != null) {
-          // User is signed in - go to home screen (map)
+          // User is signed in
           return const HomeScreen();
         } else {
           // User is not signed in

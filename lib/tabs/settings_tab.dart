@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
-import '../providers/error_provider.dart';
-import '../screens/admin_dashboard_screen.dart';
+import '../screens/admin_dashboard.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -15,27 +14,16 @@ class SettingsTab extends StatefulWidget {
 class _SettingsTabState extends State<SettingsTab> {
   bool _notificationsEnabled = true;
 
-  @override
-  void initState() {
-    super.initState();
-  }
-
   Future<void> _handleSignOut() async {
     try {
       await SupabaseService.signOut();
     } catch (error) {
       if (mounted) {
-        context.read<ErrorProvider>().showError('Sign out error: $error');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sign out error: $error')),
+        );
       }
     }
-  }
-
-  void _navigateToAdminDashboard() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const AdminDashboardScreen(),
-      ),
-    );
   }
 
   @override
@@ -76,29 +64,6 @@ class _SettingsTabState extends State<SettingsTab> {
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(
-              'Administration',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: ElevatedButton.icon(
-              onPressed: _navigateToAdminDashboard,
-              icon: const Icon(Icons.admin_panel_settings),
-              label: const Text('Admin Tools'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ),
-          const Divider(),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
               'Account',
               style: TextStyle(
                 fontSize: 18,
@@ -120,6 +85,31 @@ class _SettingsTabState extends State<SettingsTab> {
             leading: const Icon(Icons.info),
             title: const Text('About'),
             onTap: () {},
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Administration',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.admin_panel_settings),
+            title: const Text('Admin Dashboard'),
+            subtitle: const Text('Content moderation'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AdminDashboard(),
+                ),
+              );
+            },
           ),
           const Divider(),
           Padding(
