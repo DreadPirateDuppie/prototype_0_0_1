@@ -46,11 +46,13 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
               (p) => p.id == currentPost.id,
               orElse: () => currentPost,
             );
-            setState(() {
-              currentPost = updated;
-            });
-            widget.onPostUpdated?.call();
-            Navigator.of(context).pop();
+            if (mounted) {
+              setState(() {
+                currentPost = updated;
+              });
+              widget.onPostUpdated?.call();
+              Navigator.of(context).pop();
+            }
           } catch (e) {
             // Silently fail
           }
