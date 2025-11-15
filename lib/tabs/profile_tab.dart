@@ -52,11 +52,36 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Future<void> _deletePost(String postId) async {
-    await SupabaseService.deleteMapPost(postId);
-    if (mounted) {
-      setState(() {
-        _refreshPosts();
-      });
+    // Show confirmation dialog before deleting
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Post?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      await SupabaseService.deleteMapPost(postId);
+      if (mounted) {
+        setState(() {
+          _refreshPosts();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post deleted successfully')),
+        );
+      }
     }
   }
 
@@ -79,11 +104,19 @@ class _ProfileTabState extends State<ProfileTab> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
-      body: SingleChildScrollView(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          setState(() {
+            _refreshPosts();
+            _refreshUsername();
+          });
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
                     children: [
                       const SizedBox(height: 24),
                       CircleAvatar(
@@ -341,6 +374,8 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
           ),
+        ),
+      ),
     );
   }
 }
