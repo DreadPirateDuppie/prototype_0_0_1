@@ -23,6 +23,9 @@ class _AddPostDialogState extends State<AddPostDialog> {
   final _descriptionController = TextEditingController();
   bool _isLoading = false;
   File? _selectedImage;
+  int _popularityRating = 3;
+  int _securityRating = 3;
+  int _qualityRating = 3;
 
   @override
   void dispose() {
@@ -75,7 +78,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
         // Get the display name from the user_profiles table
         final displayName = await SupabaseService.getUserDisplayName(user.id);
 
-        await SupabaseService.createMapPost(
+        final post = await SupabaseService.createMapPost(
           userId: user.id,
           userName: displayName,
           userEmail: user.email,
@@ -85,6 +88,16 @@ class _AddPostDialogState extends State<AddPostDialog> {
           description: _descriptionController.text,
           photoUrl: photoUrl,
         );
+
+        // Add initial rating for the post
+        if (post != null && post.id != null) {
+          await SupabaseService.rateMapPost(
+            postId: post.id!,
+            popularityRating: _popularityRating,
+            securityRating: _securityRating,
+            qualityRating: _qualityRating,
+          );
+        }
 
         if (mounted) {
           widget.onPostAdded();
@@ -106,14 +119,49 @@ class _AddPostDialogState extends State<AddPostDialog> {
     }
   }
 
+  Widget _buildRatingRow(String label, int currentRating, Function(int) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(5, (index) {
+                return IconButton(
+                  icon: Icon(
+                    index < currentRating ? Icons.star : Icons.star_border,
+                    color: Colors.amber,
+                    size: 24,
+                  ),
+                  onPressed: () => onChanged(index + 1),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                );
+              }),
+            ),
+            const SizedBox(width: 8),
+            Text('$currentRating/5'),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Add Pin/Post'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             Text(
               'Location: ${widget.location.latitude.toStringAsFixed(4)}, ${widget.location.longitude.toStringAsFixed(4)}',
               style: Theme.of(context).textTheme.bodySmall,
@@ -157,7 +205,25 @@ class _AddPostDialogState extends State<AddPostDialog> {
               icon: const Icon(Icons.image),
               label: Text(_selectedImage != null ? 'Change Photo' : 'Add Photo'),
             ),
-          ],
+            const SizedBox(height: 16),
+            const Text(
+              'Initial Rating (you can change this later):',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            _buildRatingRow('Rating', _popularityRating, (value) {
+              setState(() => _popularityRating = value);
+            }),
+            const SizedBox(height: 8),
+            _buildRatingRow('Security', _securityRating, (value) {
+              setState(() => _securityRating = value);
+            }),
+            const SizedBox(height: 8),
+            _buildRatingRow('Quality', _qualityRating, (value) {
+              setState(() => _qualityRating = value);
+            }),
+            ],
+          ),
         ),
       ),
       actions: [

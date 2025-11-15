@@ -21,7 +21,7 @@ class _FeedTabState extends State<FeedTab> {
   }
 
   Future<void> _likePost(MapPost post) async {
-    await SupabaseService.likeMapPost(post.id!, post.likes);
+    await SupabaseService.likeMapPost(post.id!);
     if (mounted) {
       setState(() {
         _allPostsFuture = SupabaseService.getAllMapPosts();

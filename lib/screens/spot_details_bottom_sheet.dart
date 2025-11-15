@@ -21,11 +21,25 @@ class SpotDetailsBottomSheet extends StatefulWidget {
 
 class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
   late MapPost currentPost;
+  bool _hasUserLiked = false;
+  Map<String, int>? _userRating;
 
   @override
   void initState() {
     super.initState();
     currentPost = widget.post;
+    _loadUserInteractionData();
+  }
+
+  Future<void> _loadUserInteractionData() async {
+    final hasLiked = await SupabaseService.hasUserLikedPost(currentPost.id!);
+    final userRating = await SupabaseService.getUserRatingForPost(currentPost.id!);
+    if (mounted) {
+      setState(() {
+        _hasUserLiked = hasLiked;
+        _userRating = userRating;
+      });
+    }
   }
 
   bool get _isOwnPost {
@@ -60,6 +74,144 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
           }
         },
       ),
+    );
+  }
+
+  Future<void> _toggleLike() async {
+    final liked = await SupabaseService.likeMapPost(currentPost.id!);
+    if (mounted) {
+      setState(() {
+        _hasUserLiked = liked;
+      });
+      // Refresh post data to get updated like count
+      try {
+        final updatedPosts = await SupabaseService.getAllMapPosts();
+        final updated = updatedPosts.firstWhere(
+          (p) => p.id == currentPost.id,
+          orElse: () => currentPost,
+        );
+        if (mounted) {
+          setState(() {
+            currentPost = updated;
+          });
+          widget.onPostUpdated?.call();
+        }
+      } catch (e) {
+        // Silently fail
+      }
+    }
+  }
+
+  void _showRatingDialog() {
+    int popularityRating = _userRating?['popularity'] ?? 3;
+    int securityRating = _userRating?['security'] ?? 3;
+    int qualityRating = _userRating?['quality'] ?? 3;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (statefulContext, setState) => AlertDialog(
+          title: const Text('Rate this Spot'),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildRatingRow('Rating', popularityRating, (value) {
+                    setState(() => popularityRating = value);
+                  }),
+                  const SizedBox(height: 16),
+                  _buildRatingRow('Security', securityRating, (value) {
+                    setState(() => securityRating = value);
+                  }),
+                  const SizedBox(height: 16),
+                  _buildRatingRow('Quality', qualityRating, (value) {
+                    setState(() => qualityRating = value);
+                  }),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await SupabaseService.rateMapPost(
+                  postId: currentPost.id!,
+                  popularityRating: popularityRating,
+                  securityRating: securityRating,
+                  qualityRating: qualityRating,
+                );
+                if (mounted) {
+                  await _loadUserInteractionData();
+                  // Refresh post data to get updated ratings
+                  try {
+                    final updatedPosts = await SupabaseService.getAllMapPosts();
+                    final updated = updatedPosts.firstWhere(
+                      (p) => p.id == currentPost.id,
+                      orElse: () => currentPost,
+                    );
+                    if (mounted) {
+                      setState(() {
+                        currentPost = updated;
+                      });
+                      widget.onPostUpdated?.call();
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop();
+                      }
+                    }
+                  } catch (e) {
+                    // Silently fail
+                    if (dialogContext.mounted) {
+                      Navigator.of(dialogContext).pop();
+                    }
+                  }
+                }
+              },
+              child: const Text('Submit Rating'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRatingRow(String label, int currentRating, Function(int) onChanged) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        Expanded(
+          flex: 3,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(5, (index) {
+              return IconButton(
+                icon: Icon(
+                  index < currentRating ? Icons.star : Icons.star_border,
+                  color: Colors.amber,
+                  size: 24,
+                ),
+                onPressed: () => onChanged(index + 1),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              );
+            }),
+          ),
+        ),
+        Expanded(
+          flex: 1,
+          child: Text('$currentRating/5'),
+        ),
+      ],
     );
   }
 
@@ -207,7 +359,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                       children: [
                         _buildStarRating(
                           currentPost.popularityRating,
-                          'Popularity',
+                          'Rating',
                         ),
                         _buildStarRating(
                           currentPost.securityRating,
@@ -262,17 +414,20 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      icon: const Icon(Icons.favorite),
+                      icon: Icon(
+                        Icons.favorite,
+                        color: _hasUserLiked ? Colors.red : null,
+                      ),
                       label: Text('${currentPost.likes} Likes'),
-                      onPressed: () {},
+                      onPressed: _toggleLike,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
-                      icon: const Icon(Icons.comment),
-                      label: const Text('Comment'),
-                      onPressed: () {},
+                      icon: const Icon(Icons.star),
+                      label: const Text('Rate'),
+                      onPressed: _showRatingDialog,
                     ),
                   ),
                   const SizedBox(width: 8),

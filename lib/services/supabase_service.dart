@@ -193,14 +193,108 @@ class SupabaseService {
     }
   }
 
-  // Like a post
-  static Future<void> likeMapPost(String postId, int currentLikes) async {
+  // Like a post (new implementation with individual tracking)
+  static Future<bool> likeMapPost(String postId) async {
     try {
-      await _client
-          .from('map_posts')
-          .update({'likes': currentLikes + 1}).eq('id', postId);
+      final user = getCurrentUser();
+      if (user == null) return false;
+
+      // Check if user already liked this post
+      final existingLike = await _client
+          .from('post_likes')
+          .select()
+          .eq('post_id', postId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      if (existingLike != null) {
+        // User already liked, so unlike
+        await _client
+            .from('post_likes')
+            .delete()
+            .eq('post_id', postId)
+            .eq('user_id', user.id);
+        return false; // Return false to indicate unliked
+      } else {
+        // User hasn't liked, so add like
+        await _client.from('post_likes').insert({
+          'post_id': postId,
+          'user_id': user.id,
+        });
+        return true; // Return true to indicate liked
+      }
     } catch (e) {
       // Silently fail
+      return false;
+    }
+  }
+
+  // Check if current user has liked a post
+  static Future<bool> hasUserLikedPost(String postId) async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) return false;
+
+      final response = await _client
+          .from('post_likes')
+          .select()
+          .eq('post_id', postId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      return response != null;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Rate a post
+  static Future<void> rateMapPost({
+    required String postId,
+    required int popularityRating,
+    required int securityRating,
+    required int qualityRating,
+  }) async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) return;
+
+      await _client.from('post_ratings').upsert({
+        'post_id': postId,
+        'user_id': user.id,
+        'popularity_rating': popularityRating,
+        'security_rating': securityRating,
+        'quality_rating': qualityRating,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
+  // Get user's rating for a post
+  static Future<Map<String, int>?> getUserRatingForPost(String postId) async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) return null;
+
+      final response = await _client
+          .from('post_ratings')
+          .select('popularity_rating, security_rating, quality_rating')
+          .eq('post_id', postId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      if (response != null) {
+        return {
+          'popularity': response['popularity_rating'] as int,
+          'security': response['security_rating'] as int,
+          'quality': response['quality_rating'] as int,
+        };
+      }
+      return null;
+    } catch (e) {
+      return null;
     }
   }
 
