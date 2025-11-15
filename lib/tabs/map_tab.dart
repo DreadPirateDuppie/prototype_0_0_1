@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
 import '../widgets/ad_banner.dart';
+import '../providers/error_provider.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -100,9 +102,7 @@ class _MapTabState extends State<MapTab> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting location: $e')),
-        );
+        context.read<ErrorProvider>().showError('Error getting location: $e');
       }
     }
   }
@@ -200,12 +200,7 @@ class _MapTabState extends State<MapTab> {
       _isPinMode = !_isPinMode;
     });
     if (_isPinMode) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tap on the map to place a pin'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      context.read<ErrorProvider>().showError('Tap on the map to place a pin');
     }
   }
 
@@ -277,6 +272,7 @@ class _MapTabState extends State<MapTab> {
           child: Column(
             children: [
               FloatingActionButton(
+                heroTag: 'zoomInButton',
                 mini: true,
                 onPressed: () {
                   mapController.move(
@@ -289,6 +285,7 @@ class _MapTabState extends State<MapTab> {
               ),
               const SizedBox(height: 8),
               FloatingActionButton(
+                heroTag: 'zoomOutButton',
                 mini: true,
                 onPressed: () {
                   mapController.move(
@@ -307,6 +304,7 @@ class _MapTabState extends State<MapTab> {
           bottom: 16,
           right: 16,
           child: FloatingActionButton(
+            heroTag: 'pinModeButton',
             onPressed: _togglePinMode,
             backgroundColor: _isPinMode ? Colors.red : Colors.deepPurple,
             child: Icon(_isPinMode ? Icons.close : Icons.location_on),

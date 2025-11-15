@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../models/user_points.dart';
 import '../widgets/wheel_spin.dart';
 import '../widgets/ad_banner.dart';
+import '../providers/error_provider.dart';
 
 class RewardsTab extends StatefulWidget {
   const RewardsTab({super.key});
@@ -70,9 +72,7 @@ class _RewardsTabState extends State<RewardsTab> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating points: $e')),
-      );
+      context.read<ErrorProvider>().showError('Error updating points: $e');
     }
   }
 

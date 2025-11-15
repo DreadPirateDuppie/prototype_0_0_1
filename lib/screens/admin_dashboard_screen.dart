@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
+import '../providers/error_provider.dart';
+import '../screens/home_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -69,21 +71,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ]);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading data: $e'),
-            duration: const Duration(seconds: 10),
-            action: SnackBarAction(
-              label: 'Copy',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: 'Error loading data: $e'));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Error message copied to clipboard')),
-                );
-              },
-            ),
-          ),
-        );
+        context.read<ErrorProvider>().showError('Error loading data: $e');
       }
     } finally {
       if (mounted) {
@@ -120,21 +108,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading users: $e'),
-            duration: const Duration(seconds: 10),
-            action: SnackBarAction(
-              label: 'Copy',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: 'Error loading users: $e'));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Error message copied to clipboard')),
-                );
-              },
-            ),
-          ),
-        );
+        context.read<ErrorProvider>().showError('Error loading users: $e');
       }
       // Set empty list on error
       setState(() {
@@ -146,50 +120,66 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _loadPosts() async {
     final response = await Supabase.instance.client
         .from('map_posts')
-        .select('''
-          id,
-          title,
-          created_at,
-          likes,
-          user_id,
-          user_profiles!inner(display_name)
-        ''')
+        .select('id, title, created_at, likes, user_id')
         .order('created_at', ascending: false)
         .limit(50);
 
-    // Transform the response to include user_name for compatibility
-    final transformedPosts = (response as List).map((post) {
-      return {
-        ...post as Map<String, dynamic>,
-        'user_name': post['user_profiles']?['display_name'] ?? 'Unknown',
-      };
-    }).toList();
+    // Load user names separately and map them
+    final postsWithNames = await Future.wait(
+      (response as List).map((post) async {
+        final userId = post['user_id'];
+        final displayName = await SupabaseService.getUserDisplayName(userId) ?? 'Unknown';
+        return {
+          ...post as Map<String, dynamic>,
+          'user_name': displayName,
+        };
+      }),
+    );
 
     setState(() {
-      _posts = List<Map<String, dynamic>>.from(transformedPosts);
+      _posts = List<Map<String, dynamic>>.from(postsWithNames);
     });
   }
 
   Future<void> _loadStats() async {
-    final userResponse = await Supabase.instance.client
-        .from('user_profiles')
-        .select('id');
+    try {
+      final userResponse = await Supabase.instance.client
+          .from('user_profiles')
+          .select('id');
 
-    final postResponse = await Supabase.instance.client
-        .from('map_posts')
-        .select('id');
+      final postResponse = await Supabase.instance.client
+          .from('map_posts')
+          .select('id');
 
-    final likesResponse = await Supabase.instance.client
-        .from('post_likes')
-        .select('id');
+      // Try to load likes, but handle if table doesn't exist
+      int likesCount = 0;
+      try {
+        final likesResponse = await Supabase.instance.client
+            .from('post_likes')
+            .select('id');
+        likesCount = (likesResponse as List).length;
+      } catch (e) {
+        // Table may not exist yet, use 0
+        likesCount = 0;
+      }
 
-    setState(() {
-      _stats = {
-        'users': (userResponse as List).length,
-        'posts': (postResponse as List).length,
-        'likes': (likesResponse as List).length,
-      };
-    });
+      setState(() {
+        _stats = {
+          'users': (userResponse as List).length,
+          'posts': (postResponse as List).length,
+          'likes': likesCount,
+        };
+      });
+    } catch (e) {
+      // If any table doesn't exist, set default stats
+      setState(() {
+        _stats = {
+          'users': 0,
+          'posts': 0,
+          'likes': 0,
+        };
+      });
+    }
   }
 
   Future<void> _updateUserRole(String userId, String newRole) async {
@@ -201,30 +191,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
       await _loadUsers();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('User role updated successfully'),
-            duration: Duration(seconds: 3),
-          ),
-        );
+        context.read<ErrorProvider>().showError('User role updated successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating role: $e'),
-            duration: const Duration(seconds: 10),
-            action: SnackBarAction(
-              label: 'Copy',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: 'Error updating role: $e'));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Error message copied to clipboard')),
-                );
-              },
-            ),
-          ),
-        );
+        context.read<ErrorProvider>().showError('Error updating role: $e');
       }
     }
   }
@@ -235,30 +206,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       await _loadPosts();
       await _loadStats();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post deleted successfully'),
-            duration: Duration(seconds: 3),
-          ),
-        );
+        context.read<ErrorProvider>().showError('Post deleted successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting post: $e'),
-            duration: const Duration(seconds: 10),
-            action: SnackBarAction(
-              label: 'Copy',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: 'Error deleting post: $e'));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Error message copied to clipboard')),
-                );
-              },
-            ),
-          ),
-        );
+        context.read<ErrorProvider>().showError('Error deleting post: $e');
       }
     }
   }
@@ -305,21 +257,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading user stats: $e'),
-            duration: const Duration(seconds: 10),
-            action: SnackBarAction(
-              label: 'Copy',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: 'Error loading user stats: $e'));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Error message copied to clipboard')),
-                );
-              },
-            ),
-          ),
-        );
+        context.read<ErrorProvider>().showError('Error loading user stats: $e');
       }
       setState(() {
         _userStats = {};
@@ -829,8 +767,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-          tooltip: 'Back',
+          onPressed: () {
+            // Navigate back to home screen instead of just popping
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+            );
+          },
+          tooltip: 'Back to App',
         ),
         actions: [
           IconButton(

@@ -6,6 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'services/supabase_service.dart';
 import 'providers/theme_provider.dart';
+import 'providers/error_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,8 +19,11 @@ Future<void> main() async {
   );
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => ErrorProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -30,14 +34,47 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, child) {
+    return Consumer2<ThemeProvider, ErrorProvider>(
+      builder: (context, themeProvider, errorProvider, child) {
         return MaterialApp(
           title: 'Supabase Auth App',
           theme: themeProvider.getLightTheme(),
           darkTheme: themeProvider.getDarkTheme(),
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-          home: const AuthWrapper(),
+          home: Stack(
+            children: [
+              const AuthWrapper(),
+              if (errorProvider.isVisible)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Material(
+                    elevation: 8.0,
+                    child: Container(
+                      color: Colors.red,
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              errorProvider.errorMessage ?? '',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white),
+                            onPressed: errorProvider.hideError,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );
@@ -84,12 +121,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
         final session = snapshot.data?.session;
 
         if (session != null) {
-          // User is signed in - check if admin
-          if (_isAdmin == true) {
-            return const AdminDashboardScreen();
-          } else {
-            return const HomeScreen();
-          }
+          // User is signed in - go to home screen (map)
+          return const HomeScreen();
         } else {
           // User is not signed in
           return const SignInScreen();

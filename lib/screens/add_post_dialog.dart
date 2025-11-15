@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import '../services/supabase_service.dart';
+import '../providers/error_provider.dart';
 
 class AddPostDialog extends StatefulWidget {
   final LatLng location;
@@ -45,18 +47,14 @@ class _AddPostDialogState extends State<AddPostDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        context.read<ErrorProvider>().showError('Error picking image: $e');
       }
     }
   }
 
   Future<void> _createPost() async {
     if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      context.read<ErrorProvider>().showError('Please fill in all fields');
       return;
     }
 
@@ -106,9 +104,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating post: $e')),
-        );
+        context.read<ErrorProvider>().showError('Error creating post: $e');
       }
     } finally {
       if (mounted) {

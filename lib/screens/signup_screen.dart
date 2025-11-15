@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
+import '../providers/error_provider.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -45,9 +47,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         displayName: _displayNameController.text,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sign up successful! Please sign in.')),
-        );
+        context.read<ErrorProvider>().showError('Sign up successful! Please sign in.');
         Navigator.of(context).pop();
       }
     } catch (error) {

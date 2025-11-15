@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
+import '../providers/error_provider.dart';
 
 class EditPostDialog extends StatefulWidget {
   final MapPost post;
@@ -51,18 +53,14 @@ class _EditPostDialogState extends State<EditPostDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        context.read<ErrorProvider>().showError('Error picking image: $e');
       }
     }
   }
 
   Future<void> _updatePost() async {
     if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      context.read<ErrorProvider>().showError('Please fill in all fields');
       return;
     }
 
@@ -97,9 +95,7 @@ class _EditPostDialogState extends State<EditPostDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating post: $e')),
-        );
+        context.read<ErrorProvider>().showError('Error updating post: $e');
       }
     } finally {
       if (mounted) {
