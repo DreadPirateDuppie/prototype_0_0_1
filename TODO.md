@@ -1,5 +1,2 @@
-- [x] Modernize Admin Dashboard UI
-  - [x] Update stats cards with gradients and shadows
-  - [x] Improve app bar with modern look
-  - [x] Enhance list items with better styling and padding
-  - [x] Add search functionality to users and posts tabs
+- [x] Replace the ListTile with ElevatedButton.icon titled "Admin Tools" in lib/tabs/settings_tab.dart
+- [x] Add user statistics functionality to admin dashboard (view posts made, reward points, etc.)

@@ -13,19 +13,10 @@ class SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<SettingsTab> {
   bool _notificationsEnabled = true;
-  bool? _isAdmin;
 
   @override
   void initState() {
     super.initState();
-    _checkAdminStatus();
-  }
-
-  Future<void> _checkAdminStatus() async {
-    final isAdmin = await SupabaseService.isCurrentUserAdmin();
-    if (mounted) {
-      setState(() => _isAdmin = isAdmin);
-    }
   }
 
   Future<void> _handleSignOut() async {
@@ -83,25 +74,29 @@ class _SettingsTabState extends State<SettingsTab> {
             },
           ),
           const Divider(),
-          if (_isAdmin == true) ...[
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                'Administration',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Administration',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.admin_panel_settings),
-              title: const Text('Admin Dashboard'),
-              subtitle: const Text('Manage users and content'),
-              onTap: _navigateToAdminDashboard,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: ElevatedButton.icon(
+              onPressed: _navigateToAdminDashboard,
+              icon: const Icon(Icons.admin_panel_settings),
+              label: const Text('Admin Tools'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+              ),
             ),
-            const Divider(),
-          ],
+          ),
+          const Divider(),
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(

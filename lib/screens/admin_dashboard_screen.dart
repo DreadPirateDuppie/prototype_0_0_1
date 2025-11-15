@@ -20,6 +20,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Map<String, dynamic> _stats = {};
   String _usersSearchQuery = '';
   String _postsSearchQuery = '';
+  Map<String, dynamic> _userStats = {};
 
   @override
   void initState() {
@@ -100,16 +101,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
       final users = List<Map<String, dynamic>>.from(response);
 
-      // Debug: Print current user and users list
-      final currentUser = SupabaseService.getCurrentUser();
-      print('Current user: ${currentUser?.id} - ${currentUser?.email}');
-      print('Users from DB: ${users.length}');
-      users.forEach((user) => print('User: ${user['id']} - ${user['display_name']}'));
-
       // Ensure current user is included
+      final currentUser = SupabaseService.getCurrentUser();
       if (currentUser != null) {
         final currentUserInList = users.any((user) => user['id'] == currentUser.id);
-        print('Current user in list: $currentUserInList');
         if (!currentUserInList) {
           users.insert(0, {
             'id': currentUser.id,
@@ -117,7 +112,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             'role': 'user',
             'created_at': DateTime.now().toIso8601String(),
           });
-          print('Added current user to list');
         }
       }
 
@@ -125,7 +119,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _users = users;
       });
     } catch (e) {
-      print('Error loading users: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -153,12 +146,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _loadPosts() async {
     final response = await Supabase.instance.client
         .from('map_posts')
-        .select('id, title, user_name, created_at, likes')
+        .select('''
+          id,
+          title,
+          created_at,
+          likes,
+          user_id,
+          user_profiles!inner(display_name)
+        ''')
         .order('created_at', ascending: false)
         .limit(50);
 
+    // Transform the response to include user_name for compatibility
+    final transformedPosts = (response as List).map((post) {
+      return {
+        ...post as Map<String, dynamic>,
+        'user_name': post['user_profiles']?['display_name'] ?? 'Unknown',
+      };
+    }).toList();
+
     setState(() {
-      _posts = List<Map<String, dynamic>>.from(response);
+      _posts = List<Map<String, dynamic>>.from(transformedPosts);
     });
   }
 
@@ -255,6 +263,122 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  Future<void> _loadUserStats(String userId) async {
+    try {
+      // Load user's posts count
+      final postsResponse = await Supabase.instance.client
+          .from('map_posts')
+          .select('id, likes')
+          .eq('user_id', userId);
+
+      final posts = List<Map<String, dynamic>>.from(postsResponse);
+      final postsCount = posts.length;
+      final totalLikes = posts.fold<int>(0, (sum, post) => sum + (post['likes'] as int? ?? 0));
+
+      // Load user's points
+      final pointsResponse = await Supabase.instance.client
+          .from('user_points')
+          .select('points, last_spin_date')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      final points = pointsResponse?['points'] as int? ?? 0;
+      final lastSpinDate = pointsResponse?['last_spin_date'] as String?;
+
+      // Load user profile
+      final profileResponse = await Supabase.instance.client
+          .from('user_profiles')
+          .select('display_name, role, created_at')
+          .eq('id', userId)
+          .maybeSingle();
+
+      setState(() {
+        _userStats = {
+          'postsCount': postsCount,
+          'totalLikes': totalLikes,
+          'points': points,
+          'lastSpinDate': lastSpinDate,
+          'displayName': profileResponse?['display_name'] ?? 'Unknown',
+          'role': profileResponse?['role'] ?? 'user',
+          'joinDate': profileResponse?['created_at'] as String?,
+        };
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading user stats: $e'),
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'Copy',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: 'Error loading user stats: $e'));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error message copied to clipboard')),
+                );
+              },
+            ),
+          ),
+        );
+      }
+      setState(() {
+        _userStats = {};
+      });
+    }
+  }
+
+  void _showUserStatsDialog(String userId) {
+    _loadUserStats(userId);
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('User Statistics'),
+          content: _userStats.isEmpty
+              ? const SizedBox(
+                  height: 100,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Name: ${_userStats['displayName']}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Role: ${_userStats['role']}'),
+                      const SizedBox(height: 8),
+                      Text('Posts Made: ${_userStats['postsCount']}'),
+                      const SizedBox(height: 8),
+                      Text('Total Likes Received: ${_userStats['totalLikes']}'),
+                      const SizedBox(height: 8),
+                      Text('Reward Points: ${_userStats['points']}'),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Last Spin: ${_userStats['lastSpinDate'] != null ? DateTime.parse(_userStats['lastSpinDate']).toLocal().toString().substring(0, 10) : 'Never'}',
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Joined: ${_userStats['joinDate'] != null ? DateTime.parse(_userStats['joinDate']).toLocal().toString().substring(0, 10) : 'Unknown'}',
+                      ),
+                    ],
+                  ),
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatsCard(String title, String value, IconData icon) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
@@ -272,7 +396,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.deepPurple.withOpacity(isDark ? 0.5 : 0.3),
+            color: Colors.deepPurple.withValues(alpha: isDark ? 0.5 : 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -296,7 +420,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Text(
               title,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 fontSize: 14,
               ),
             ),
@@ -345,7 +469,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -364,25 +488,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: (user['role'] == 'admin') ? Colors.deepPurple.shade100 : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: DropdownButton<String>(
-                        value: user['role'] ?? 'user',
-                        underline: const SizedBox(),
-                        items: const [
-                          DropdownMenuItem(value: 'user', child: Text('User')),
-                          DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                        ],
-                        onChanged: (newRole) {
-                          if (newRole != null) {
-                            _updateUserRole(user['id'], newRole);
-                          }
-                        },
-                      ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.bar_chart, color: Colors.deepPurple),
+                          onPressed: () => _showUserStatsDialog(user['id']),
+                          tooltip: 'View Stats',
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: (user['role'] == 'admin') ? Colors.deepPurple.shade100 : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: DropdownButton<String>(
+                            value: user['role'] ?? 'user',
+                            underline: const SizedBox(),
+                            items: const [
+                              DropdownMenuItem(value: 'user', child: Text('User')),
+                              DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                            ],
+                            onChanged: (newRole) {
+                              if (newRole != null) {
+                                _updateUserRole(user['id'], newRole);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -433,7 +568,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -595,7 +730,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.orange.withOpacity(0.3),
+                            color: Colors.orange.withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -630,7 +765,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(context.watch<ThemeProvider>().isDarkMode ? 0.3 : 0.1),
+                        color: Colors.black.withValues(alpha: context.watch<ThemeProvider>().isDarkMode ? 0.3 : 0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),
@@ -692,6 +827,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ),
         ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+          tooltip: 'Back',
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -712,7 +852,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
