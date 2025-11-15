@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/supabase_service.dart';
+import '../services/image_service.dart';
 
 class AddPostDialog extends StatefulWidget {
   final LatLng location;
@@ -36,9 +37,28 @@ class _AddPostDialogState extends State<AddPostDialog> {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
+        // Show loading indicator
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Compressing image...')),
+          );
+        }
+
+        // Compress the image
+        final compressedImage = await ImageService.compressImage(File(image.path));
+        
+        if (compressedImage != null) {
+          setState(() {
+            _selectedImage = compressedImage;
+          });
+          
+          if (mounted) {
+            final sizeMB = await ImageService.getFileSizeMB(compressedImage);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Image ready (${sizeMB.toStringAsFixed(2)} MB)')),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {

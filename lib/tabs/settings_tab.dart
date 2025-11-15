@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
+import '../screens/admin_dashboard.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -84,6 +85,31 @@ class _SettingsTabState extends State<SettingsTab> {
             leading: const Icon(Icons.info),
             title: const Text('About'),
             onTap: () {},
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Administration',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.admin_panel_settings),
+            title: const Text('Admin Dashboard'),
+            subtitle: const Text('Content moderation'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AdminDashboard(),
+                ),
+              );
+            },
           ),
           const Divider(),
           Padding(

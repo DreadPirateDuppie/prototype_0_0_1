@@ -4,6 +4,7 @@ import '../tabs/feed_tab.dart';
 import '../tabs/profile_tab.dart';
 import '../tabs/rewards_tab.dart';
 import '../tabs/settings_tab.dart';
+import '../services/connectivity_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -46,7 +47,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _buildTabContent(),
+      body: Column(
+        children: [
+          ConnectivityService.buildOfflineBanner(context),
+          Expanded(child: _buildTabContent()),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,

@@ -6,7 +6,6 @@ import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
-import '../widgets/ad_banner.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -320,24 +319,6 @@ class _MapTabState extends State<MapTab> {
               ),
             ),
           ],
-        ),
-        // Ad banner overlay at the top
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                height: 20,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.grey[800]
-                    : Colors.grey[200],
-              ),
-              const AdBanner(),
-            ],
-          ),
         ),
       ],
     );
