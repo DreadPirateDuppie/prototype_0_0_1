@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
+import '../providers/theme_provider.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -15,11 +18,44 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _posts = [];
   Map<String, dynamic> _stats = {};
+  String _usersSearchQuery = '';
+  String _postsSearchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _ensureCurrentUserProfile().then((_) => _loadData());
+  }
+
+  Future<void> _ensureCurrentUserProfile() async {
+    final user = SupabaseService.getCurrentUser();
+    if (user != null) {
+      try {
+        // Check if profile exists
+        final existing = await Supabase.instance.client
+            .from('user_profiles')
+            .select('id, display_name, role')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (existing == null) {
+          // Create profile if it doesn't exist
+          await Supabase.instance.client.from('user_profiles').insert({
+            'id': user.id,
+            'display_name': user.email ?? 'User',
+            'role': 'user',
+          });
+        } else {
+          // Update display name if it has changed
+          final currentDisplayName = await SupabaseService.getUserDisplayName(user.id);
+          if (currentDisplayName != user.email && user.email != null) {
+            await SupabaseService.saveUserDisplayName(user.id, user.email!);
+          }
+        }
+      } catch (e) {
+        // Silently fail - table may not exist yet
+      }
+    }
   }
 
   Future<void> _loadData() async {
@@ -33,7 +69,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading data: $e')),
+          SnackBar(
+            content: Text('Error loading data: $e'),
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'Copy',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: 'Error loading data: $e'));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error message copied to clipboard')),
+                );
+              },
+            ),
+          ),
         );
       }
     } finally {
@@ -44,14 +92,62 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _loadUsers() async {
-    final response = await Supabase.instance.client
-        .from('user_profiles')
-        .select('id, display_name, role, created_at')
-        .order('created_at', ascending: false);
+    try {
+      final response = await Supabase.instance.client
+          .from('user_profiles')
+          .select('id, display_name, role, created_at')
+          .order('created_at', ascending: false);
 
-    setState(() {
-      _users = List<Map<String, dynamic>>.from(response);
-    });
+      final users = List<Map<String, dynamic>>.from(response);
+
+      // Debug: Print current user and users list
+      final currentUser = SupabaseService.getCurrentUser();
+      print('Current user: ${currentUser?.id} - ${currentUser?.email}');
+      print('Users from DB: ${users.length}');
+      users.forEach((user) => print('User: ${user['id']} - ${user['display_name']}'));
+
+      // Ensure current user is included
+      if (currentUser != null) {
+        final currentUserInList = users.any((user) => user['id'] == currentUser.id);
+        print('Current user in list: $currentUserInList');
+        if (!currentUserInList) {
+          users.insert(0, {
+            'id': currentUser.id,
+            'display_name': currentUser.email ?? 'Current User',
+            'role': 'user',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+          print('Added current user to list');
+        }
+      }
+
+      setState(() {
+        _users = users;
+      });
+    } catch (e) {
+      print('Error loading users: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading users: $e'),
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'Copy',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: 'Error loading users: $e'));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error message copied to clipboard')),
+                );
+              },
+            ),
+          ),
+        );
+      }
+      // Set empty list on error
+      setState(() {
+        _users = [];
+      });
+    }
   }
 
   Future<void> _loadPosts() async {
@@ -98,13 +194,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       await _loadUsers();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User role updated successfully')),
+          const SnackBar(
+            content: Text('User role updated successfully'),
+            duration: Duration(seconds: 3),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating role: $e')),
+          SnackBar(
+            content: Text('Error updating role: $e'),
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'Copy',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: 'Error updating role: $e'));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error message copied to clipboard')),
+                );
+              },
+            ),
+          ),
         );
       }
     }
@@ -117,34 +228,78 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       await _loadStats();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post deleted successfully')),
+          const SnackBar(
+            content: Text('Post deleted successfully'),
+            duration: Duration(seconds: 3),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting post: $e')),
+          SnackBar(
+            content: Text('Error deleting post: $e'),
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'Copy',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: 'Error deleting post: $e'));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error message copied to clipboard')),
+                );
+              },
+            ),
+          ),
         );
       }
     }
   }
 
   Widget _buildStatsCard(String title, String value, IconData icon) {
-    return Card(
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [Colors.deepPurple.shade700, Colors.deepPurple.shade900]
+              : [Colors.deepPurple.shade400, Colors.deepPurple.shade600],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.deepPurple.withOpacity(isDark ? 0.5 : 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            Icon(icon, size: 32, color: Colors.deepPurple),
-            const SizedBox(height: 8),
+            Icon(icon, size: 36, color: Colors.white),
+            const SizedBox(height: 12),
             Text(
               value,
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
-            Text(title, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 14,
+              ),
+            ),
           ],
         ),
       ),
@@ -152,60 +307,190 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildUsersTab() {
-    return RefreshIndicator(
-      onRefresh: _loadUsers,
-      child: ListView.builder(
-        itemCount: _users.length,
-        itemBuilder: (context, index) {
-          final user = _users[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: ListTile(
-              title: Text(user['display_name'] ?? 'No name'),
-              subtitle: Text(
-                'Role: ${user['role'] ?? 'user'} • Joined: ${user['created_at']?.substring(0, 10) ?? 'Unknown'}',
+    final filteredUsers = _users.where((user) {
+      final displayName = user['display_name']?.toString().toLowerCase() ?? '';
+      final email = user['id']?.toString().toLowerCase() ?? '';
+      final query = _usersSearchQuery.toLowerCase();
+      return displayName.contains(query) || email.contains(query);
+    }).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Search users...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              trailing: DropdownButton<String>(
-                value: user['role'] ?? 'user',
-                items: const [
-                  DropdownMenuItem(value: 'user', child: Text('User')),
-                  DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                ],
-                onChanged: (newRole) {
-                  if (newRole != null) {
-                    _updateUserRole(user['id'], newRole);
-                  }
-                },
-              ),
+              filled: true,
+              fillColor: Theme.of(context).cardColor,
             ),
-          );
-        },
-      ),
+            onChanged: (value) => setState(() => _usersSearchQuery = value),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadUsers,
+            child: ListView.builder(
+              itemCount: filteredUsers.length,
+              itemBuilder: (context, index) {
+                final user = filteredUsers[index];
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    title: Text(
+                      user['display_name'] ?? 'No name',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Role: ${user['role'] ?? 'user'} • Joined: ${user['created_at']?.substring(0, 10) ?? 'Unknown'}',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: (user['role'] == 'admin') ? Colors.deepPurple.shade100 : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: DropdownButton<String>(
+                        value: user['role'] ?? 'user',
+                        underline: const SizedBox(),
+                        items: const [
+                          DropdownMenuItem(value: 'user', child: Text('User')),
+                          DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                        ],
+                        onChanged: (newRole) {
+                          if (newRole != null) {
+                            _updateUserRole(user['id'], newRole);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildPostsTab() {
-    return RefreshIndicator(
-      onRefresh: _loadPosts,
-      child: ListView.builder(
-        itemCount: _posts.length,
-        itemBuilder: (context, index) {
-          final post = _posts[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: ListTile(
-              title: Text(post['title'] ?? 'No title'),
-              subtitle: Text(
-                'By: ${post['user_name'] ?? 'Unknown'} • Likes: ${post['likes'] ?? 0} • ${post['created_at']?.substring(0, 10) ?? 'Unknown'}',
+    final filteredPosts = _posts.where((post) {
+      final title = post['title']?.toString().toLowerCase() ?? '';
+      final userName = post['user_name']?.toString().toLowerCase() ?? '';
+      final query = _postsSearchQuery.toLowerCase();
+      return title.contains(query) || userName.contains(query);
+    }).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Search posts...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () => _showDeleteConfirmation(post['id']),
-              ),
+              filled: true,
+              fillColor: Theme.of(context).cardColor,
             ),
-          );
-        },
-      ),
+            onChanged: (value) => setState(() => _postsSearchQuery = value),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadPosts,
+            child: ListView.builder(
+              itemCount: filteredPosts.length,
+              itemBuilder: (context, index) {
+                final post = filteredPosts[index];
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    title: Text(
+                      post['title'] ?? 'No title',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.person, size: 16, color: Colors.grey.shade600),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              post['user_name'] ?? 'Unknown',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                          ),
+                          Icon(Icons.favorite, size: 16, color: Colors.red.shade400),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${post['likes'] ?? 0}',
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
+                          const SizedBox(width: 4),
+                          Text(
+                            post['created_at']?.substring(0, 10) ?? 'Unknown',
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    trailing: IconButton(
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.delete, color: Colors.red.shade600, size: 20),
+                      ),
+                      onPressed: () => _showDeleteConfirmation(post['id']),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -236,54 +521,149 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return RefreshIndicator(
       onRefresh: _loadStats,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Dashboard Overview',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: context.watch<ThemeProvider>().isDarkMode
+                  ? [Colors.deepPurple.shade900, Colors.grey.shade900]
+                  : [Colors.deepPurple.shade50, Colors.white],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
-            const SizedBox(height: 16),
-            Row(
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _buildStatsCard(
-                    'Total Users',
-                    _stats['users']?.toString() ?? '0',
-                    Icons.people,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.deepPurple.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.dashboard,
+                        color: Colors.deepPurple,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Text(
+                      'Dashboard Overview',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepPurple,
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: _buildStatsCard(
-                    'Total Posts',
-                    _stats['posts']?.toString() ?? '0',
-                    Icons.post_add,
+                const SizedBox(height: 24),
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  children: [
+                    _buildStatsCard(
+                      'Total Users',
+                      _stats['users']?.toString() ?? '0',
+                      Icons.people,
+                    ),
+                    _buildStatsCard(
+                      'Total Posts',
+                      _stats['posts']?.toString() ?? '0',
+                      Icons.post_add,
+                    ),
+                    _buildStatsCard(
+                      'Total Likes',
+                      _stats['likes']?.toString() ?? '0',
+                      Icons.favorite,
+                    ),
+                    Container(
+                      margin: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.orange.shade400, Colors.orange.shade600],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.orange.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.trending_up, size: 36, color: Colors.white),
+                            SizedBox(height: 12),
+                            Text(
+                              'Analytics',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(context.watch<ThemeProvider>().isDarkMode ? 0.3 : 0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.timeline, color: Colors.deepPurple),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Recent Activity',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.deepPurple,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Activity tracking coming soon...',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatsCard(
-                    'Total Likes',
-                    _stats['likes']?.toString() ?? '0',
-                    Icons.favorite,
-                  ),
-                ),
-                const Expanded(child: SizedBox()),
-              ],
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'Recent Activity',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            // Add more dashboard widgets here as needed
-          ],
+          ),
         ),
       ),
     );
@@ -302,6 +682,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         title: const Text('Admin Dashboard'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.deepPurple.shade600, Colors.deepPurple.shade800],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadData,
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
       body: IndexedStack(
         index: _selectedIndex,
@@ -311,23 +708,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           _buildPostsTab(),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people),
-            label: 'Users',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.post_add),
-            label: 'Posts',
-          ),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) => setState(() => _selectedIndex = index),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          selectedItemColor: Colors.deepPurple,
+          unselectedItemColor: Colors.grey.shade600,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people),
+              label: 'Users',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.post_add),
+              label: 'Posts',
+            ),
+          ],
+        ),
       ),
     );
   }

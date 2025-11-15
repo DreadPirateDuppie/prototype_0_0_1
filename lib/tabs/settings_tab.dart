@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
+import '../screens/admin_dashboard_screen.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -12,6 +13,20 @@ class SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<SettingsTab> {
   bool _notificationsEnabled = true;
+  bool? _isAdmin;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminStatus();
+  }
+
+  Future<void> _checkAdminStatus() async {
+    final isAdmin = await SupabaseService.isCurrentUserAdmin();
+    if (mounted) {
+      setState(() => _isAdmin = isAdmin);
+    }
+  }
 
   Future<void> _handleSignOut() async {
     try {
@@ -23,6 +38,14 @@ class _SettingsTabState extends State<SettingsTab> {
         );
       }
     }
+  }
+
+  void _navigateToAdminDashboard() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const AdminDashboardScreen(),
+      ),
+    );
   }
 
   @override
@@ -60,6 +83,25 @@ class _SettingsTabState extends State<SettingsTab> {
             },
           ),
           const Divider(),
+          if (_isAdmin == true) ...[
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                'Administration',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings),
+              title: const Text('Admin Dashboard'),
+              subtitle: const Text('Manage users and content'),
+              onTap: _navigateToAdminDashboard,
+            ),
+            const Divider(),
+          ],
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(
