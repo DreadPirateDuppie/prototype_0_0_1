@@ -317,10 +317,20 @@ class _MapTabState extends State<MapTab> {
         ),
         // Ad banner overlay at the top
         Positioned(
-          top: 20,
+          top: 0,
           left: 0,
           right: 0,
-          child: const AdBanner(),
+          child: Column(
+            children: [
+              Container(
+                height: 20,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey[800]
+                    : Colors.grey[200],
+              ),
+              const AdBanner(),
+            ],
+          ),
         ),
       ],
     );

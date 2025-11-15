@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/edit_post_dialog.dart';
+import '../screens/edit_username_dialog.dart';
 import '../widgets/star_rating_display.dart';
 import '../widgets/ad_banner.dart';
 
@@ -14,23 +15,13 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   late Future<List<MapPost>> _userPostsFuture;
-  String? _displayName;
-  bool _isEditingName = false;
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
+  late Future<String?> _usernameFuture;
 
   @override
   void initState() {
     super.initState();
     _refreshPosts();
-    _loadDisplayName();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    super.dispose();
+    _refreshUsername();
   }
 
   void _refreshPosts() {
@@ -40,43 +31,25 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
-  Future<void> _loadDisplayName() async {
+  void _refreshUsername() {
     final user = SupabaseService.getCurrentUser();
     if (user != null) {
-      final displayName = await SupabaseService.getUserDisplayName(user.id);
-      setState(() {
-        _displayName = displayName;
-        _nameController.text = displayName ?? '';
-        _emailController.text = user.email ?? '';
-      });
+      _usernameFuture = SupabaseService.getUserUsername(user.id);
     }
   }
 
-  Future<void> _saveDisplayName() async {
-    final user = SupabaseService.getCurrentUser();
-    if (user != null && _nameController.text.trim().isNotEmpty) {
-      final newDisplayName = _nameController.text.trim();
-      await SupabaseService.saveUserDisplayName(user.id, newDisplayName);
-
-      // Update all posts by this user to reflect the new display name
-      await SupabaseService.updatePostUserName(user.id, newDisplayName);
-
-      setState(() {
-        _displayName = newDisplayName;
-        _isEditingName = false;
-      });
-
-      // Refresh posts to show updated display name
-      _refreshPosts();
-      setState(() {});
-    }
-  }
-
-  void _cancelEdit() {
-    setState(() {
-      _isEditingName = false;
-      _nameController.text = _displayName ?? '';
-    });
+  void _editUsername(String currentUsername) {
+    showDialog(
+      context: context,
+      builder: (context) => EditUsernameDialog(
+        currentUsername: currentUsername,
+        onUsernameSaved: (newUsername) {
+          setState(() {
+            _refreshUsername();
+          });
+        },
+      ),
+    );
   }
 
   Future<void> _deletePost(String postId) async {
@@ -106,20 +79,7 @@ class _ProfileTabState extends State<ProfileTab> {
     final user = SupabaseService.getCurrentUser();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        actions: [
-          if (!_isEditingName)
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                setState(() {
-                  _isEditingName = true;
-                });
-              },
-            ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Profile')),
       body: Column(
         children: [
           const AdBanner(),
@@ -135,9 +95,7 @@ class _ProfileTabState extends State<ProfileTab> {
                         radius: 50,
                         backgroundColor: Colors.deepPurple,
                         child: Text(
-                          (_displayName?.isNotEmpty ?? false)
-                              ? _displayName![0].toUpperCase()
-                              : user?.email?.substring(0, 1).toUpperCase() ?? 'U',
+                          user?.email?.substring(0, 1).toUpperCase() ?? 'U',
                           style: const TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
@@ -147,61 +105,79 @@ class _ProfileTabState extends State<ProfileTab> {
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        _displayName ?? 'User Profile',
+                        'User Profile',
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 16),
-                      if (_isEditingName)
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Display Name',
-                                  style: Theme.of(context).textTheme.labelLarge,
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        controller: _nameController,
-                                        decoration: const InputDecoration(
-                                          hintText: 'Enter display name',
-                                          border: OutlineInputBorder(),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(Icons.check),
-                                      onPressed: _saveDisplayName,
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.close),
-                                      onPressed: _cancelEdit,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Email',
-                                  style: Theme.of(context).textTheme.labelLarge,
-                                ),
-                                const SizedBox(height: 8),
-                                TextField(
-                                  controller: _emailController,
-                                  decoration: const InputDecoration(
-                                    hintText: 'Enter email',
-                                    border: OutlineInputBorder(),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Username',
+                                    style: Theme.of(context).textTheme.labelLarge,
                                   ),
-                                ),
-                              ],
-                            ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, size: 18),
+                                    onPressed: () {
+                                      _usernameFuture.then((username) {
+                                        _editUsername(username ?? '');
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              FutureBuilder<String?>(
+                                future: _usernameFuture,
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    );
+                                  }
+                                  final username = snapshot.data ?? 'Not set';
+                                  return Text(
+                                    username,
+                                    style:
+                                        Theme.of(context).textTheme.bodyMedium,
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Email',
+                                style: Theme.of(context).textTheme.labelLarge,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                user?.email ?? 'Not available',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'User ID',
+                                style: Theme.of(context).textTheme.labelLarge,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                user?.id ?? 'Not available',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
                           ),
                         ),
+                      ),
                       const SizedBox(height: 24),
                       Text(
                         'My Posts',

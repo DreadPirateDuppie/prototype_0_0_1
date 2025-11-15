@@ -1,7 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import '../models/post.dart';
-import '../models/user_points.dart';
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -31,27 +30,52 @@ class SupabaseService {
     }
   }
 
-  // Get user role
-  static Future<String?> getUserRole(String userId) async {
+  // Get current user display name with fallback
+  static Future<String?> getCurrentUserDisplayName() async {
+    final user = getCurrentUser();
+    if (user == null) return null;
+    
+    // Try to get from user metadata first
+    var displayName = user.userMetadata?['display_name'] as String?;
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+    
+    // Try to get from user_profiles table
+    displayName = await getUserDisplayName(user.id);
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+    
+    // Fallback to email prefix
+    return user.email?.split('@').first ?? 'User';
+  }
+
+  // Get user username
+  static Future<String?> getUserUsername(String userId) async {
     try {
       final response = await _client
           .from('user_profiles')
-          .select('role')
+          .select('username')
           .eq('id', userId)
           .maybeSingle();
-      return response?['role'] ?? 'user';
+      return response?['username'];
     } catch (e) {
-      // Silently fail - table may not exist yet
-      return 'user';
+      return null;
     }
   }
 
-  // Check if current user is admin
-  static Future<bool> isCurrentUserAdmin() async {
-    final user = getCurrentUser();
-    if (user == null) return false;
-    final role = await getUserRole(user.id);
-    return role == 'admin';
+  // Check if username is available
+  static Future<bool> isUsernameAvailable(String username) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('id')
+          .eq('username', username);
+      return (response as List).isEmpty;
+    } catch (e) {
+      return true; // Assume available if query fails
+    }
   }
 
   // Save user display name
@@ -66,6 +90,21 @@ class SupabaseService {
       });
     } catch (e) {
       // Silently fail - table may not exist yet
+    }
+  }
+
+  // Save user username (with uniqueness constraint)
+  static Future<void> saveUserUsername(
+    String userId,
+    String username,
+  ) async {
+    try {
+      await _client.from('user_profiles').upsert({
+        'id': userId,
+        'username': username.toLowerCase().trim(),
+      });
+    } catch (e) {
+      throw Exception('Failed to save username: $e');
     }
   }
 
@@ -216,108 +255,14 @@ class SupabaseService {
     }
   }
 
-  // Like a post (new implementation with individual tracking)
-  static Future<bool> likeMapPost(String postId) async {
+  // Like a post
+  static Future<void> likeMapPost(String postId, int currentLikes) async {
     try {
-      final user = getCurrentUser();
-      if (user == null) return false;
-
-      // Check if user already liked this post
-      final existingLike = await _client
-          .from('post_likes')
-          .select()
-          .eq('post_id', postId)
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-      if (existingLike != null) {
-        // User already liked, so unlike
-        await _client
-            .from('post_likes')
-            .delete()
-            .eq('post_id', postId)
-            .eq('user_id', user.id);
-        return false; // Return false to indicate unliked
-      } else {
-        // User hasn't liked, so add like
-        await _client.from('post_likes').insert({
-          'post_id': postId,
-          'user_id': user.id,
-        });
-        return true; // Return true to indicate liked
-      }
+      await _client
+          .from('map_posts')
+          .update({'likes': currentLikes + 1}).eq('id', postId);
     } catch (e) {
       // Silently fail
-      return false;
-    }
-  }
-
-  // Check if current user has liked a post
-  static Future<bool> hasUserLikedPost(String postId) async {
-    try {
-      final user = getCurrentUser();
-      if (user == null) return false;
-
-      final response = await _client
-          .from('post_likes')
-          .select()
-          .eq('post_id', postId)
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-      return response != null;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // Rate a post
-  static Future<void> rateMapPost({
-    required String postId,
-    required int popularityRating,
-    required int securityRating,
-    required int qualityRating,
-  }) async {
-    try {
-      final user = getCurrentUser();
-      if (user == null) return;
-
-      await _client.from('post_ratings').upsert({
-        'post_id': postId,
-        'user_id': user.id,
-        'popularity_rating': popularityRating,
-        'security_rating': securityRating,
-        'quality_rating': qualityRating,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      // Silently fail
-    }
-  }
-
-  // Get user's rating for a post
-  static Future<Map<String, int>?> getUserRatingForPost(String postId) async {
-    try {
-      final user = getCurrentUser();
-      if (user == null) return null;
-
-      final response = await _client
-          .from('post_ratings')
-          .select('popularity_rating, security_rating, quality_rating')
-          .eq('post_id', postId)
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-      if (response != null) {
-        return {
-          'popularity': response['popularity_rating'] as int,
-          'security': response['security_rating'] as int,
-          'quality': response['quality_rating'] as int,
-        };
-      }
-      return null;
-    } catch (e) {
-      return null;
     }
   }
 
@@ -345,68 +290,6 @@ class SupabaseService {
       return MapPost.fromMap(response);
     } catch (e) {
       throw Exception('Failed to update post: $e');
-    }
-  }
-
-  // Update post user name (when display name changes)
-  static Future<void> updatePostUserName(String userId, String userName) async {
-    try {
-      await _client
-          .from('map_posts')
-          .update({'user_name': userName})
-          .eq('user_id', userId);
-    } catch (e) {
-      // Silently fail
-    }
-  }
-
-  // Get user points
-  static Future<UserPoints> getUserPoints(String userId) async {
-    try {
-      final response = await _client
-          .from('user_points')
-          .select()
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      if (response == null) {
-        // Create initial points record if it doesn't exist
-        final newPoints = UserPoints(userId: userId, points: 0);
-        await _client.from('user_points').insert(newPoints.toMap());
-        return newPoints;
-      }
-
-      return UserPoints.fromMap(response);
-    } catch (e) {
-      // Return default points if table doesn't exist
-      return UserPoints(userId: userId, points: 0);
-    }
-  }
-
-  // Update user points after wheel spin
-  static Future<UserPoints> updatePointsAfterSpin(
-    String userId,
-    int pointsToAdd,
-  ) async {
-    try {
-      final currentPoints = await getUserPoints(userId);
-      final newPoints = currentPoints.points + pointsToAdd;
-      
-      final updateData = {
-        'user_id': userId,
-        'points': newPoints,
-        'last_spin_date': DateTime.now().toIso8601String(),
-      };
-
-      await _client.from('user_points').upsert(updateData);
-
-      return UserPoints(
-        userId: userId,
-        points: newPoints,
-        lastSpinDate: DateTime.now(),
-      );
-    } catch (e) {
-      throw Exception('Failed to update points: $e');
     }
   }
 }
