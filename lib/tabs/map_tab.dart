@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
+import '../widgets/ad_banner.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -238,6 +239,7 @@ class _MapTabState extends State<MapTab> {
       children: [
         Column(
           children: [
+            const AdBanner(),
             Expanded(
               child: Stack(
                 children: [
