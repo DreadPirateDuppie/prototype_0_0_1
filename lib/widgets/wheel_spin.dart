@@ -112,7 +112,7 @@ class _WheelSpinState extends State<WheelSpin>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withAlpha((0.3 * 255).round()),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -162,7 +162,7 @@ class WheelPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    final paint = Paint()..style = PaintStyle.fill;
+    final paint = Paint()..style = PaintingStyle.fill;
 
     final colors = [
       Colors.red.shade400,
@@ -218,7 +218,7 @@ class WheelPainter extends CustomPainter {
     // Draw border
     paint
       ..color = Colors.white
-      ..style = PaintStyle.stroke
+      ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
     canvas.drawCircle(center, radius, paint);
   }
