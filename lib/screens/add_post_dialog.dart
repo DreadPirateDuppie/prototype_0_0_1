@@ -50,9 +50,19 @@ class _AddPostDialogState extends State<AddPostDialog> {
   }
 
   Future<void> _createPost() async {
-    if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
+    if (_titleController.text.trim().isEmpty || _descriptionController.text.trim().isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Missing Information'),
+          content: const Text('Please fill in both title and description fields.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
       );
       return;
     }

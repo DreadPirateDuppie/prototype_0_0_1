@@ -41,6 +41,19 @@ class _MapTabState extends State<MapTab> {
         if (mounted) {
           setState(() {
             userPosts = posts;
+            // Clear all markers and rebuild from scratch
+            markers.clear();
+            markerPostMap.clear();
+            _addSampleMarkers();
+            // Add current location marker if available
+            if (!_isLoading) {
+              _addMarkerToList(
+                currentLocation,
+                'Your Location',
+                'You are here',
+                Colors.blue,
+              );
+            }
             _addUserPostMarkers();
           });
         }
@@ -165,17 +178,7 @@ class _MapTabState extends State<MapTab> {
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(subtitle),
-                      ],
-                    ),
+                    content: Text('$title - $subtitle'),
                     duration: const Duration(seconds: 2),
                   ),
                 );
@@ -275,6 +278,7 @@ class _MapTabState extends State<MapTab> {
           bottom: 100,
           right: 16,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               FloatingActionButton(
                 mini: true,
@@ -323,6 +327,7 @@ class _MapTabState extends State<MapTab> {
           left: 0,
           right: 0,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 height: 20,
