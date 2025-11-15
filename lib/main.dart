@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'screens/signin_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/admin_dashboard_screen.dart';
+import 'services/supabase_service.dart';
 import 'providers/theme_provider.dart';
 
 Future<void> main() async {
@@ -43,8 +45,28 @@ class MyApp extends StatelessWidget {
 }
 
 // AuthWrapper handles routing based on user authentication state
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool? _isAdmin;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminStatus();
+  }
+
+  Future<void> _checkAdminStatus() async {
+    final isAdmin = await SupabaseService.isCurrentUserAdmin();
+    if (mounted) {
+      setState(() => _isAdmin = isAdmin);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +74,7 @@ class AuthWrapper extends StatelessWidget {
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
         // Check connection state
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting || _isAdmin == null) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
@@ -62,8 +84,12 @@ class AuthWrapper extends StatelessWidget {
         final session = snapshot.data?.session;
 
         if (session != null) {
-          // User is signed in
-          return const HomeScreen();
+          // User is signed in - check if admin
+          if (_isAdmin == true) {
+            return const AdminDashboardScreen();
+          } else {
+            return const HomeScreen();
+          }
         } else {
           // User is not signed in
           return const SignInScreen();

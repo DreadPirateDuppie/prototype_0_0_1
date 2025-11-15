@@ -31,6 +31,29 @@ class SupabaseService {
     }
   }
 
+  // Get user role
+  static Future<String?> getUserRole(String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+      return response?['role'] ?? 'user';
+    } catch (e) {
+      // Silently fail - table may not exist yet
+      return 'user';
+    }
+  }
+
+  // Check if current user is admin
+  static Future<bool> isCurrentUserAdmin() async {
+    final user = getCurrentUser();
+    if (user == null) return false;
+    final role = await getUserRole(user.id);
+    return role == 'admin';
+  }
+
   // Save user display name
   static Future<void> saveUserDisplayName(
     String userId,
