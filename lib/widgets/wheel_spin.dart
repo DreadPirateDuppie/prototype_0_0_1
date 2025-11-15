@@ -29,6 +29,13 @@ class _WheelSpinState extends State<WheelSpin>
       duration: const Duration(seconds: 3),
       vsync: this,
     );
+    _animation = Tween<double>(
+      begin: 0,
+      end: 0,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
   }
 
   @override
@@ -48,7 +55,7 @@ class _WheelSpinState extends State<WheelSpin>
     final random = math.Random();
     final fullRotations = 5 + random.nextInt(3); // 5-7 full rotations
     final landingIndex = random.nextInt(_rewards.length);
-    final landingAngle = (landingIndex * (2 * math.pi / _rewards.length));
+    final landingAngle = (landingIndex * (2 * math.pi / _rewards.length)) + math.pi / 2;
     final totalRotation = (fullRotations * 2 * math.pi) + landingAngle;
 
     _animation = Tween<double>(

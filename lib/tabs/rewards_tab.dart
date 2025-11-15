@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../models/user_points.dart';
 import '../widgets/wheel_spin.dart';
+import '../widgets/ad_banner.dart';
 
 class RewardsTab extends StatefulWidget {
   const RewardsTab({super.key});
@@ -81,11 +82,15 @@ class _RewardsTabState extends State<RewardsTab> {
       appBar: AppBar(title: const Text('Rewards')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
+          : Column(
+              children: [
+                const AdBanner(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
                     Card(
                       color: Colors.amber.shade100,
                       child: Padding(
@@ -162,9 +167,12 @@ class _RewardsTabState extends State<RewardsTab> {
                         );
                       },
                     ),
-                  ],
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
     );
   }

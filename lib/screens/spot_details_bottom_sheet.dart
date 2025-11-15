@@ -36,7 +36,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
   void _showEditDialog() {
     showDialog(
       context: context,
-      builder: (context) => EditPostDialog(
+      builder: (dialogContext) => EditPostDialog(
         post: currentPost,
         onPostUpdated: () async {
           // Refresh the post data
@@ -51,7 +51,9 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                 currentPost = updated;
               });
               widget.onPostUpdated?.call();
-              Navigator.of(context).pop();
+              if (dialogContext.mounted) {
+                Navigator.of(dialogContext).pop();
+              }
             }
           } catch (e) {
             // Silently fail
