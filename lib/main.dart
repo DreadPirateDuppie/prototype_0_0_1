@@ -4,9 +4,14 @@ import 'package:provider/provider.dart';
 import 'screens/signin_screen.dart';
 import 'screens/home_screen.dart';
 import 'providers/theme_provider.dart';
+import 'services/error_service.dart';
+import 'services/connectivity_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize error tracking
+  ErrorService.initialize();
 
   // Initialize Supabase with your project URL and anon key
   // Replace these with your actual Supabase credentials
@@ -14,6 +19,9 @@ Future<void> main() async {
     url: 'https://vgcdednbyjdkyjysvctm.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY2RlZG5ieWpka3lqeXN2Y3RtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMzI3NDUsImV4cCI6MjA3ODcwODc0NX0.A9y5TFwhUMKrpiYpQJr_VYfVyyHRH5lpiHLG30Yv4s8',
   );
+
+  // Initialize connectivity monitoring
+  await ConnectivityService.initialize();
 
   runApp(
     ChangeNotifierProvider(

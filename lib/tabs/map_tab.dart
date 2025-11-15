@@ -6,7 +6,6 @@ import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
-import '../widgets/ad_banner.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -41,6 +40,19 @@ class _MapTabState extends State<MapTab> {
         if (mounted) {
           setState(() {
             userPosts = posts;
+            // Clear all markers and rebuild from scratch
+            markers.clear();
+            markerPostMap.clear();
+            _addSampleMarkers();
+            // Add current location marker if available
+            if (!_isLoading) {
+              _addMarkerToList(
+                currentLocation,
+                'Your Location',
+                'You are here',
+                Colors.blue,
+              );
+            }
             _addUserPostMarkers();
           });
         }
@@ -165,17 +177,7 @@ class _MapTabState extends State<MapTab> {
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(subtitle),
-                      ],
-                    ),
+                    content: Text('$title - $subtitle'),
                     duration: const Duration(seconds: 2),
                   ),
                 );
@@ -275,6 +277,7 @@ class _MapTabState extends State<MapTab> {
           bottom: 100,
           right: 16,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               FloatingActionButton(
                 mini: true,
@@ -316,23 +319,6 @@ class _MapTabState extends State<MapTab> {
               ),
             ),
           ],
-        ),
-        // Ad banner overlay at the top
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: Column(
-            children: [
-              Container(
-                height: 20,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.grey[800]
-                    : Colors.grey[200],
-              ),
-              const AdBanner(),
-            ],
-          ),
         ),
       ],
     );

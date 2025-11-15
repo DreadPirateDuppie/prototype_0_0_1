@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/post.dart';
 import '../screens/edit_post_dialog.dart';
+import '../screens/rate_post_dialog.dart';
 import '../services/supabase_service.dart';
 
 class SpotDetailsBottomSheet extends StatefulWidget {
@@ -55,6 +56,87 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
             // Silently fail
           }
         },
+      ),
+    );
+  }
+
+  void _showReportDialog() {
+    final reasonController = TextEditingController();
+    final detailsController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Report Post'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Why are you reporting this post?'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Reason',
+                  hintText: 'e.g., Inappropriate content',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: detailsController,
+                decoration: const InputDecoration(
+                  labelText: 'Additional Details (Optional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please provide a reason')),
+                );
+                return;
+              }
+
+              try {
+                await SupabaseService.reportPost(
+                  postId: currentPost.id!,
+                  reason: reasonController.text.trim(),
+                  details: detailsController.text.trim().isEmpty
+                      ? null
+                      : detailsController.text.trim(),
+                );
+
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Report submitted successfully'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Submit Report'),
+          ),
+        ],
       ),
     );
   }
@@ -258,25 +340,65 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
+                      icon: const Icon(Icons.star),
+                      label: const Text('Rate'),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => RatePostDialog(
+                            post: currentPost,
+                            onRated: () async {
+                              // Refresh post data
+                              try {
+                                final updatedPosts = await SupabaseService.getAllMapPosts();
+                                final updated = updatedPosts.firstWhere(
+                                  (p) => p.id == currentPost.id,
+                                  orElse: () => currentPost,
+                                );
+                                setState(() {
+                                  currentPost = updated;
+                                });
+                                widget.onPostUpdated?.call();
+                              } catch (e) {
+                                // Silently fail
+                              }
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.flag),
+                      label: const Text('Report'),
+                      onPressed: () {
+                        _showReportDialog();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
                       icon: const Icon(Icons.favorite),
-                      label: Text('${currentPost.likes} Likes'),
-                      onPressed: () {},
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.comment),
-                      label: const Text('Comment'),
-                      onPressed: () {},
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.share),
-                      label: const Text('Share'),
-                      onPressed: () {},
+                      label: Text('${currentPost.likes}'),
+                      onPressed: () async {
+                        await SupabaseService.likeMapPost(currentPost.id!, currentPost.likes);
+                        // Refresh post data
+                        try {
+                          final updatedPosts = await SupabaseService.getAllMapPosts();
+                          final updated = updatedPosts.firstWhere(
+                            (p) => p.id == currentPost.id,
+                            orElse: () => currentPost,
+                          );
+                          setState(() {
+                            currentPost = updated;
+                          });
+                        } catch (e) {
+                          // Silently fail
+                        }
+                      },
                     ),
                   ),
                 ],
