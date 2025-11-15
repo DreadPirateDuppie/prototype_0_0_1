@@ -14,11 +14,23 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   late Future<List<MapPost>> _userPostsFuture;
+  String? _displayName;
+  bool _isEditingName = false;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _refreshPosts();
+    _loadDisplayName();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    super.dispose();
   }
 
   void _refreshPosts() {
@@ -26,6 +38,36 @@ class _ProfileTabState extends State<ProfileTab> {
     if (user != null) {
       _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
     }
+  }
+
+  Future<void> _loadDisplayName() async {
+    final user = SupabaseService.getCurrentUser();
+    if (user != null) {
+      final displayName = await SupabaseService.getUserDisplayName(user.id);
+      setState(() {
+        _displayName = displayName;
+        _nameController.text = displayName ?? '';
+        _emailController.text = user.email ?? '';
+      });
+    }
+  }
+
+  Future<void> _saveDisplayName() async {
+    final user = SupabaseService.getCurrentUser();
+    if (user != null && _nameController.text.trim().isNotEmpty) {
+      await SupabaseService.saveUserDisplayName(user.id, _nameController.text.trim());
+      setState(() {
+        _displayName = _nameController.text.trim();
+        _isEditingName = false;
+      });
+    }
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _isEditingName = false;
+      _nameController.text = _displayName ?? '';
+    });
   }
 
   Future<void> _deletePost(String postId) async {
@@ -55,7 +97,20 @@ class _ProfileTabState extends State<ProfileTab> {
     final user = SupabaseService.getCurrentUser();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: [
+          if (!_isEditingName)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () {
+                setState(() {
+                  _isEditingName = true;
+                });
+              },
+            ),
+        ],
+      ),
       body: Column(
         children: [
           const AdBanner(),
@@ -71,7 +126,9 @@ class _ProfileTabState extends State<ProfileTab> {
                         radius: 50,
                         backgroundColor: Colors.deepPurple,
                         child: Text(
-                          user?.email?.substring(0, 1).toUpperCase() ?? 'U',
+                          (_displayName?.isNotEmpty ?? false)
+                              ? _displayName![0].toUpperCase()
+                              : user?.email?.substring(0, 1).toUpperCase() ?? 'U',
                           style: const TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
@@ -81,39 +138,61 @@ class _ProfileTabState extends State<ProfileTab> {
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        'User Profile',
+                        _displayName ?? 'User Profile',
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Email',
-                                style: Theme.of(context).textTheme.labelLarge,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                user?.email ?? 'Not available',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'User ID',
-                                style: Theme.of(context).textTheme.labelLarge,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                user?.id ?? 'Not available',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
+                      if (_isEditingName)
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Display Name',
+                                  style: Theme.of(context).textTheme.labelLarge,
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _nameController,
+                                        decoration: const InputDecoration(
+                                          hintText: 'Enter display name',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.check),
+                                      onPressed: _saveDisplayName,
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.close),
+                                      onPressed: _cancelEdit,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Email',
+                                  style: Theme.of(context).textTheme.labelLarge,
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: _emailController,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Enter email',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
                       const SizedBox(height: 24),
                       Text(
                         'My Posts',
