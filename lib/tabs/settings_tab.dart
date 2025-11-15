@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
+import '../providers/error_provider.dart';
 import '../screens/admin_dashboard.dart';
 
 class SettingsTab extends StatefulWidget {
@@ -19,9 +20,7 @@ class _SettingsTabState extends State<SettingsTab> {
       await SupabaseService.signOut();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sign out error: $error')),
-        );
+        Provider.of<ErrorProvider>(context, listen: false).showError('Sign out error: $error');
       }
     }
   }

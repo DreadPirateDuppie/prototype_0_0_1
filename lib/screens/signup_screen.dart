@@ -47,7 +47,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         displayName: _displayNameController.text,
       );
       if (mounted) {
-        context.read<ErrorProvider>().showError('Sign up successful! Please sign in.');
+        Provider.of<ErrorProvider>(context, listen: false).showError('Sign up successful! Please sign in.');
         Navigator.of(context).pop();
       }
     } catch (error) {

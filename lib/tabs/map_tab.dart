@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
 import '../widgets/ad_banner.dart';
+import '../providers/error_provider.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -113,9 +115,7 @@ class _MapTabState extends State<MapTab> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting location: $e')),
-        );
+        Provider.of<ErrorProvider>(context, listen: false).showError('Error getting location: $e');
       }
     }
   }
@@ -176,12 +176,7 @@ class _MapTabState extends State<MapTab> {
                   ),
                 );
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$title - $subtitle'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
+                Provider.of<ErrorProvider>(context, listen: false).showError('$title - $subtitle');
               }
             },
             child: Container(
@@ -203,12 +198,7 @@ class _MapTabState extends State<MapTab> {
       _isPinMode = !_isPinMode;
     });
     if (_isPinMode) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tap on the map to place a pin'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      Provider.of<ErrorProvider>(context, listen: false).showError('Tap on the map to place a pin');
     }
   }
 

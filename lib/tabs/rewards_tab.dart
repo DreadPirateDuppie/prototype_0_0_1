@@ -72,7 +72,7 @@ class _RewardsTabState extends State<RewardsTab> {
       );
     } catch (e) {
       if (!mounted) return;
-      context.read<ErrorProvider>().showError('Error updating points: $e');
+      Provider.of<ErrorProvider>(context, listen: false).showError('Error updating points: $e');
     }
   }
 

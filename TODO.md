@@ -1,2 +1,3 @@
 - [x] Replace the ListTile with ElevatedButton.icon titled "Admin Tools" in lib/tabs/settings_tab.dart
 - [x] Add user statistics functionality to admin dashboard (view posts made, reward points, etc.)
+- [x] Implement global error overlay that displays errors at the bottom of the screen, above all UI elements

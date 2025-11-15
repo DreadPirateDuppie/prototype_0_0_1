@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/post.dart';
 import '../screens/edit_post_dialog.dart';
 import '../screens/rate_post_dialog.dart';
 import '../services/supabase_service.dart';
+import '../providers/error_provider.dart';
 
 class SpotDetailsBottomSheet extends StatefulWidget {
   final MapPost post;
@@ -102,10 +104,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
           ElevatedButton(
             onPressed: () async {
               if (reasonController.text.trim().isEmpty) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please provide a reason')),
-                );
+                Provider.of<ErrorProvider>(context, listen: false).showError('Please provide a reason');
                 return;
               }
 
@@ -120,11 +119,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
 
                 if (!context.mounted) return;
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Report submitted successfully'),
-                  ),
-                );
+                Provider.of<ErrorProvider>(context, listen: false).showError('Report submitted successfully');
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

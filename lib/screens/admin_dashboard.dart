@@ -41,16 +41,16 @@ class _AdminDashboardState extends State<AdminDashboard>
     try {
       final posts = await SupabaseService.getAllMapPosts();
       final reports = await SupabaseService.getReportedPosts();
-      
+
       // Calculate analytics
       final totalPosts = posts.length;
       final totalLikes = posts.fold<int>(0, (sum, post) => sum + post.likes);
       final totalReports = reports.length;
       final avgLikesPerPost = totalPosts > 0 ? (totalLikes / totalPosts).toStringAsFixed(1) : '0';
-      
+
       // Get posts with photos
       final postsWithPhotos = posts.where((p) => p.photoUrl != null && p.photoUrl!.isNotEmpty).length;
-      
+
       return {
         'totalPosts': totalPosts,
         'totalLikes': totalLikes,
@@ -98,7 +98,7 @@ class _AdminDashboardState extends State<AdminDashboard>
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Post deleted successfully')),
           );
-          _loadReports();
+          _loadData();
         }
       } catch (e) {
         if (mounted) {
@@ -561,13 +561,13 @@ class _AdminDashboardState extends State<AdminDashboard>
           }
 
           final posts = snapshot.data ?? [];
-          
+
           // Extract unique users from posts
           final userMap = <String, Map<String, dynamic>>{};
           for (var post in posts) {
             final userId = post.userId;
             final userName = post.userName ?? 'Unknown User';
-            
+
             if (!userMap.containsKey(userId)) {
               userMap[userId] = {
                 'name': userName,
@@ -576,9 +576,9 @@ class _AdminDashboardState extends State<AdminDashboard>
                 'totalLikes': post.likes,
               };
             } else {
-              userMap[userId]!['postCount'] = 
+              userMap[userId]!['postCount'] =
                   (userMap[userId]!['postCount'] as int) + 1;
-              userMap[userId]!['totalLikes'] = 
+              userMap[userId]!['totalLikes'] =
                   (userMap[userId]!['totalLikes'] as int) + post.likes;
             }
           }
@@ -624,9 +624,8 @@ class _AdminDashboardState extends State<AdminDashboard>
               ),
               const SizedBox(height: 16),
               ...users.map((entry) {
-                final userId = entry.key;
                 final userData = entry.value;
-                
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
@@ -644,15 +643,6 @@ class _AdminDashboardState extends State<AdminDashboard>
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '${userData['totalLikes']} likes',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
->>>>>>> 26e8f460c2110169a16419e73d2bde744c12f423
-                        ),
-=======
-                        Text(
                           '${userData['postCount']} posts',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
@@ -662,15 +652,6 @@ class _AdminDashboardState extends State<AdminDashboard>
                             fontSize: 12,
                             color: Colors.grey[600],
                           ),
-                        ),
-=======
-                        Text(
-                          '${userData['totalLikes']} likes',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
->>>>>>> 26e8f460c2110169a16419e73d2bde744c12f423
                         ),
                       ],
                     ),
