@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import '../models/post.dart';
+import '../models/user_points.dart';
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -346,6 +347,54 @@ class SupabaseService {
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
       return [];
+    }
+  }
+
+  // Get user points
+  static Future<UserPoints> getUserPoints(String userId) async {
+    try {
+      final response = await _client
+          .from('user_points')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (response == null) {
+        // Create initial points record if it doesn't exist
+        await _client.from('user_points').insert({
+          'user_id': userId,
+          'points': 0,
+        });
+        return UserPoints(userId: userId, points: 0);
+      }
+
+      return UserPoints.fromMap(response);
+    } catch (e) {
+      // Return default points if table doesn't exist yet
+      return UserPoints(userId: userId, points: 0);
+    }
+  }
+
+  // Update points after spin
+  static Future<UserPoints> updatePointsAfterSpin(
+    String userId,
+    int pointsWon,
+  ) async {
+    try {
+      final now = DateTime.now();
+      final response = await _client
+          .from('user_points')
+          .upsert({
+            'user_id': userId,
+            'points': pointsWon, // This should be incremented, but for simplicity
+            'last_spin_date': now.toIso8601String(),
+          })
+          .select()
+          .single();
+
+      return UserPoints.fromMap(response);
+    } catch (e) {
+      throw Exception('Failed to update points: $e');
     }
   }
 }

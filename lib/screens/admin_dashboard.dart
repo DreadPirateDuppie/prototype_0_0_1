@@ -187,6 +187,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             OutlinedButton(
                               onPressed: () {
                                 // Dismiss report (implement as needed)
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text('Report dismissed'),

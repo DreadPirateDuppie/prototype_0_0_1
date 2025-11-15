@@ -38,11 +38,10 @@ class _AddPostDialogState extends State<AddPostDialog> {
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
         // Show loading indicator
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Compressing image...')),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Compressing image...')),
+        );
 
         // Compress the image
         final compressedImage = await ImageService.compressImage(File(image.path));
@@ -52,12 +51,12 @@ class _AddPostDialogState extends State<AddPostDialog> {
             _selectedImage = compressedImage;
           });
           
-          if (mounted) {
-            final sizeMB = await ImageService.getFileSizeMB(compressedImage);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Image ready (${sizeMB.toStringAsFixed(2)} MB)')),
-            );
-          }
+          if (!mounted) return;
+          final sizeMB = await ImageService.getFileSizeMB(compressedImage);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Image ready (${sizeMB.toStringAsFixed(2)} MB)')),
+          );
         }
       }
     } catch (e) {

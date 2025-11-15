@@ -43,13 +43,12 @@ class _RatePostDialogState extends State<RatePostDialog> {
         qualityRating: _qualityRating,
       );
 
-      if (mounted) {
-        widget.onRated();
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Rating submitted successfully!')),
-        );
-      }
+      if (!mounted) return;
+      widget.onRated();
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Rating submitted successfully!')),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

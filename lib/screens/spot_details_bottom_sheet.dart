@@ -102,6 +102,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
           ElevatedButton(
             onPressed: () async {
               if (reasonController.text.trim().isEmpty) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Please provide a reason')),
                 );
@@ -117,14 +118,13 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                       : detailsController.text.trim(),
                 );
 
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Report submitted successfully'),
-                    ),
-                  );
-                }
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Report submitted successfully'),
+                  ),
+                );
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
