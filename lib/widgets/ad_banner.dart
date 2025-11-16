@@ -75,7 +75,7 @@ class _AdBannerState extends State<AdBanner> {
   @override
   Widget build(BuildContext context) {
     final currentAd = _advertisements[_currentAdIndex];
-    
+
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 500),
       transitionBuilder: (Widget child, Animation<double> animation) {
@@ -97,7 +97,7 @@ class _AdBannerState extends State<AdBanner> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              (currentAd['color'] as Color).withOpacity(0.1),
+              (currentAd['color'] as Color).withAlpha(26), // ~10% opacity
               Theme.of(context).brightness == Brightness.dark
                   ? Colors.grey[800]!
                   : Colors.grey[200]!,
@@ -141,12 +141,8 @@ class _AdBannerState extends State<AdBanner> {
                       children: [
                         Text(
                           currentAd['title'] as String,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
@@ -164,7 +160,9 @@ class _AdBannerState extends State<AdBanner> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: (currentAd['color'] as Color).withOpacity(0.2),
+                      color: (currentAd['color'] as Color).withAlpha(
+                        51,
+                      ), // ~20% opacity
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: currentAd['color'] as Color,

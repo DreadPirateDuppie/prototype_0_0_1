@@ -37,25 +37,34 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
   }
 
   void _showEditDialog() {
+    final dialogContext = context; // Store context before async gap
     showDialog(
-      context: context,
+      context: dialogContext,
       builder: (context) => EditPostDialog(
         post: currentPost,
         onPostUpdated: () async {
           // Refresh the post data
           try {
             final updatedPosts = await SupabaseService.getAllMapPosts();
+            if (!mounted) return; // Check if widget is still mounted
+
             final updated = updatedPosts.firstWhere(
               (p) => p.id == currentPost.id,
               orElse: () => currentPost,
             );
+
             setState(() {
               currentPost = updated;
             });
+
             widget.onPostUpdated?.call();
-            Navigator.of(context).pop();
+            if (context.mounted) {
+              Navigator.of(context).pop();
+            }
           } catch (e) {
-            // Silently fail
+            if (context.mounted) {
+              Navigator.of(context).pop();
+            }
           }
         },
       ),
@@ -104,7 +113,10 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
           ElevatedButton(
             onPressed: () async {
               if (reasonController.text.trim().isEmpty) {
-                Provider.of<ErrorProvider>(context, listen: false).showError('Please provide a reason');
+                Provider.of<ErrorProvider>(
+                  context,
+                  listen: false,
+                ).showError('Please provide a reason');
                 return;
               }
 
@@ -119,12 +131,15 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
 
                 if (!context.mounted) return;
                 Navigator.pop(context);
-                Provider.of<ErrorProvider>(context, listen: false).showError('Report submitted successfully');
+                Provider.of<ErrorProvider>(
+                  context,
+                  listen: false,
+                ).showError('Report submitted successfully');
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
               }
             },
@@ -139,10 +154,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
   Widget _buildStarRating(double rating, String label) {
     return Column(
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
         const SizedBox(height: 4),
         Row(
           children: List.generate(5, (index) {
@@ -194,8 +206,8 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                       (currentPost.userName?.isNotEmpty ?? false)
                           ? currentPost.userName![0].toUpperCase()
                           : (currentPost.userEmail?.isNotEmpty ?? false)
-                              ? currentPost.userEmail![0].toUpperCase()
-                              : '?',
+                          ? currentPost.userEmail![0].toUpperCase()
+                          : '?',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -286,10 +298,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                           currentPost.securityRating,
                           'Security',
                         ),
-                        _buildStarRating(
-                          currentPost.qualityRating,
-                          'Quality',
-                        ),
+                        _buildStarRating(currentPost.qualityRating, 'Quality'),
                       ],
                     ),
                   ],
@@ -305,10 +314,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                   const SizedBox(width: 8),
                   Text(
                     '${currentPost.latitude.toStringAsFixed(4)}, ${currentPost.longitude.toStringAsFixed(4)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -321,10 +327,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                   const SizedBox(width: 8),
                   Text(
                     currentPost.createdAt.toString().substring(0, 16),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -345,7 +348,8 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                             onRated: () async {
                               // Refresh post data
                               try {
-                                final updatedPosts = await SupabaseService.getAllMapPosts();
+                                final updatedPosts =
+                                    await SupabaseService.getAllMapPosts();
                                 final updated = updatedPosts.firstWhere(
                                   (p) => p.id == currentPost.id,
                                   orElse: () => currentPost,
@@ -379,10 +383,14 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                       icon: const Icon(Icons.favorite),
                       label: Text('${currentPost.likes}'),
                       onPressed: () async {
-                        await SupabaseService.likeMapPost(currentPost.id!, currentPost.likes);
+                        await SupabaseService.likeMapPost(
+                          currentPost.id!,
+                          currentPost.likes,
+                        );
                         // Refresh post data
                         try {
-                          final updatedPosts = await SupabaseService.getAllMapPosts();
+                          final updatedPosts =
+                              await SupabaseService.getAllMapPosts();
                           final updated = updatedPosts.firstWhere(
                             (p) => p.id == currentPost.id,
                             orElse: () => currentPost,

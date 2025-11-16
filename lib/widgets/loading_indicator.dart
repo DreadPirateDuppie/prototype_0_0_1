@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/index.dart';
 
 /// A reusable loading indicator widget
 class LoadingIndicator extends StatelessWidget {
@@ -8,12 +9,12 @@ class LoadingIndicator extends StatelessWidget {
   final Color? color;
 
   const LoadingIndicator({
-    Key? key,
+    super.key,
     this.message,
     this.size = 32.0,
     this.strokeWidth = 2.0,
     this.color,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +63,7 @@ class StateBuilder<T> extends StatelessWidget {
   final bool showErrorOnRefresh;
 
   const StateBuilder({
-    Key? key,
+    super.key,
     required this.state,
     required this.builder,
     this.onInitial,
@@ -71,14 +72,13 @@ class StateBuilder<T> extends StatelessWidget {
     this.onEmpty,
     this.showLoadingOnRefresh = true,
     this.showErrorOnRefresh = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    return state.when(
+    return state.when<Widget>(
       initial: () => onInitial?.call() ?? const SizedBox.shrink(),
-      loading: (message) =>
-          onLoading?.call(message) ??
+      loading: (message) => onLoading?.call(message) ??
           Center(child: LoadingIndicator(message: message)),
       loaded: (data) => builder(data),
       error: (error) => onError?.call(error) ?? _buildErrorWidget(context, error),

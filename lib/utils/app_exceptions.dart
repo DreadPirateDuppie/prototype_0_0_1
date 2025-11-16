@@ -12,30 +12,25 @@ abstract class AppException implements Exception {
 
 /// Thrown when there's an authentication error
 class AuthException extends AppException {
-  const AuthException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  const AuthException(super.message, {super.code, super.details});
 }
 
 /// Thrown when there's a network error
 class NetworkException extends AppException {
-  const NetworkException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  const NetworkException(super.message, {super.code, super.details});
 }
 
 /// Thrown when there's a data validation error
 class ValidationException extends AppException {
-  const ValidationException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  const ValidationException(super.message, {super.code, super.details});
 }
 
 /// Thrown when a requested resource is not found
 class NotFoundException extends AppException {
-  const NotFoundException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  const NotFoundException(super.message, {super.code, super.details});
 }
 
 /// Thrown when there's a permission error
 class PermissionException extends AppException {
-  const PermissionException(String message, {String? code, dynamic details})
-      : super(message, code: code, details: details);
+  const PermissionException(super.message, {super.code, super.details});
 }
