@@ -175,11 +175,25 @@ class _FeedTabState extends State<FeedTab> {
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.comment),
-                                    onPressed: () {},
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Comments feature coming soon!'),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.share),
-                                    onPressed: () {},
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Share feature coming soon!'),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),

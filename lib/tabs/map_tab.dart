@@ -35,28 +35,26 @@ class _MapTabState extends State<MapTab> {
 
   Future<void> _loadUserPosts() async {
     try {
-      final user = SupabaseService.getCurrentUser();
-      if (user != null) {
-        final posts = await SupabaseService.getUserMapPosts(user.id);
-        if (mounted) {
-          setState(() {
-            userPosts = posts;
-            // Clear all markers and rebuild from scratch
-            markers.clear();
-            markerPostMap.clear();
-            _addSampleMarkers();
-            // Add current location marker if available
-            if (!_isLoading) {
-              _addMarkerToList(
-                currentLocation,
-                'Your Location',
-                'You are here',
-                Colors.blue,
-              );
-            }
-            _addUserPostMarkers();
-          });
-        }
+      // Load ALL posts from ALL users, not just current user's posts
+      final posts = await SupabaseService.getAllMapPosts();
+      if (mounted) {
+        setState(() {
+          userPosts = posts;
+          // Clear all markers and rebuild from scratch
+          markers.clear();
+          markerPostMap.clear();
+          _addSampleMarkers();
+          // Add current location marker if available
+          if (!_isLoading) {
+            _addMarkerToList(
+              currentLocation,
+              'Your Location',
+              'You are here',
+              Colors.blue,
+            );
+          }
+          _addUserPostMarkers();
+        });
       }
     } catch (e) {
       // Silently fail
