@@ -116,7 +116,10 @@ class _MapTabState extends State<MapTab> {
         _isLoading = false;
       });
       if (mounted) {
-        Provider.of<ErrorProvider>(context, listen: false).showError('Error getting location: $e');
+        Provider.of<ErrorProvider>(
+          context,
+          listen: false,
+        ).showError('Error getting location: $e');
       }
     }
   }
@@ -169,7 +172,9 @@ class _MapTabState extends State<MapTab> {
                   context: context,
                   isScrollControlled: true,
                   shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
                   builder: (context) => SpotDetailsBottomSheet(
                     post: post,
@@ -177,7 +182,10 @@ class _MapTabState extends State<MapTab> {
                   ),
                 );
               } else {
-                Provider.of<ErrorProvider>(context, listen: false).showError('$title - $subtitle');
+                Provider.of<ErrorProvider>(
+                  context,
+                  listen: false,
+                ).showError('$title - $subtitle');
               }
             },
             child: Container(
@@ -186,7 +194,11 @@ class _MapTabState extends State<MapTab> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.white, width: 2),
               ),
-              child: const Icon(Icons.location_on, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.location_on,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ),
         ),
@@ -318,89 +330,148 @@ class _MapTabState extends State<MapTab> {
                     mapController: mapController,
                     options: MapOptions(
                       initialCenter: currentLocation,
-                initialZoom: 13.0,
-                minZoom: 5.0,
-                maxZoom: 18.0,
-                onTap: (tapPosition, point) => _handleMapTap(point),
-              ),
-              children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.prototype_0_0_1',
-              maxZoom: 19,
-            ),
-            MarkerLayer(
-              markers: markers,
-            ),
-          ],
-        ),
-        if (_isLoading)
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const CircularProgressIndicator(),
-            ),
-          ),
-        // Zoom buttons
-        Positioned(
-          bottom: 100,
-          right: 16,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FloatingActionButton(
-                mini: true,
-                onPressed: () {
-                  mapController.move(
-                    mapController.camera.center,
-                    mapController.camera.zoom + 1,
-                  );
-                },
-                backgroundColor: Colors.deepPurple,
-                child: const Icon(Icons.add),
-              ),
-              const SizedBox(height: 8),
-              FloatingActionButton(
-                mini: true,
-                onPressed: () {
-                  mapController.move(
-                    mapController.camera.center,
-                    mapController.camera.zoom - 1,
-                  );
-                },
-                backgroundColor: Colors.deepPurple,
-                child: const Icon(Icons.remove),
-              ),
-            ],
-          ),
-        ),
-        // Share location toggle
-        Positioned(
-          bottom: 16,
-          left: 16,
-          child: FloatingActionButton(
-            onPressed: _toggleShareLocation,
-            backgroundColor:
-                _isSharingLocation ? Colors.green : Colors.deepPurple,
-            child: Icon(
-              _isSharingLocation ? Icons.share_location : Icons.location_disabled,
-            ),
-          ),
-        ),
-        // Pin placement button
-        Positioned(
-          bottom: 16,
-          right: 16,
-          child: FloatingActionButton(
-            onPressed: _togglePinMode,
-            backgroundColor: _isPinMode ? Colors.red : Colors.deepPurple,
-            child: Icon(_isPinMode ? Icons.close : Icons.location_on),
-          ),
-        ),
+                      initialZoom: 13.0,
+                      onTap: (tapPosition, point) => _handleMapTap(point),
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.prototype_0_0_1',
+                      ),
+                      MarkerLayer(markers: markers),
+                    ],
+                  ),
+                  // Location sharing slider at the top
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 3,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(30),
+                              blurRadius: 6,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: _isSharingLocation
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withAlpha(100)
+                                : Theme.of(context).dividerColor,
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _isSharingLocation
+                                  ? Icons.location_on_rounded
+                                  : Icons.location_off_rounded,
+                              color: _isSharingLocation
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).hintColor,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Share Location',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.2,
+                                  ),
+                            ),
+                            const SizedBox(width: 4),
+                            Transform.scale(
+                              scale: 0.7,
+                              child: Switch.adaptive(
+                                value: _isSharingLocation,
+                                activeThumbColor: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimary,
+                                activeTrackColor: Theme.of(
+                                  context,
+                                ).colorScheme.primary,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                onChanged: (value) => _toggleShareLocation(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_isLoading)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const CircularProgressIndicator(),
+                      ),
+                    ),
+                  // Zoom buttons
+                  Positioned(
+                    bottom: 100,
+                    right: 16,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FloatingActionButton(
+                          mini: true,
+                          onPressed: () {
+                            mapController.move(
+                              mapController.camera.center,
+                              mapController.camera.zoom + 1,
+                            );
+                          },
+                          backgroundColor: Colors.deepPurple,
+                          child: const Icon(Icons.add),
+                        ),
+                        const SizedBox(height: 8),
+                        FloatingActionButton(
+                          mini: true,
+                          onPressed: () {
+                            mapController.move(
+                              mapController.camera.center,
+                              mapController.camera.zoom - 1,
+                            );
+                          },
+                          backgroundColor: Colors.deepPurple,
+                          child: const Icon(Icons.remove),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Pin placement button
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: FloatingActionButton(
+                      onPressed: _togglePinMode,
+                      backgroundColor: _isPinMode
+                          ? Colors.red
+                          : Colors.deepPurple,
+                      child: Icon(_isPinMode ? Icons.close : Icons.location_on),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -416,4 +487,3 @@ class _MapTabState extends State<MapTab> {
     super.dispose();
   }
 }
-
