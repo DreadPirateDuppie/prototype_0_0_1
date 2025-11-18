@@ -4,6 +4,7 @@ import '../models/battle.dart';
 import '../services/battle_service.dart';
 import '../screens/battle_detail_screen.dart';
 import '../screens/create_battle_dialog.dart';
+import '../screens/community_verification_screen.dart';
 
 class VsTab extends StatefulWidget {
   const VsTab({super.key});
@@ -114,6 +115,20 @@ class _VsTabState extends State<VsTab> {
         title: const Text('VS Battles'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.verified_user),
+            tooltip: 'Community Verification',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CommunityVerificationScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
