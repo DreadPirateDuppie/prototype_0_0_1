@@ -4,6 +4,7 @@ import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
 import '../providers/error_provider.dart';
 import '../screens/admin_dashboard_screen.dart';
+import '../screens/home_screen.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -20,7 +21,10 @@ class _SettingsTabState extends State<SettingsTab> {
       await SupabaseService.signOut();
     } catch (error) {
       if (mounted) {
-        Provider.of<ErrorProvider>(context, listen: false).showError('Sign out error: $error');
+        Provider.of<ErrorProvider>(
+          context,
+          listen: false,
+        ).showError('Sign out error: $error');
       }
     }
   }
@@ -31,14 +35,26 @@ class _SettingsTabState extends State<SettingsTab> {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
+          ListTile(
+            leading: const Icon(Icons.edit),
+            title: const Text('Edit Profile'),
+            onTap: () {
+              // Pop back to home screen
+              Navigator.of(context).popUntil((route) => route.isFirst);
+
+              // Access the home screen's state to switch tabs
+              final homeState = HomeScreen.of(context);
+              if (homeState != null && homeState.mounted) {
+                homeState.setTab(4, editMode: true);
+              }
+            },
+          ),
+          const Divider(),
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(
               'Preferences',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           SwitchListTile(
@@ -64,10 +80,7 @@ class _SettingsTabState extends State<SettingsTab> {
             padding: EdgeInsets.all(16.0),
             child: Text(
               'Account',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           ListTile(
@@ -90,10 +103,7 @@ class _SettingsTabState extends State<SettingsTab> {
             padding: EdgeInsets.all(16.0),
             child: Text(
               'Administration',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           ListTile(
