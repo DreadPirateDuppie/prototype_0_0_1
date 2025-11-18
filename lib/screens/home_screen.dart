@@ -86,8 +86,15 @@ class _HomeScreenState extends State<HomeScreen> implements HomeScreenState {
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
+        currentIndex: _selectedIndex >= 5
+            ? 4
+            : _selectedIndex, // Handle settings tab index
+        onTap: (index) {
+          // Only allow navigation to tabs 0-4 (Feed, Map, VS, Rewards, Profile)
+          if (index < 5) {
+            _onItemTapped(index);
+          }
+        },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Colors.deepPurple,
         unselectedItemColor: Colors.grey,
@@ -103,10 +110,6 @@ class _HomeScreenState extends State<HomeScreen> implements HomeScreenState {
             label: 'Rewards',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
         ],
       ),
     );
