@@ -118,6 +118,12 @@ class _AddPostDialogState extends State<AddPostDialog> {
           widget.onPostAdded();
           Navigator.of(context).pop();
         }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('You must be logged in to create a post')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

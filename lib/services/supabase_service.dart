@@ -5,6 +5,7 @@ import '../models/user_points.dart';
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
+  static RealtimeChannel? _activeSkatersChannel;
 
   // Get current user session
   static User? getCurrentUser() {
@@ -414,6 +415,71 @@ class SupabaseService {
       }
     } catch (e) {
       throw Exception('Failed to update points: $e');
+    }
+  }
+
+  // Presence: Active skaters sharing location
+  static Future<void> startLocationSharing({
+    required double latitude,
+    required double longitude,
+    String? spotId,
+  }) async {
+    final user = getCurrentUser();
+    if (user == null) return;
+
+    try {
+      _activeSkatersChannel ??=
+          _client.channel('active_skaters', opts: const RealtimeChannelConfig(self: true));
+      _activeSkatersChannel!.onPresenceSync((_) {});
+      _activeSkatersChannel!.subscribe((status, [ref]) async {
+        if (status == RealtimeSubscribeStatus.subscribed) {
+          final username = await getUserUsername(user.id) ?? user.email ?? 'Skater';
+          await _activeSkatersChannel!.track({
+            'user_id': user.id,
+            'username': username,
+            'lat': latitude,
+            'lng': longitude,
+            'spot_id': spotId,
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+        }
+      });
+    } catch (e) {
+      // Silently fail if realtime not available
+    }
+  }
+
+  static Future<void> stopLocationSharing() async {
+    try {
+      await _activeSkatersChannel?.untrack();
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
+  static List<Map<String, dynamic>> getActiveSkatersPresence() {
+    try {
+      final state = _activeSkatersChannel?.presenceState();
+      if (state == null) return [];
+      final List<Map<String, dynamic>> result = [];
+      for (final single in state as List) {
+        final dynamic metas = (single as dynamic).metas ?? single['metas'];
+        if (metas is List) {
+          for (final m in metas) {
+            try {
+              final dynamic payload = (m as dynamic).payload ?? m['payload'] ?? m;
+              if (payload is Map) {
+                result.add(Map<String, dynamic>.from(payload));
+              }
+            } catch (e) {
+              // ignore malformed payloads
+            }
+          }
+        }
+      }
+      return result;
+    } catch (e) {
+      return [];
     }
   }
 }

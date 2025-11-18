@@ -3,6 +3,7 @@ import '../tabs/map_tab.dart';
 import '../tabs/feed_tab.dart';
 import '../tabs/profile_tab.dart';
 import '../tabs/rewards_tab.dart';
+import '../tabs/vs_tab.dart';
 import '../tabs/settings_tab.dart';
 import '../services/connectivity_service.dart';
 
@@ -36,8 +37,10 @@ class _HomeScreenState extends State<HomeScreen> {
       case 2:
         return const MapTab();
       case 3:
-        return const RewardsTab();
+        return const VsTab();
       case 4:
+        return const RewardsTab();
+      case 5:
         return const SettingsTab();
       default:
         return const MapTab();
@@ -71,6 +74,10 @@ class _HomeScreenState extends State<HomeScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.location_on),
               label: 'Map',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.sports_kabaddi),
+              label: 'VS',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.card_giftcard),

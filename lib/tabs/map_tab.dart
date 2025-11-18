@@ -25,6 +25,7 @@ class _MapTabState extends State<MapTab> {
   LatLng currentLocation = const LatLng(37.7749, -122.4194); // Default: SF
   bool _isLoading = true;
   bool _isPinMode = false;
+  bool _isSharingLocation = false;
 
   @override
   void initState() {
@@ -198,12 +199,92 @@ class _MapTabState extends State<MapTab> {
       _isPinMode = !_isPinMode;
     });
     if (_isPinMode) {
-      Provider.of<ErrorProvider>(context, listen: false).showError('Tap on the map to place a pin');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Tap on the map to place a pin'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  String? _nearestSpotId(LatLng location, {double radiusMeters = 250}) {
+    try {
+      final d = Distance();
+      String? nearestId;
+      double nearest = double.infinity;
+      for (final entry in markerPostMap.entries) {
+        final parts = entry.key.split(',');
+        if (parts.length != 2) continue;
+        final lat = double.tryParse(parts[0]);
+        final lng = double.tryParse(parts[1]);
+        if (lat == null || lng == null) continue;
+        final dist = d(location, LatLng(lat, lng));
+        if (dist < nearest) {
+          nearest = dist;
+          nearestId = entry.value.id;
+        }
+      }
+      if (nearest <= radiusMeters) {
+        return nearestId;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> _toggleShareLocation() async {
+    final user = SupabaseService.getCurrentUser();
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sign in to share your location')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSharingLocation = !_isSharingLocation;
+    });
+
+    if (_isSharingLocation) {
+      final spotId = _nearestSpotId(currentLocation);
+      await SupabaseService.startLocationSharing(
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        spotId: spotId,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            spotId != null
+                ? 'Sharing location at spot'
+                : 'Sharing your current location',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      await SupabaseService.stopLocationSharing();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Stopped sharing location'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
   void _handleMapTap(LatLng location) {
     if (_isPinMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pin location selected! Opening post dialog...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
       _showAddPostDialog(location);
     }
   }
@@ -295,6 +376,19 @@ class _MapTabState extends State<MapTab> {
                 child: const Icon(Icons.remove),
               ),
             ],
+          ),
+        ),
+        // Share location toggle
+        Positioned(
+          bottom: 16,
+          left: 16,
+          child: FloatingActionButton(
+            onPressed: _toggleShareLocation,
+            backgroundColor:
+                _isSharingLocation ? Colors.green : Colors.deepPurple,
+            child: Icon(
+              _isSharingLocation ? Icons.share_location : Icons.location_disabled,
+            ),
           ),
         ),
         // Pin placement button

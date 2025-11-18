@@ -65,51 +65,11 @@ class MyApp extends StatelessWidget {
           title: 'Supabase Auth App',
           theme: themeProvider.getLightTheme(),
           darkTheme: themeProvider.getDarkTheme(),
-          themeMode: themeProvider.isDarkMode
-              ? ThemeMode.dark
-              : ThemeMode.light,
+          themeMode:
+              themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
           home: const AuthWrapper(),
           builder: (context, child) {
-            return Stack(
-              children: [
-                child!,
-                Consumer<ErrorProvider>(
-                  builder: (context, errorProvider, child) {
-                    if (!errorProvider.isVisible) {
-                      return const SizedBox.shrink();
-                    }
-                    return Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        color: Colors.red,
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error, color: Colors.white),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                errorProvider.errorMessage ?? '',
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: errorProvider.hideError,
-                              icon: const Icon(
-                                Icons.close,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            );
+            return child!;
           },
         );
       },
