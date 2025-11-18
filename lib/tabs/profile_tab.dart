@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
+import '../services/battle_service.dart';
 import '../models/post.dart';
+import '../models/user_scores.dart';
 import '../screens/edit_post_dialog.dart';
 import '../screens/edit_username_dialog.dart';
 import '../widgets/star_rating_display.dart';
@@ -15,12 +17,14 @@ class ProfileTab extends StatefulWidget {
 class _ProfileTabState extends State<ProfileTab> {
   late Future<List<MapPost>> _userPostsFuture;
   late Future<String?> _usernameFuture;
+  late Future<UserScores> _userScoresFuture;
 
   @override
   void initState() {
     super.initState();
     _refreshPosts();
     _refreshUsername();
+    _refreshScores();
   }
 
   void _refreshPosts() {
@@ -34,6 +38,13 @@ class _ProfileTabState extends State<ProfileTab> {
     final user = SupabaseService.getCurrentUser();
     if (user != null) {
       _usernameFuture = SupabaseService.getUserUsername(user.id);
+    }
+  }
+
+  void _refreshScores() {
+    final user = SupabaseService.getCurrentUser();
+    if (user != null) {
+      _userScoresFuture = BattleService.getUserScores(user.id);
     }
   }
 
@@ -98,6 +109,41 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  Widget _buildScoreRow(String label, double score, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Text(
+              '${score.toStringAsFixed(0)} / 1000',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        LinearProgressIndicator(
+          value: score / 1000,
+          backgroundColor: color.withOpacity(0.2),
+          valueColor: AlwaysStoppedAnimation<Color>(color),
+          minHeight: 8,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = SupabaseService.getCurrentUser();
@@ -109,6 +155,7 @@ class _ProfileTabState extends State<ProfileTab> {
           setState(() {
             _refreshPosts();
             _refreshUsername();
+            _refreshScores();
           });
         },
         child: SingleChildScrollView(
@@ -201,6 +248,76 @@ class _ProfileTabState extends State<ProfileTab> {
                               Text(
                                 user?.id ?? 'Not available',
                                 style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Battle Stats',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 16),
+                              FutureBuilder<UserScores>(
+                                future: _userScoresFuture,
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
+
+                                  final scores = snapshot.data;
+                                  if (scores == null) {
+                                    return const Text('No scores available');
+                                  }
+
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildScoreRow(
+                                        'Map Score',
+                                        scores.mapScore,
+                                        Colors.blue,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _buildScoreRow(
+                                        'Player Score',
+                                        scores.playerScore,
+                                        Colors.green,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _buildScoreRow(
+                                        'Ranking Score',
+                                        scores.rankingScore,
+                                        Colors.orange,
+                                      ),
+                                      const Divider(height: 24),
+                                      _buildScoreRow(
+                                        'Final Score',
+                                        scores.finalScore,
+                                        Colors.deepPurple,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Vote Influence: ${(scores.voteWeight * 100).toStringAsFixed(1)}%',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
                             ],
                           ),
