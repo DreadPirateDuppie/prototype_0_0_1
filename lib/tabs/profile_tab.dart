@@ -4,6 +4,7 @@ import '../models/post.dart';
 import '../screens/edit_post_dialog.dart';
 import '../screens/edit_username_dialog.dart';
 import '../widgets/star_rating_display.dart';
+import '../screens/home_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   final bool editMode;
@@ -227,10 +228,17 @@ class _ProfileTabState extends State<ProfileTab>
       appBar: AppBar(
         title: const Text('My Profile'),
         actions: [
-          IconButton(
-            icon: Icon(_isEditing ? Icons.check : Icons.edit),
-            onPressed: _toggleEdit,
-          ),
+          if (_isEditing)
+            IconButton(icon: const Icon(Icons.check), onPressed: _toggleEdit)
+          else
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                HomeScreen.of(
+                  context,
+                )?.setTab(5); // Navigate to Settings tab (index 5)
+              },
+            ),
         ],
       ),
       body: SingleChildScrollView(
