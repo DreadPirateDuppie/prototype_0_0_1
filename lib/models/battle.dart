@@ -1,0 +1,147 @@
+enum GameMode {
+  skate,  // S-K-A-T-E
+  sk8,    // S-K-8
+  custom  // User defined letters
+}
+
+enum VerificationStatus {
+  pending,
+  quickFireVoting,
+  communityVerification,
+  resolved
+}
+
+enum VoteType {
+  land,
+  noLand,
+  rebate
+}
+
+class Battle {
+  final String? id;
+  final String player1Id;
+  final String player2Id;
+  final GameMode gameMode;
+  final String customLetters;
+  final String player1Letters;
+  final String player2Letters;
+  final String? setTrickVideoUrl;
+  final String? attemptVideoUrl;
+  final VerificationStatus verificationStatus;
+  final DateTime createdAt;
+  final DateTime? completedAt;
+  final String? winnerId;
+  final String currentTurnPlayerId;
+
+  Battle({
+    this.id,
+    required this.player1Id,
+    required this.player2Id,
+    required this.gameMode,
+    this.customLetters = '',
+    this.player1Letters = '',
+    this.player2Letters = '',
+    this.setTrickVideoUrl,
+    this.attemptVideoUrl,
+    this.verificationStatus = VerificationStatus.pending,
+    required this.createdAt,
+    this.completedAt,
+    this.winnerId,
+    required this.currentTurnPlayerId,
+  });
+
+  String getGameLetters() {
+    switch (gameMode) {
+      case GameMode.skate:
+        return 'SKATE';
+      case GameMode.sk8:
+        return 'SK8';
+      case GameMode.custom:
+        return customLetters;
+    }
+  }
+
+  bool isComplete() {
+    final targetLetters = getGameLetters();
+    return player1Letters == targetLetters || player2Letters == targetLetters;
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'player1_id': player1Id,
+      'player2_id': player2Id,
+      'game_mode': gameMode.toString().split('.').last,
+      'custom_letters': customLetters,
+      'player1_letters': player1Letters,
+      'player2_letters': player2Letters,
+      'set_trick_video_url': setTrickVideoUrl,
+      'attempt_video_url': attemptVideoUrl,
+      'verification_status': verificationStatus.toString().split('.').last,
+      'created_at': createdAt.toIso8601String(),
+      'completed_at': completedAt?.toIso8601String(),
+      'winner_id': winnerId,
+      'current_turn_player_id': currentTurnPlayerId,
+    };
+  }
+
+  factory Battle.fromMap(Map<String, dynamic> map) {
+    return Battle(
+      id: map['id'] as String?,
+      player1Id: map['player1_id'] as String,
+      player2Id: map['player2_id'] as String,
+      gameMode: GameMode.values.firstWhere(
+        (e) => e.toString().split('.').last == map['game_mode'],
+        orElse: () => GameMode.skate,
+      ),
+      customLetters: map['custom_letters'] as String? ?? '',
+      player1Letters: map['player1_letters'] as String? ?? '',
+      player2Letters: map['player2_letters'] as String? ?? '',
+      setTrickVideoUrl: map['set_trick_video_url'] as String?,
+      attemptVideoUrl: map['attempt_video_url'] as String?,
+      verificationStatus: VerificationStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == map['verification_status'],
+        orElse: () => VerificationStatus.pending,
+      ),
+      createdAt: DateTime.parse(map['created_at'] as String),
+      completedAt: map['completed_at'] != null 
+          ? DateTime.parse(map['completed_at'] as String) 
+          : null,
+      winnerId: map['winner_id'] as String?,
+      currentTurnPlayerId: map['current_turn_player_id'] as String,
+    );
+  }
+
+  Battle copyWith({
+    String? id,
+    String? player1Id,
+    String? player2Id,
+    GameMode? gameMode,
+    String? customLetters,
+    String? player1Letters,
+    String? player2Letters,
+    String? setTrickVideoUrl,
+    String? attemptVideoUrl,
+    VerificationStatus? verificationStatus,
+    DateTime? createdAt,
+    DateTime? completedAt,
+    String? winnerId,
+    String? currentTurnPlayerId,
+  }) {
+    return Battle(
+      id: id ?? this.id,
+      player1Id: player1Id ?? this.player1Id,
+      player2Id: player2Id ?? this.player2Id,
+      gameMode: gameMode ?? this.gameMode,
+      customLetters: customLetters ?? this.customLetters,
+      player1Letters: player1Letters ?? this.player1Letters,
+      player2Letters: player2Letters ?? this.player2Letters,
+      setTrickVideoUrl: setTrickVideoUrl ?? this.setTrickVideoUrl,
+      attemptVideoUrl: attemptVideoUrl ?? this.attemptVideoUrl,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
+      createdAt: createdAt ?? this.createdAt,
+      completedAt: completedAt ?? this.completedAt,
+      winnerId: winnerId ?? this.winnerId,
+      currentTurnPlayerId: currentTurnPlayerId ?? this.currentTurnPlayerId,
+    );
+  }
+}
