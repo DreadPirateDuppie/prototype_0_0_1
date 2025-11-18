@@ -38,16 +38,16 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
           _battle = battle;
         });
       }
-      
+
       // Load Quick-Fire vote if in voting status
       if (_battle.verificationStatus == VerificationStatus.quickFireVoting) {
         await _loadQuickFireVote();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading battle: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading battle: $e')));
       }
     }
   }
@@ -63,7 +63,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
   Future<void> _uploadSetTrick() async {
     final picker = ImagePicker();
     final video = await picker.pickVideo(source: ImageSource.gallery);
-    
+
     if (video == null) return;
 
     setState(() {
@@ -91,15 +91,15 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Set trick uploaded!')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Set trick uploaded!')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading video: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error uploading video: $e')));
       }
     } finally {
       setState(() {
@@ -111,7 +111,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
   Future<void> _uploadAttempt() async {
     final picker = ImagePicker();
     final video = await picker.pickVideo(source: ImageSource.gallery);
-    
+
     if (video == null) return;
 
     setState(() {
@@ -130,7 +130,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       // Create verification attempt
       final attempt = await VerificationService.createVerificationAttempt(
         battleId: _battle.id!,
-        attemptingPlayerId: _currentUser!.id,
+        attemptingPlayerId: _currentUser.id,
         attemptVideoUrl: videoUrl,
       );
 
@@ -157,14 +157,16 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Attempt uploaded! Waiting for votes...')),
+          const SnackBar(
+            content: Text('Attempt uploaded! Waiting for votes...'),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading attempt: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error uploading attempt: $e')));
       }
     } finally {
       setState(() {
@@ -194,22 +196,26 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       if (mounted) {
         if (updatedVote?.bothPlayersVoted == true) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Vote recorded! Processing result...')),
+            const SnackBar(
+              content: Text('Vote recorded! Processing result...'),
+            ),
           );
           // Reload battle details after a delay
           await Future.delayed(const Duration(seconds: 2));
           await _loadBattleDetails();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Vote recorded! Waiting for other player...')),
+            const SnackBar(
+              content: Text('Vote recorded! Waiting for other player...'),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error submitting vote: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error submitting vote: $e')));
       }
     } finally {
       setState(() {
@@ -220,9 +226,12 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
 
   Widget _buildQuickFireVoting() {
     final myId = _currentUser?.id;
-    final hasVoted = _quickFireVote != null && 
-        ((_quickFireVote!.player1Id == myId && _quickFireVote!.player1Vote != null) ||
-         (_quickFireVote!.player2Id == myId && _quickFireVote!.player2Vote != null));
+    final hasVoted =
+        _quickFireVote != null &&
+        ((_quickFireVote!.player1Id == myId &&
+                _quickFireVote!.player1Vote != null) ||
+            (_quickFireVote!.player2Id == myId &&
+                _quickFireVote!.player2Vote != null));
 
     return Card(
       margin: const EdgeInsets.all(16),
@@ -233,10 +242,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
           children: [
             const Text(
               'Quick-Fire Voting',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             if (hasVoted)
@@ -256,8 +262,8 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       ElevatedButton.icon(
-                        onPressed: _isLoading 
-                            ? null 
+                        onPressed: _isLoading
+                            ? null
                             : () => _submitQuickFireVote(VoteType.land),
                         icon: const Icon(Icons.check),
                         label: const Text('Land'),
@@ -267,8 +273,8 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                         ),
                       ),
                       ElevatedButton.icon(
-                        onPressed: _isLoading 
-                            ? null 
+                        onPressed: _isLoading
+                            ? null
                             : () => _submitQuickFireVote(VoteType.noLand),
                         icon: const Icon(Icons.close),
                         label: const Text('No Land'),
@@ -278,8 +284,8 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                         ),
                       ),
                       ElevatedButton.icon(
-                        onPressed: _isLoading 
-                            ? null 
+                        onPressed: _isLoading
+                            ? null
                             : () => _submitQuickFireVote(VoteType.rebate),
                         icon: const Icon(Icons.replay),
                         label: const Text('Rebate'),
@@ -300,13 +306,19 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final myLetters = _isPlayer1 ? _battle.player1Letters : _battle.player2Letters;
-    final opponentLetters = _isPlayer1 ? _battle.player2Letters : _battle.player1Letters;
+    final myLetters = _isPlayer1
+        ? _battle.player1Letters
+        : _battle.player2Letters;
+    final opponentLetters = _isPlayer1
+        ? _battle.player2Letters
+        : _battle.player1Letters;
     final targetLetters = _battle.getGameLetters();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${_battle.gameMode.toString().split('.').last.toUpperCase()} Battle'),
+        title: Text(
+          '${_battle.gameMode.toString().split('.').last.toUpperCase()} Battle',
+        ),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
       ),
@@ -319,6 +331,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                   // Score Display
                   Container(
                     padding: const EdgeInsets.all(16),
+                    // ignore: deprecated_member_use
                     color: Colors.deepPurple.withOpacity(0.1),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -377,9 +390,15 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                   // Turn indicator
                   Container(
                     padding: const EdgeInsets.all(16),
-                    color: _isMyTurn ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                    color: _isMyTurn
+                        // ignore: deprecated_member_use
+                        ? Colors.green.withOpacity(0.1)
+                        // ignore: deprecated_member_use
+                        : Colors.orange.withOpacity(0.1),
                     child: Text(
-                      _isMyTurn ? "Your turn - Upload a trick!" : "Opponent's turn",
+                      _isMyTurn
+                          ? "Your turn - Upload a trick!"
+                          : "Opponent's turn",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 18,
@@ -423,7 +442,8 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                     ),
 
                   // Quick-Fire voting
-                  if (_battle.verificationStatus == VerificationStatus.quickFireVoting)
+                  if (_battle.verificationStatus ==
+                      VerificationStatus.quickFireVoting)
                     _buildQuickFireVoting(),
 
                   // Action buttons
@@ -443,9 +463,10 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                               padding: const EdgeInsets.all(16),
                             ),
                           ),
-                        if (!_isMyTurn && 
-                            _battle.setTrickVideoUrl != null && 
-                            _battle.verificationStatus == VerificationStatus.pending)
+                        if (!_isMyTurn &&
+                            _battle.setTrickVideoUrl != null &&
+                            _battle.verificationStatus ==
+                                VerificationStatus.pending)
                           ElevatedButton.icon(
                             onPressed: _uploadAttempt,
                             icon: const Icon(Icons.upload),

@@ -42,9 +42,9 @@ class _VsTabState extends State<VsTab> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading battles: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading battles: $e')));
       }
     }
   }
@@ -62,9 +62,10 @@ class _VsTabState extends State<VsTab> {
 
   Widget _buildBattleCard(Battle battle) {
     final isPlayer1 = battle.player1Id == _currentUser?.id;
-    final opponentId = isPlayer1 ? battle.player2Id : battle.player1Id;
     final myLetters = isPlayer1 ? battle.player1Letters : battle.player2Letters;
-    final opponentLetters = isPlayer1 ? battle.player2Letters : battle.player1Letters;
+    final opponentLetters = isPlayer1
+        ? battle.player2Letters
+        : battle.player1Letters;
     final isMyTurn = battle.currentTurnPlayerId == _currentUser?.id;
 
     return Card(
@@ -133,43 +134,33 @@ class _VsTabState extends State<VsTab> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _battles.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.sports_kabaddi,
-                        size: 80,
-                        color: Colors.grey[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No active battles',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Start a new battle to compete!',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.sports_kabaddi, size: 80, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No active battles',
+                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadBattles,
-                  child: ListView.builder(
-                    itemCount: _battles.length,
-                    itemBuilder: (context, index) {
-                      return _buildBattleCard(_battles[index]);
-                    },
+                  const SizedBox(height: 8),
+                  Text(
+                    'Start a new battle to compete!',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                   ),
-                ),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadBattles,
+              child: ListView.builder(
+                itemCount: _battles.length,
+                itemBuilder: (context, index) {
+                  return _buildBattleCard(_battles[index]);
+                },
+              ),
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final result = await showDialog<bool>(

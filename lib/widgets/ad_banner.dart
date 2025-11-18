@@ -75,7 +75,7 @@ class _AdBannerState extends State<AdBanner> {
   @override
   Widget build(BuildContext context) {
     final currentAd = _advertisements[_currentAdIndex];
-    
+
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 500),
       transitionBuilder: (Widget child, Animation<double> animation) {
@@ -97,6 +97,7 @@ class _AdBannerState extends State<AdBanner> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
+              // ignore: deprecated_member_use
               (currentAd['color'] as Color).withOpacity(0.1),
               Theme.of(context).brightness == Brightness.dark
                   ? Colors.grey[800]!
@@ -141,12 +142,8 @@ class _AdBannerState extends State<AdBanner> {
                       children: [
                         Text(
                           currentAd['title'] as String,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(

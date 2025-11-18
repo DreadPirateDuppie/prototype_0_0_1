@@ -59,7 +59,7 @@ class BattleService {
           .from('battles')
           .select()
           .or('player1_id.eq.$userId,player2_id.eq.$userId')
-          .is_('winner_id', null)
+          .filter('winner_id', 'is', 'null')
           .order('created_at', ascending: false);
 
       return (response as List)
@@ -95,13 +95,15 @@ class BattleService {
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filename = '${type}_${battleId}_${playerId}_$timestamp.mp4';
-      
+
       final bytes = await videoFile.readAsBytes();
-      await _client.storage.from('battle_videos').uploadBinary(
-        filename,
-        bytes,
-        fileOptions: const FileOptions(contentType: 'video/mp4'),
-      );
+      await _client.storage
+          .from('battle_videos')
+          .uploadBinary(
+            filename,
+            bytes,
+            fileOptions: const FileOptions(contentType: 'video/mp4'),
+          );
 
       final publicUrl = _client.storage
           .from('battle_videos')
@@ -141,7 +143,10 @@ class BattleService {
           .from('battles')
           .update({
             'attempt_video_url': videoUrl,
-            'verification_status': VerificationStatus.quickFireVoting.toString().split('.').last,
+            'verification_status': VerificationStatus.quickFireVoting
+                .toString()
+                .split('.')
+                .last,
           })
           .eq('id', battleId)
           .select()
@@ -170,7 +175,7 @@ class BattleService {
         final nextIndex = currentLetters.length;
         if (nextIndex < targetLetters.length) {
           updatedLetters = currentLetters + targetLetters[nextIndex];
-          
+
           final response = await _client
               .from('battles')
               .update({'player1_letters': updatedLetters})
@@ -179,7 +184,7 @@ class BattleService {
               .single();
 
           final updatedBattle = Battle.fromMap(response);
-          
+
           // Check if game is complete
           if (updatedBattle.isComplete()) {
             await completeBattle(
@@ -187,7 +192,7 @@ class BattleService {
               winnerId: battle.player2Id, // Other player wins
             );
           }
-          
+
           return updatedBattle;
         }
       } else if (battle.player2Id == playerId) {
@@ -195,7 +200,7 @@ class BattleService {
         final nextIndex = currentLetters.length;
         if (nextIndex < targetLetters.length) {
           updatedLetters = currentLetters + targetLetters[nextIndex];
-          
+
           final response = await _client
               .from('battles')
               .update({'player2_letters': updatedLetters})
@@ -204,7 +209,7 @@ class BattleService {
               .single();
 
           final updatedBattle = Battle.fromMap(response);
-          
+
           // Check if game is complete
           if (updatedBattle.isComplete()) {
             await completeBattle(
@@ -212,7 +217,7 @@ class BattleService {
               winnerId: battle.player1Id, // Other player wins
             );
           }
-          
+
           return updatedBattle;
         }
       }
@@ -240,10 +245,10 @@ class BattleService {
           .single();
 
       final battle = Battle.fromMap(response);
-      
+
       // Update player scores
       await updatePlayerScoreForBattle(battle);
-      
+
       return battle;
     } catch (e) {
       throw Exception('Failed to complete battle: $e');
@@ -256,8 +261,8 @@ class BattleService {
       // Get current scores for both players
       final winner = await getUserScores(battle.winnerId!);
       final loser = await getUserScores(
-        battle.player1Id == battle.winnerId 
-            ? battle.player2Id 
+        battle.player1Id == battle.winnerId
+            ? battle.player2Id
             : battle.player1Id,
       );
 
@@ -266,13 +271,13 @@ class BattleService {
       await updatePlayerScore(battle.winnerId!, newWinnerScore);
 
       // Loser loses points based on letters collected
-      final loserId = battle.player1Id == battle.winnerId 
-          ? battle.player2Id 
+      final loserId = battle.player1Id == battle.winnerId
+          ? battle.player2Id
           : battle.player1Id;
-      final loserLetters = battle.player1Id == battle.winnerId 
-          ? battle.player2Letters 
+      final loserLetters = battle.player1Id == battle.winnerId
+          ? battle.player2Letters
           : battle.player1Letters;
-      
+
       // Fewer letters = better performance = less point loss
       final pointsLost = 5 + (loserLetters.length * 2);
       final newLoserScore = (loser.playerScore - pointsLost).clamp(0.0, 1000.0);
@@ -318,14 +323,11 @@ class BattleService {
   }
 
   // Update ranking score
-  static Future<void> updateRankingScore(
-    String userId,
-    int adjustment,
-  ) async {
+  static Future<void> updateRankingScore(String userId, int adjustment) async {
     try {
       final scores = await getUserScores(userId);
       final newScore = (scores.rankingScore + adjustment).clamp(0.0, 1000.0);
-      
+
       await _client.from('user_scores').upsert({
         'user_id': userId,
         'map_score': scores.mapScore,
@@ -366,7 +368,10 @@ class BattleService {
           .from('battles')
           .update({
             'current_turn_player_id': nextPlayer,
-            'verification_status': VerificationStatus.pending.toString().split('.').last,
+            'verification_status': VerificationStatus.pending
+                .toString()
+                .split('.')
+                .last,
           })
           .eq('id', battleId)
           .select()

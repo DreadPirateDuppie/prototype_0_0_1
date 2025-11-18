@@ -493,6 +493,6 @@ class _ProfileTabState extends State<ProfileTab> {
           ),
         ),
       ),
-    );
+    )
   }
 }

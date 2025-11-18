@@ -1,7 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/battle.dart';
 import '../models/verification.dart';
-import '../models/user_scores.dart';
 import 'battle_service.dart';
 
 class VerificationService {
@@ -132,7 +131,10 @@ class VerificationService {
         await _client
             .from('verification_attempts')
             .update({
-              'status': VerificationStatus.communityVerification.toString().split('.').last,
+              'status': VerificationStatus.communityVerification
+                  .toString()
+                  .split('.')
+                  .last,
             })
             .eq('id', attemptId);
       }
@@ -206,9 +208,7 @@ class VerificationService {
           .eq('attempt_id', attemptId)
           .order('created_at', ascending: false);
 
-      return (response as List)
-          .map((vote) => Vote.fromMap(vote))
-          .toList();
+      return (response as List).map((vote) => Vote.fromMap(vote)).toList();
     } catch (e) {
       return [];
     }
@@ -343,12 +343,16 @@ class VerificationService {
   }
 
   // Get community verification queue
-  static Future<List<VerificationAttempt>> getCommunityVerificationQueue() async {
+  static Future<List<VerificationAttempt>>
+  getCommunityVerificationQueue() async {
     try {
       final response = await _client
           .from('verification_attempts')
           .select()
-          .eq('status', VerificationStatus.communityVerification.toString().split('.').last)
+          .eq(
+            'status',
+            VerificationStatus.communityVerification.toString().split('.').last,
+          )
           .order('created_at', ascending: true);
 
       return (response as List)

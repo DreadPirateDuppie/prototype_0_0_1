@@ -37,7 +37,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
         throw Exception('No user logged in');
       }
 
-      final customLetters = _selectedMode == GameMode.custom 
+      final customLetters = _selectedMode == GameMode.custom
           ? _customLettersController.text.toUpperCase()
           : '';
 
@@ -56,9 +56,9 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating battle: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error creating battle: $e')));
       }
     } finally {
       if (mounted) {
@@ -86,10 +86,13 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<GameMode>(
-                value: _selectedMode,
+                initialValue: _selectedMode,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                 ),
                 items: const [
                   DropdownMenuItem(
@@ -112,7 +115,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 },
               ),
               const SizedBox(height: 16),
-              
+
               if (_selectedMode == GameMode.custom) ...[
                 TextFormField(
                   controller: _customLettersController,
