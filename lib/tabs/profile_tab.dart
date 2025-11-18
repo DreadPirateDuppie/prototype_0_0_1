@@ -6,7 +6,9 @@ import '../screens/edit_username_dialog.dart';
 import '../widgets/star_rating_display.dart';
 
 class ProfileTab extends StatefulWidget {
-  const ProfileTab({super.key});
+  final bool editMode;
+
+  const ProfileTab({super.key, this.editMode = false});
 
   @override
   State<ProfileTab> createState() => _ProfileTabState();
@@ -31,6 +33,11 @@ class _ProfileTabState extends State<ProfileTab>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _refreshData();
+
+    // Enable edit mode if requested
+    if (widget.editMode) {
+      _toggleEdit();
+    }
   }
 
   @override
