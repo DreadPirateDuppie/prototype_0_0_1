@@ -382,17 +382,36 @@ class SupabaseService {
   ) async {
     try {
       final now = DateTime.now();
-      final response = await _client
+      final existing = await _client
           .from('user_points')
-          .upsert({
-            'user_id': userId,
-            'points': pointsWon, // This should be incremented, but for simplicity
-            'last_spin_date': now.toIso8601String(),
-          })
           .select()
-          .single();
+          .eq('user_id', userId)
+          .maybeSingle();
 
-      return UserPoints.fromMap(response);
+      if (existing == null) {
+        final inserted = await _client
+            .from('user_points')
+            .insert({
+              'user_id': userId,
+              'points': pointsWon,
+              'last_spin_date': now.toIso8601String(),
+            })
+            .select()
+            .single();
+        return UserPoints.fromMap(inserted);
+      } else {
+        final currentPoints = (existing['points'] as int?) ?? 0;
+        final updated = await _client
+            .from('user_points')
+            .update({
+              'points': currentPoints + pointsWon,
+              'last_spin_date': now.toIso8601String(),
+            })
+            .eq('user_id', userId)
+            .select()
+            .single();
+        return UserPoints.fromMap(updated);
+      }
     } catch (e) {
       throw Exception('Failed to update points: $e');
     }

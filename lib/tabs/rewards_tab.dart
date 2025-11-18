@@ -76,6 +76,12 @@ class _RewardsTabState extends State<RewardsTab> {
     }
   }
 
+  DateTime? _computeNextSpinAt(DateTime? lastSpinDate) {
+    if (lastSpinDate == null) return null;
+    final base = DateTime(lastSpinDate.year, lastSpinDate.month, lastSpinDate.day);
+    return base.add(const Duration(days: 1));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -136,6 +142,7 @@ class _RewardsTabState extends State<RewardsTab> {
                     WheelSpin(
                       onSpinComplete: _handleSpinComplete,
                       canSpin: _userPoints?.canSpinToday() ?? true,
+                      nextSpinAt: _computeNextSpinAt(_userPoints?.lastSpinDate),
                     ),
                     const SizedBox(height: 24),
                     Text(

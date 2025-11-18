@@ -5,6 +5,7 @@ import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
 import '../providers/error_provider.dart';
 import '../screens/home_screen.dart';
+import '../models/post.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -22,6 +23,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String _usersSearchQuery = '';
   String _postsSearchQuery = '';
   Map<String, dynamic> _userStats = {};
+  late Future<List<Map<String, dynamic>>> _reportsFuture;
+  late Future<Map<String, dynamic>> _analyticsData;
 
   @override
   void initState() {
@@ -67,6 +70,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _loadUsers(),
         _loadPosts(),
         _loadStats(),
+        _loadReports(),
+        _prepareAnalytics(),
       ]);
     } catch (e) {
       if (mounted) {
@@ -204,6 +209,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       await SupabaseService.deleteMapPost(postId);
       await _loadPosts();
       await _loadStats();
+      await _loadReports();
+      await _prepareAnalytics();
       if (mounted) {
         context.read<ErrorProvider>().showError('Post deleted successfully');
       }
@@ -788,6 +795,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           _buildDashboardTab(),
           _buildUsersTab(),
           _buildPostsTab(),
+          _buildReportsTab(),
+          _buildAnalyticsTab(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -821,9 +830,232 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               icon: Icon(Icons.post_add),
               label: 'Posts',
             ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.report),
+              label: 'Reports',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.analytics),
+              label: 'Analytics',
+            ),
           ],
         ),
       ),
+    );
+  }
+  Future<void> _loadReports() async {
+    _reportsFuture = SupabaseService.getReportedPosts();
+  }
+  
+  Future<void> _prepareAnalytics() async {
+    _analyticsData = _loadAnalytics();
+  }
+  
+  Future<Map<String, dynamic>> _loadAnalytics() async {
+    try {
+      final posts = await SupabaseService.getAllMapPosts();
+      final reports = await SupabaseService.getReportedPosts();
+      final totalPosts = posts.length;
+      final totalLikes = posts.fold<int>(0, (sum, post) => sum + post.likes);
+      final totalReports = reports.length;
+      final avgLikesPerPost = totalPosts > 0 ? (totalLikes / totalPosts).toStringAsFixed(1) : '0';
+      final postsWithPhotos = posts.where((p) => p.photoUrl != null && p.photoUrl!.isNotEmpty).length;
+      return {
+        'totalPosts': totalPosts,
+        'totalLikes': totalLikes,
+        'totalReports': totalReports,
+        'avgLikesPerPost': avgLikesPerPost,
+        'postsWithPhotos': postsWithPhotos,
+        'recentPosts': posts.take(5).toList(),
+      };
+    } catch (e) {
+      return {
+        'totalPosts': 0,
+        'totalLikes': 0,
+        'totalReports': 0,
+        'avgLikesPerPost': '0',
+        'postsWithPhotos': 0,
+        'recentPosts': <MapPost>[],
+      };
+    }
+  }
+  
+  Widget _buildAnalyticsTab() {
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _prepareAnalytics();
+        setState(() {});
+      },
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: _analyticsData,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final data = snapshot.data ?? {};
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              const Text(
+                'Analytics & Insights',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Content Statistics',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildAnalyticRow('Total Posts', '${data['totalPosts'] ?? 0}'),
+                      _buildAnalyticRow('Posts with Photos', '${data['postsWithPhotos'] ?? 0}'),
+                      _buildAnalyticRow('Total Likes', '${data['totalLikes'] ?? 0}'),
+                      _buildAnalyticRow('Average Likes per Post', data['avgLikesPerPost'] ?? '0'),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                color: Colors.blue[50],
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info, color: Colors.blue[700]),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Analytics update in real-time as users interact with your app.',
+                          style: TextStyle(color: Colors.blue[900]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+  
+  Widget _buildAnalyticRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildReportsTab() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _reportsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        final reports = snapshot.data ?? [];
+        if (reports.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle, size: 80, color: Colors.green),
+                SizedBox(height: 16),
+                Text('No reports to review', style: TextStyle(fontSize: 18)),
+              ],
+            ),
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async {
+            await _loadReports();
+            setState(() {});
+          },
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: reports.length,
+            itemBuilder: (context, index) {
+              final report = reports[index];
+              final post = report['map_posts'];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
+                            child: const Text('REPORTED', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                          const Spacer(),
+                          Text('Status: ${report['status']}', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (post != null) ...[
+                        Text(post['title'] ?? 'Unknown Title', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text(post['description'] ?? '', maxLines: 3, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 8),
+                        Text('By: ${post['user_name'] ?? 'Unknown User'}', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                      ],
+                      const Divider(height: 24),
+                      Text('Report Reason: ${report['reason']}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                      if (report['details'] != null) ...[
+                        const SizedBox(height: 8),
+                        Text('Details: ${report['details']}'),
+                      ],
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report dismissed')));
+                              _loadReports();
+                              setState(() {});
+                            },
+                            child: const Text('Dismiss'),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: post != null ? () => _deletePost(post['id']) : null,
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                            child: const Text('Delete Post'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

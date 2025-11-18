@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:async';
 
 class WheelSpin extends StatefulWidget {
   final Function(int) onSpinComplete;
   final bool canSpin;
+  final DateTime? nextSpinAt;
 
   const WheelSpin({
     super.key,
     required this.onSpinComplete,
     required this.canSpin,
+    this.nextSpinAt,
   });
 
   @override
@@ -21,6 +24,8 @@ class _WheelSpinState extends State<WheelSpin>
   late Animation<double> _animation;
   bool _isSpinning = false;
   final List<int> _rewards = [10, 25, 50, 100, 200, 500];
+  Duration _remaining = Duration.zero;
+  Timer? _countdownTimer;
 
   @override
   void initState() {
@@ -36,12 +41,45 @@ class _WheelSpinState extends State<WheelSpin>
       parent: _controller,
       curve: Curves.easeOutCubic,
     ));
+
+    _startCountdownIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant WheelSpin oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.canSpin != widget.canSpin || oldWidget.nextSpinAt != widget.nextSpinAt) {
+      _startCountdownIfNeeded();
+    }
   }
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _startCountdownIfNeeded() {
+    if (!widget.canSpin && widget.nextSpinAt != null) {
+      _updateRemaining();
+      _countdownTimer?.cancel();
+      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        _updateRemaining();
+      });
+    } else {
+      _countdownTimer?.cancel();
+      _remaining = Duration.zero;
+    }
+  }
+
+  void _updateRemaining() {
+    final now = DateTime.now();
+    final target = widget.nextSpinAt!;
+    final diff = target.difference(now);
+    setState(() {
+      _remaining = diff.isNegative ? Duration.zero : diff;
+    });
   }
 
   void _spinWheel() {
@@ -53,10 +91,10 @@ class _WheelSpinState extends State<WheelSpin>
 
     // Generate random number of full rotations + landing position
     final random = math.Random();
-    final fullRotations = 5 + random.nextInt(3); // 5-7 full rotations
+    final fullRotations = 5 + random.nextInt(3);
     final landingIndex = random.nextInt(_rewards.length);
-    final landingAngle = (landingIndex * (2 * math.pi / _rewards.length)) + math.pi / 2;
-    final totalRotation = (fullRotations * 2 * math.pi) + landingAngle;
+    final segmentAngle = 2 * math.pi / _rewards.length;
+    final totalRotation = (fullRotations * 2 * math.pi) + (landingIndex * segmentAngle);
 
     _animation = Tween<double>(
       begin: 0,
@@ -155,8 +193,30 @@ class _WheelSpinState extends State<WheelSpin>
             style: const TextStyle(fontSize: 16, color: Colors.white),
           ),
         ),
+        if (!widget.canSpin)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              _formatDuration(_remaining),
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
       ],
     );
+  }
+
+  String _formatDuration(Duration d) {
+    final hours = d.inHours;
+    final minutes = d.inMinutes.remainder(60);
+    final seconds = d.inSeconds.remainder(60);
+    final hh = hours.toString().padLeft(2, '0');
+    final mm = minutes.toString().padLeft(2, '0');
+    final ss = seconds.toString().padLeft(2, '0');
+    return 'Next spin in $hh:$mm:$ss';
   }
 }
 

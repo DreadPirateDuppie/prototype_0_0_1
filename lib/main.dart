@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'services/connectivity_service.dart';
+import 'services/error_service.dart';
 import 'screens/signin_screen.dart';
 import 'screens/home_screen.dart';
 import 'providers/theme_provider.dart';
@@ -10,18 +12,35 @@ import 'providers/error_provider.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
-  
-  // Initialize Supabase with environment variables
-  await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL'] ?? '',
-    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
-  );
-  
-  // Verify environment variables are loaded
-  if (dotenv.env['SUPABASE_URL'] == null || dotenv.env['SUPABASE_ANON_KEY'] == null) {
-    throw Exception('Missing required environment variables. Please check your .env file.');
+  try {
+    // Load environment variables
+    await dotenv.load(fileName: ".env");
+
+    // Get environment variables with null safety
+    final supabaseUrl = dotenv.env['SUPABASE_URL'];
+    final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];
+
+    // Verify environment variables are loaded
+    if (supabaseUrl == null || supabaseAnonKey == null) {
+      throw Exception(
+        'Missing required environment variables. Please check your .env file.',
+      );
+    }
+
+    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+    ErrorService.initialize();
+    await ConnectivityService.initialize();
+  } catch (e) {
+    // Print error and exit if initialization fails
+    debugPrint('Error initializing app: $e');
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(child: Text('Failed to initialize app: $e')),
+        ),
+      ),
+    );
+    return;
   }
 
   runApp(
@@ -46,7 +65,9 @@ class MyApp extends StatelessWidget {
           title: 'Supabase Auth App',
           theme: themeProvider.getLightTheme(),
           darkTheme: themeProvider.getDarkTheme(),
-          themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          themeMode: themeProvider.isDarkMode
+              ? ThemeMode.dark
+              : ThemeMode.light,
           home: const AuthWrapper(),
           builder: (context, child) {
             return Stack(
@@ -54,7 +75,9 @@ class MyApp extends StatelessWidget {
                 child!,
                 Consumer<ErrorProvider>(
                   builder: (context, errorProvider, child) {
-                    if (!errorProvider.isVisible) return const SizedBox.shrink();
+                    if (!errorProvider.isVisible) {
+                      return const SizedBox.shrink();
+                    }
                     return Positioned(
                       bottom: 0,
                       left: 0,
@@ -74,7 +97,10 @@ class MyApp extends StatelessWidget {
                             ),
                             IconButton(
                               onPressed: errorProvider.hideError,
-                              icon: const Icon(Icons.close, color: Colors.white),
+                              icon: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                              ),
                             ),
                           ],
                         ),

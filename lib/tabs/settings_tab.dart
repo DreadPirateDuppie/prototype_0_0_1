@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
 import '../providers/error_provider.dart';
-import '../screens/admin_dashboard.dart';
+import '../screens/admin_dashboard_screen.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -105,7 +105,7 @@ class _SettingsTabState extends State<SettingsTab> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const AdminDashboard(),
+                  builder: (context) => const AdminDashboardScreen(),
                 ),
               );
             },
