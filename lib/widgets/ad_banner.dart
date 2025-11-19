@@ -98,7 +98,7 @@ class _AdBannerState extends State<AdBanner> {
           gradient: LinearGradient(
             colors: [
               // ignore: deprecated_member_use
-              (currentAd['color'] as Color).withOpacity(0.1),
+              (currentAd['color'] as Color).withValues(alpha: 0.1),
               Theme.of(context).brightness == Brightness.dark
                   ? Colors.grey[800]!
                   : Colors.grey[200]!,
@@ -161,7 +161,9 @@ class _AdBannerState extends State<AdBanner> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: (currentAd['color'] as Color).withOpacity(0.2),
+                      color: (currentAd['color'] as Color).withValues(
+                        alpha: 0.2,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: currentAd['color'] as Color,

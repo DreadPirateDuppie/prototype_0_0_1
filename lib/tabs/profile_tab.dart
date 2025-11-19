@@ -82,7 +82,7 @@ class _ProfileTabState extends State<ProfileTab> {
         ],
       ),
     );
-    
+
     if (confirmed == true) {
       await SupabaseService.deleteMapPost(postId);
       if (mounted) {
@@ -118,10 +118,7 @@ class _ProfileTabState extends State<ProfileTab> {
           children: [
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),
             Text(
               '${score.toStringAsFixed(0)} / 1000',
@@ -136,7 +133,7 @@ class _ProfileTabState extends State<ProfileTab> {
         const SizedBox(height: 4),
         LinearProgressIndicator(
           value: score / 1000,
-          backgroundColor: color.withOpacity(0.2),
+          backgroundColor: color.withValues(alpha: 0.2),
           valueColor: AlwaysStoppedAnimation<Color>(color),
           minHeight: 8,
         ),
@@ -164,335 +161,350 @@ class _ProfileTabState extends State<ProfileTab> {
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
-                    children: [
-                      const SizedBox(height: 24),
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.deepPurple,
-                        child: Text(
-                          user?.email?.substring(0, 1).toUpperCase() ?? 'U',
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                children: [
+                  const SizedBox(height: 24),
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.deepPurple,
+                    child: Text(
+                      user?.email?.substring(0, 1).toUpperCase() ?? 'U',
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'User Profile',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'User Profile',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Username',
-                                    style: Theme.of(context).textTheme.labelLarge,
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, size: 18),
-                                    onPressed: () {
-                                      _usernameFuture.then((username) {
-                                        _editUsername(username ?? '');
-                                      });
-                                    },
-                                  ),
-                                ],
+                              Text(
+                                'Username',
+                                style: Theme.of(context).textTheme.labelLarge,
                               ),
-                              const SizedBox(height: 8),
-                              FutureBuilder<String?>(
-                                future: _usernameFuture,
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState ==
-                                      ConnectionState.waiting) {
-                                    return const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    );
-                                  }
-                                  final username = snapshot.data ?? 'Not set';
-                                  return Text(
-                                    username,
-                                    style:
-                                        Theme.of(context).textTheme.bodyMedium,
-                                  );
+                              IconButton(
+                                icon: const Icon(Icons.edit, size: 18),
+                                onPressed: () {
+                                  _usernameFuture.then((username) {
+                                    _editUsername(username ?? '');
+                                  });
                                 },
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Email',
-                                style: Theme.of(context).textTheme.labelLarge,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                user?.email ?? 'Not available',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'User ID',
-                                style: Theme.of(context).textTheme.labelLarge,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                user?.id ?? 'Not available',
-                                style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          FutureBuilder<String?>(
+                            future: _usernameFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                );
+                              }
+                              final username = snapshot.data ?? 'Not set';
+                              return Text(
+                                username,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Email',
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            user?.email ?? 'Not available',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'User ID',
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            user?.id ?? 'Not available',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Battle Stats',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 16),
-                              FutureBuilder<UserScores>(
-                                future: _userScoresFuture,
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState ==
-                                      ConnectionState.waiting) {
-                                    return const Center(
-                                      child: CircularProgressIndicator(),
-                                    );
-                                  }
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Battle Stats',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 16),
+                          FutureBuilder<UserScores>(
+                            future: _userScoresFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
 
-                                  final scores = snapshot.data;
-                                  if (scores == null) {
-                                    return const Text('No scores available');
-                                  }
+                              final scores = snapshot.data;
+                              if (scores == null) {
+                                return const Text('No scores available');
+                              }
 
-                                  return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildScoreRow(
+                                    'Map Score',
+                                    scores.mapScore,
+                                    Colors.blue,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildScoreRow(
+                                    'Player Score',
+                                    scores.playerScore,
+                                    Colors.green,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildScoreRow(
+                                    'Ranking Score',
+                                    scores.rankingScore,
+                                    Colors.orange,
+                                  ),
+                                  const Divider(height: 24),
+                                  _buildScoreRow(
+                                    'Final Score',
+                                    scores.finalScore,
+                                    Colors.deepPurple,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Vote Influence: ${(scores.voteWeight * 100).toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'My Posts',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 16),
+                  FutureBuilder<List<MapPost>>(
+                    future: _userPostsFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const CircularProgressIndicator();
+                      }
+
+                      if (snapshot.hasError) {
+                        return Text('Error: ${snapshot.error}');
+                      }
+
+                      final posts = snapshot.data ?? [];
+
+                      if (posts.isEmpty) {
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'No posts yet. Add a post from the Map tab!',
+                          ),
+                        );
+                      }
+
+                      return Column(
+                        children: posts.map((post) {
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
                                     children: [
-                                      _buildScoreRow(
-                                        'Map Score',
-                                        scores.mapScore,
-                                        Colors.blue,
+                                      CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: Colors.deepPurple,
+                                        child: Text(
+                                          (post.userName?.isNotEmpty ?? false)
+                                              ? post.userName![0].toUpperCase()
+                                              : (post.userEmail?.isNotEmpty ??
+                                                    false)
+                                              ? post.userEmail![0].toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
                                       ),
-                                      const SizedBox(height: 12),
-                                      _buildScoreRow(
-                                        'Player Score',
-                                        scores.playerScore,
-                                        Colors.green,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildScoreRow(
-                                        'Ranking Score',
-                                        scores.rankingScore,
-                                        Colors.orange,
-                                      ),
-                                      const Divider(height: 24),
-                                      _buildScoreRow(
-                                        'Final Score',
-                                        scores.finalScore,
-                                        Colors.deepPurple,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Vote Influence: ${(scores.voteWeight * 100).toStringAsFixed(1)}%',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[600],
-                                          fontStyle: FontStyle.italic,
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          post.userName ?? 'Unknown User',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                     ],
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'My Posts',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 16),
-                      FutureBuilder<List<MapPost>>(
-                        future: _userPostsFuture,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const CircularProgressIndicator();
-                          }
-
-                          if (snapshot.hasError) {
-                            return Text('Error: ${snapshot.error}');
-                          }
-
-                          final posts = snapshot.data ?? [];
-
-                          if (posts.isEmpty) {
-                            return Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text('No posts yet. Add a post from the Map tab!'),
-                            );
-                          }
-
-                          return Column(
-                            children: posts.map((post) {
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      // User info header
-                                      Row(
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 18,
-                                            backgroundColor: Colors.deepPurple,
-                                            child: Text(
-                                              (post.userName?.isNotEmpty ?? false)
-                                                  ? post.userName![0].toUpperCase()
-                                                  : (post.userEmail?.isNotEmpty ?? false)
-                                                      ? post.userEmail![0].toUpperCase()
-                                                      : '?',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Text(
-                                              post.userName ?? 'Unknown User',
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      if (post.photoUrl != null) ...[
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: Image.network(
-                                            post.photoUrl!,
-                                            height: 150,
-                                            width: double.infinity,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) {
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (post.photoUrl != null) ...[
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        post.photoUrl!,
+                                        height: 150,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
                                               return Container(
                                                 height: 150,
                                                 color: Colors.grey[300],
                                                 child: const Center(
-                                                  child: Icon(Icons.image_not_supported),
+                                                  child: Icon(
+                                                    Icons.image_not_supported,
+                                                  ),
                                                 ),
                                               );
                                             },
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                      ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
+                                  Text(
+                                    post.title,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    post.description,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${post.latitude.toStringAsFixed(4)}, ${post.longitude.toStringAsFixed(4)}',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  StarRatingDisplay(
+                                    popularityRating: post.popularityRating,
+                                    securityRating: post.securityRating,
+                                    qualityRating: post.qualityRating,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
                                       Text(
-                                        post.title,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        '❤️ ${post.likes}',
+                                        style: const TextStyle(fontSize: 12),
                                       ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        post.description,
-                                        style: Theme.of(context).textTheme.bodyMedium,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '${post.latitude.toStringAsFixed(4)}, ${post.longitude.toStringAsFixed(4)}',
-                                        style: Theme.of(context).textTheme.bodySmall,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      StarRatingDisplay(
-                                        popularityRating: post.popularityRating,
-                                        securityRating: post.securityRating,
-                                        qualityRating: post.qualityRating,
-                                      ),
-                                      const SizedBox(height: 8),
                                       Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text(
-                                            '❤️ ${post.likes}',
-                                            style: const TextStyle(fontSize: 12),
+                                          ElevatedButton.icon(
+                                            onPressed: () => _editPost(post),
+                                            icon: const Icon(
+                                              Icons.edit,
+                                              size: 16,
+                                            ),
+                                            label: const Text('Edit'),
+                                            style: ElevatedButton.styleFrom(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                            ),
                                           ),
-                                          Row(
-                                            children: [
-                                              ElevatedButton.icon(
-                                                onPressed: () => _editPost(post),
-                                                icon: const Icon(Icons.edit, size: 16),
-                                                label: const Text('Edit'),
-                                                style: ElevatedButton.styleFrom(
-                                                  padding: const EdgeInsets.symmetric(
+                                          const SizedBox(width: 8),
+                                          ElevatedButton.icon(
+                                            onPressed: () =>
+                                                _deletePost(post.id!),
+                                            icon: const Icon(
+                                              Icons.delete,
+                                              size: 16,
+                                            ),
+                                            label: const Text('Delete'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
                                                     horizontal: 8,
                                                     vertical: 4,
                                                   ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              ElevatedButton.icon(
-                                                onPressed: () => _deletePost(post.id!),
-                                                icon: const Icon(Icons.delete, size: 16),
-                                                label: const Text('Delete'),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.red,
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ],
                                   ),
-                                ),
-                              );
-                            }).toList(),
+                                ],
+                              ),
+                            ),
                           );
-                        },
-                      ),
-                    ],
+                        }).toList(),
+                      );
+                    },
                   ),
-                ),
+                ],
               ),
             ),
           ),
         ),
       ),
-    )
+    );
   }
 }

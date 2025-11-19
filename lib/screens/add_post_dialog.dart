@@ -39,43 +39,52 @@ class _AddPostDialogState extends State<AddPostDialog> {
       if (image != null) {
         // Show loading indicator
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Compressing image...')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Compressing image...')));
         }
 
         // Compress the image
-        final compressedImage = await ImageService.compressImage(File(image.path));
-        
+        final compressedImage = await ImageService.compressImage(
+          File(image.path),
+        );
+
         if (compressedImage != null) {
           setState(() {
             _selectedImage = compressedImage;
           });
-          
-          if (mounted) {
-            final sizeMB = await ImageService.getFileSizeMB(compressedImage);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Image ready (${sizeMB.toStringAsFixed(2)} MB)')),
-            );
-          }
+
+          if (!mounted) return;
+          final sizeMB = await ImageService.getFileSizeMB(compressedImage);
+          if (!mounted) return;
+
+          final messenger = ScaffoldMessenger.of(context);
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('Image ready (${sizeMB.toStringAsFixed(2)} MB)'),
+            ),
+          );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
       }
     }
   }
 
   Future<void> _createPost() async {
-    if (_titleController.text.trim().isEmpty || _descriptionController.text.trim().isEmpty) {
+    if (_titleController.text.trim().isEmpty ||
+        _descriptionController.text.trim().isEmpty) {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Missing Information'),
-          content: const Text('Please fill in both title and description fields.'),
+          content: const Text(
+            'Please fill in both title and description fields.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -102,7 +111,8 @@ class _AddPostDialogState extends State<AddPostDialog> {
           );
         }
 
-        final displayName = await SupabaseService.getCurrentUserDisplayName() ?? 'User';
+        final displayName =
+            await SupabaseService.getCurrentUserDisplayName() ?? 'User';
 
         await SupabaseService.createMapPost(
           userId: user.id,
@@ -122,9 +132,9 @@ class _AddPostDialogState extends State<AddPostDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating post: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error creating post: $e')));
       }
     } finally {
       if (mounted) {
@@ -184,7 +194,9 @@ class _AddPostDialogState extends State<AddPostDialog> {
             ElevatedButton.icon(
               onPressed: _isLoading ? null : _pickImage,
               icon: const Icon(Icons.image),
-              label: Text(_selectedImage != null ? 'Change Photo' : 'Add Photo'),
+              label: Text(
+                _selectedImage != null ? 'Change Photo' : 'Add Photo',
+              ),
             ),
           ],
         ),

@@ -109,6 +109,40 @@ class _VsTabState extends State<VsTab> {
     );
   }
 
+  Battle _buildTutorialBattle() {
+    final now = DateTime.now();
+    return Battle(
+      id: 'tutorial_battle',
+      player1Id: 'tutorial_player_1',
+      player2Id: 'tutorial_player_2',
+      gameMode: GameMode.skate,
+      customLetters: '',
+      player1Letters: 'SK',
+      player2Letters: 'S',
+      setTrickVideoUrl: 'https://example.com/tutorial_set.mp4',
+      attemptVideoUrl: null,
+      verificationStatus: VerificationStatus.pending,
+      createdAt: now,
+      completedAt: null,
+      winnerId: null,
+      currentTurnPlayerId: 'tutorial_player_1',
+    );
+  }
+
+  void _openTutorialBattle() {
+    final tutorialBattle = _buildTutorialBattle();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BattleDetailScreen(
+          battle: tutorialBattle,
+          tutorialMode: true,
+          tutorialUserId: tutorialBattle.player1Id,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -128,6 +162,11 @@ class _VsTabState extends State<VsTab> {
                 ),
               );
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Tutorial Mode',
+            onPressed: _openTutorialBattle,
           ),
         ],
       ),
