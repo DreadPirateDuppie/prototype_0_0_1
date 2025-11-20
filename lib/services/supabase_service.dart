@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
+import 'dart:developer' as developer;
 import '../models/post.dart';
 
 class SupabaseService {
@@ -34,19 +35,19 @@ class SupabaseService {
   static Future<String?> getCurrentUserDisplayName() async {
     final user = getCurrentUser();
     if (user == null) return null;
-    
+
     // Try to get from user metadata first
     var displayName = user.userMetadata?['display_name'] as String?;
     if (displayName != null && displayName.isNotEmpty) {
       return displayName;
     }
-    
+
     // Try to get from user_profiles table
     displayName = await getUserDisplayName(user.id);
     if (displayName != null && displayName.isNotEmpty) {
       return displayName;
     }
-    
+
     // Fallback to email prefix
     return user.email?.split('@').first ?? 'User';
   }
@@ -62,6 +63,62 @@ class SupabaseService {
       return response?['username'];
     } catch (e) {
       return null;
+    }
+  }
+
+  /// Checks if the current user has admin privileges.
+  /// Returns false if the user is not logged in, the user profile doesn't exist,
+  /// or if there's any error during the check.
+  static Future<bool> isCurrentUserAdmin() async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) {
+        developer.log('User not logged in', name: 'AdminCheck');
+        return false;
+      }
+
+      // First, check if the user is the hardcoded admin (if needed)
+      if (user.email == 'admin@example.com' || user.email == '123@123.com') {
+        // Change this to your admin email
+        developer.log('User is hardcoded admin', name: 'AdminCheck');
+        return true;
+      }
+
+      // Check the user_profiles table for admin status
+      developer.log(
+        'Checking admin status for user: ${user.email} (${user.id})',
+        name: 'AdminCheck',
+      );
+
+      final response = await _client
+          .from('user_profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 5));
+
+      final isAdmin = response?['is_admin'] == true;
+      developer.log(
+        'Database admin status for ${user.email}: $isAdmin',
+        name: 'AdminCheck',
+      );
+      return isAdmin;
+    } on PostgrestException catch (e) {
+      developer.log(
+        'Database error checking admin status: ${e.message}',
+        name: 'AdminCheck',
+        error: e,
+        stackTrace: StackTrace.current,
+      );
+      return false;
+    } catch (e, stackTrace) {
+      developer.log(
+        'Error checking admin status',
+        name: 'AdminCheck',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return false;
     }
   }
 
@@ -94,10 +151,7 @@ class SupabaseService {
   }
 
   // Save user username (with uniqueness constraint)
-  static Future<void> saveUserUsername(
-    String userId,
-    String username,
-  ) async {
+  static Future<void> saveUserUsername(String userId, String username) async {
     try {
       await _client.from('user_profiles').upsert({
         'id': userId,
@@ -163,13 +217,15 @@ class SupabaseService {
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filename = 'post_${userId}_$timestamp.jpg';
-      
+
       final bytes = await imageFile.readAsBytes();
-      await _client.storage.from('post_images').uploadBinary(
-        filename,
-        bytes,
-        fileOptions: const FileOptions(contentType: 'image/jpeg'),
-      );
+      await _client.storage
+          .from('post_images')
+          .uploadBinary(
+            filename,
+            bytes,
+            fileOptions: const FileOptions(contentType: 'image/jpeg'),
+          );
 
       final publicUrl = _client.storage
           .from('post_images')
@@ -192,18 +248,22 @@ class SupabaseService {
     String? userEmail,
   }) async {
     try {
-      final response = await _client.from('map_posts').insert({
-        'user_id': userId,
-        'user_name': userName,
-        'user_email': userEmail,
-        'latitude': latitude,
-        'longitude': longitude,
-        'title': title,
-        'description': description,
-        'created_at': DateTime.now().toIso8601String(),
-        'likes': 0,
-        'photo_url': photoUrl,
-      }).select().single();
+      final response = await _client
+          .from('map_posts')
+          .insert({
+            'user_id': userId,
+            'user_name': userName,
+            'user_email': userEmail,
+            'latitude': latitude,
+            'longitude': longitude,
+            'title': title,
+            'description': description,
+            'created_at': DateTime.now().toIso8601String(),
+            'likes': 0,
+            'photo_url': photoUrl,
+          })
+          .select()
+          .single();
 
       return MapPost.fromMap(response);
     } catch (e) {
@@ -219,9 +279,7 @@ class SupabaseService {
           .select()
           .order('created_at', ascending: false);
 
-      return (response as List)
-          .map((post) => MapPost.fromMap(post))
-          .toList();
+      return (response as List).map((post) => MapPost.fromMap(post)).toList();
     } catch (e) {
       // Table may not exist yet
       return [];
@@ -237,9 +295,7 @@ class SupabaseService {
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      return (response as List)
-          .map((post) => MapPost.fromMap(post))
-          .toList();
+      return (response as List).map((post) => MapPost.fromMap(post)).toList();
     } catch (e) {
       // Table may not exist yet
       return [];
@@ -260,7 +316,8 @@ class SupabaseService {
     try {
       await _client
           .from('map_posts')
-          .update({'likes': currentLikes + 1}).eq('id', postId);
+          .update({'likes': currentLikes + 1})
+          .eq('id', postId);
     } catch (e) {
       // Silently fail
     }
@@ -349,6 +406,3 @@ class SupabaseService {
     }
   }
 }
-
-
-

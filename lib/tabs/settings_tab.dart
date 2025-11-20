@@ -13,11 +13,46 @@ class SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<SettingsTab> {
   bool _notificationsEnabled = true;
+  bool _isAdmin = false;
+  bool _isLoadingAdminStatus = true;
 
   @override
   void initState() {
     super.initState();
     _loadNotificationPreference();
+    _checkAdminStatus();
+  }
+
+  Future<void> _checkAdminStatus() async {
+    try {
+      final isAdmin = await SupabaseService.isCurrentUserAdmin();
+      if (mounted) {
+        setState(() {
+          _isAdmin = isAdmin;
+          _isLoadingAdminStatus = false;
+        });
+
+        // Show welcome message if user is admin
+        if (isAdmin) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Hello Admin :)'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAdmin = false;
+          _isLoadingAdminStatus = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadNotificationPreference() async {
@@ -49,9 +84,9 @@ class _SettingsTabState extends State<SettingsTab> {
       await SupabaseService.signOut();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sign out error: $error')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Sign out error: $error')));
       }
     }
   }
@@ -66,10 +101,7 @@ class _SettingsTabState extends State<SettingsTab> {
             padding: EdgeInsets.all(16.0),
             child: Text(
               'Preferences',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           SwitchListTile(
@@ -96,10 +128,7 @@ class _SettingsTabState extends State<SettingsTab> {
             padding: EdgeInsets.all(16.0),
             child: Text(
               'Account',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           ListTile(
@@ -226,32 +255,31 @@ class _SettingsTabState extends State<SettingsTab> {
               );
             },
           ),
-          const Divider(),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              'Administration',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+          if (_isAdmin && !_isLoadingAdminStatus) ...[
+            const Divider(),
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                'Administration',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.admin_panel_settings),
-            title: const Text('Admin Dashboard'),
-            subtitle: const Text('Content moderation'),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AdminDashboard(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings),
+              title: const Text('Admin Dashboard'),
+              subtitle: const Text('Content moderation'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminDashboard(),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+          ],
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: ElevatedButton.icon(

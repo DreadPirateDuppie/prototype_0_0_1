@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:ui' as ui;
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
@@ -21,16 +22,18 @@ class _MapTabState extends State<MapTab> {
   List<MapPost> userPosts = [];
   Map<String, MapPost> markerPostMap = {}; // Map marker location to post
   LatLng currentLocation = const LatLng(37.7749, -122.4194); // Default: SF
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _isPinMode = false;
+  bool _isSharingLocation = false; // Slider state
 
   @override
   void initState() {
     super.initState();
     mapController = MapController();
-    _getCurrentLocation();
     _addSampleMarkers();
     _loadUserPosts();
+    // Automatically try to get location on startup
+    _getCurrentLocation();
   }
 
   Future<void> _loadUserPosts() async {
@@ -44,8 +47,8 @@ class _MapTabState extends State<MapTab> {
           markers.clear();
           markerPostMap.clear();
           _addSampleMarkers();
-          // Add current location marker if available
-          if (!_isLoading) {
+          // Add current location marker if available and sharing is on
+          if (!_isLoading && _isSharingLocation) {
             _addMarkerToList(
               currentLocation,
               'Your Location',
@@ -75,10 +78,34 @@ class _MapTabState extends State<MapTab> {
   }
 
   Future<void> _getCurrentLocation() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        await Geolocator.requestPermission();
+        final requested = await Geolocator.requestPermission();
+        if (requested == LocationPermission.denied) {
+           setState(() {
+            _isLoading = false;
+            _isSharingLocation = false; // Turn off slider if denied
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+         setState(() {
+            _isLoading = false;
+            _isSharingLocation = false; // Turn off slider if denied
+          });
+          if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location permission permanently denied. Please enable in settings.')),
+            );
+          }
+          return;
       }
 
       final position = await Geolocator.getCurrentPosition(
@@ -93,28 +120,38 @@ class _MapTabState extends State<MapTab> {
         setState(() {
           currentLocation = newLocation;
           _isLoading = false;
+          _isSharingLocation = true; // Enable slider on success
         });
 
         // Animate to current location
         mapController.move(newLocation, 14.0);
 
-        // Add marker at current location
-        _addMarkerToList(
-          newLocation,
-          'Your Location',
-          'You are here',
-          Colors.blue,
-        );
+        // Rebuild markers to include location
+        _loadUserPosts();
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
+        _isSharingLocation = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting location: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error getting location: $e')));
       }
+    }
+  }
+
+  void _toggleLocationSharing(bool value) {
+    setState(() {
+      _isSharingLocation = value;
+    });
+
+    if (value) {
+      _getCurrentLocation();
+    } else {
+      // Remove location marker by reloading posts (which checks _isSharingLocation)
+      _loadUserPosts();
     }
   }
 
@@ -166,7 +203,9 @@ class _MapTabState extends State<MapTab> {
                   context: context,
                   isScrollControlled: true,
                   shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
                   builder: (context) => SpotDetailsBottomSheet(
                     post: post,
@@ -188,7 +227,11 @@ class _MapTabState extends State<MapTab> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.white, width: 2),
               ),
-              child: const Icon(Icons.location_on, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.location_on,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ),
         ),
@@ -245,76 +288,152 @@ class _MapTabState extends State<MapTab> {
                     mapController: mapController,
                     options: MapOptions(
                       initialCenter: currentLocation,
-                initialZoom: 13.0,
-                minZoom: 5.0,
-                maxZoom: 18.0,
-                onTap: (tapPosition, point) => _handleMapTap(point),
-              ),
-              children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.prototype_0_0_1',
-              maxZoom: 19,
-            ),
-            MarkerLayer(
-              markers: markers,
-            ),
-          ],
-        ),
-        if (_isLoading)
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const CircularProgressIndicator(),
-            ),
-          ),
-        // Zoom buttons
-        Positioned(
-          bottom: 100,
-          right: 16,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FloatingActionButton(
-                mini: true,
-                onPressed: () {
-                  mapController.move(
-                    mapController.camera.center,
-                    mapController.camera.zoom + 1,
-                  );
-                },
-                backgroundColor: Colors.deepPurple,
-                child: const Icon(Icons.add),
-              ),
-              const SizedBox(height: 8),
-              FloatingActionButton(
-                mini: true,
-                onPressed: () {
-                  mapController.move(
-                    mapController.camera.center,
-                    mapController.camera.zoom - 1,
-                  );
-                },
-                backgroundColor: Colors.deepPurple,
-                child: const Icon(Icons.remove),
-              ),
-            ],
-          ),
-        ),
-        // Pin placement button
-        Positioned(
-          bottom: 16,
-          right: 16,
-          child: FloatingActionButton(
-            onPressed: _togglePinMode,
-            backgroundColor: _isPinMode ? Colors.red : Colors.deepPurple,
-            child: Icon(_isPinMode ? Icons.close : Icons.location_on),
-          ),
-        ),
+                      initialZoom: 13.0,
+                      minZoom: 5.0,
+                      maxZoom: 18.0,
+                      onTap: (tapPosition, point) => _handleMapTap(point),
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.prototype_0_0_1',
+                        maxZoom: 19,
+                      ),
+                      MarkerLayer(markers: markers),
+                    ],
+                  ),
+                  if (_isLoading)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const CircularProgressIndicator(),
+                      ),
+                    ),
+                  
+                  // Location Share Slider (Top Center)
+                  Positioned(
+                    top: 40, // Moved higher up
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Material(
+                        elevation: 4,
+                        shadowColor: Colors.black26,
+                        borderRadius: BorderRadius.circular(30),
+                        color: Colors.white,
+                        child: InkWell(
+                          onTap: () => _toggleLocationSharing(!_isSharingLocation),
+                          borderRadius: BorderRadius.circular(30),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 6, // Slimmer vertical padding
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(
+                                color: _isSharingLocation
+                                    ? Colors.deepPurple
+                                    : Colors.grey.shade300,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _isSharingLocation
+                                      ? Icons.my_location
+                                      : Icons.location_disabled,
+                                  size: 18,
+                                  color: _isSharingLocation
+                                      ? Colors.deepPurple
+                                      : Colors.grey,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _isSharingLocation
+                                      ? 'Sharing Location'
+                                      : 'Location Hidden',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: _isSharingLocation
+                                        ? Colors.deepPurple
+                                        : Colors.grey.shade700,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                  height: 20,
+                                  width: 30,
+                                  child: Switch(
+                                    value: _isSharingLocation,
+                                    onChanged: _toggleLocationSharing,
+                                    activeColor: Colors.deepPurple,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Action buttons (Zoom) - Removed Location FAB
+                  Positioned(
+                    bottom: 100,
+                    right: 16,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FloatingActionButton(
+                          mini: true,
+                          onPressed: () {
+                            mapController.move(
+                              mapController.camera.center,
+                              mapController.camera.zoom + 1,
+                            );
+                          },
+                          backgroundColor: Colors.deepPurple,
+                          child: const Icon(Icons.add),
+                        ),
+                        const SizedBox(height: 8),
+                        FloatingActionButton(
+                          mini: true,
+                          onPressed: () {
+                            mapController.move(
+                              mapController.camera.center,
+                              mapController.camera.zoom - 1,
+                            );
+                          },
+                          backgroundColor: Colors.deepPurple,
+                          child: const Icon(Icons.remove),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Pin placement button
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: FloatingActionButton(
+                      onPressed: _togglePinMode,
+                      backgroundColor: _isPinMode
+                          ? Colors.red
+                          : Colors.deepPurple,
+                      child: Icon(_isPinMode ? Icons.close : Icons.location_on),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -330,4 +449,3 @@ class _MapTabState extends State<MapTab> {
     super.dispose();
   }
 }
-

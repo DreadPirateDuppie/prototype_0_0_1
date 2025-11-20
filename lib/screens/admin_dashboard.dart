@@ -15,12 +15,54 @@ class _AdminDashboardState extends State<AdminDashboard>
   late Future<List<Map<String, dynamic>>> _reportsFuture;
   late Future<List<MapPost>> _allPostsFuture;
   late Future<Map<String, dynamic>> _analyticsData;
+  bool _isCheckingAuth = true;
+  bool _isAuthorized = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _loadData();
+    _checkAuthorization();
+  }
+
+  Future<void> _checkAuthorization() async {
+    try {
+      final isAdmin = await SupabaseService.isCurrentUserAdmin();
+      if (mounted) {
+        setState(() {
+          _isAuthorized = isAdmin;
+          _isCheckingAuth = false;
+        });
+
+        if (!isAdmin) {
+          // Not authorized, show error and go back
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Access denied: Admin privileges required'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          Navigator.of(context).pop();
+        } else {
+          // Authorized, load data
+          _loadData();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAuthorized = false;
+          _isCheckingAuth = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Authorization check failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    }
   }
 
   @override
@@ -116,29 +158,62 @@ class _AdminDashboardState extends State<AdminDashboard>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Dashboard'),
-        backgroundColor: Colors.deepPurple,
-        bottom: TabBar(
+    // Show loading while checking authorization
+    if (_isCheckingAuth) {
+      return Scaffold(
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Checking authorization...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show dashboard if authorized
+    if (_isAuthorized) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Admin Dashboard'),
+          backgroundColor: Colors.deepPurple,
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: Colors.white,
+            tabs: const [
+              Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
+              Tab(icon: Icon(Icons.analytics), text: 'Analytics'),
+              Tab(icon: Icon(Icons.report), text: 'Reports'),
+              Tab(icon: Icon(Icons.people), text: 'Users'),
+            ],
+          ),
+        ),
+        body: TabBarView(
           controller: _tabController,
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
-            Tab(icon: Icon(Icons.analytics), text: 'Analytics'),
-            Tab(icon: Icon(Icons.report), text: 'Reports'),
-            Tab(icon: Icon(Icons.people), text: 'Users'),
+          children: [
+            _buildOverviewTab(),
+            _buildAnalyticsTab(),
+            _buildReportsTab(),
+            _buildUsersTab(),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildOverviewTab(),
-          _buildAnalyticsTab(),
-          _buildReportsTab(),
-          _buildUsersTab(),
-        ],
+      );
+    }
+
+    // Should not reach here, but just in case
+    return Scaffold(
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error, size: 80, color: Colors.red),
+            SizedBox(height: 16),
+            Text('Access denied: Admin privileges required'),
+          ],
+        ),
       ),
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/battle.dart';
-import '../models/verification.dart';
 import '../services/battle_service.dart';
 import '../services/verification_service.dart';
 import 'package:image_picker/image_picker.dart';
@@ -51,8 +50,6 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
   late Battle _battle;
   bool _isLoading = false;
   final _currentUser = Supabase.instance.client.auth.currentUser;
-  QuickFireVote? _quickFireVote;
-  VerificationAttempt? _currentAttempt;
   List<_TutorialScene> _tutorialScenes = [];
   int _tutorialSceneIndex = 0;
   bool _tutorialPlaying = false;
@@ -525,151 +522,6 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     );
   }
 
-  Widget _buildMediaCard({
-    required String title,
-    required String description,
-    required IconData icon,
-    required Color accent,
-    required bool hasContent,
-    required Color cardColor,
-    required Color shadowColor,
-    required Color textColor,
-    required Color subtextColor,
-    required bool isDarkMode,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: shadowColor,
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: textColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      description,
-                      style: TextStyle(color: subtextColor, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              height: 190,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: hasContent
-                      ? [accent.withValues(alpha: 0.65), accent]
-                      : isDarkMode
-                      ? [
-                          Colors.white.withValues(alpha: 0.08),
-                          Colors.white.withValues(alpha: 0.04),
-                        ]
-                      : [Colors.grey.shade200, Colors.grey.shade100],
-                ),
-              ),
-              child: Center(
-                child: Icon(
-                  hasContent
-                      ? Icons.play_circle_fill_rounded
-                      : Icons.hourglass_empty,
-                  size: 64,
-                  color: hasContent ? Colors.white : subtextColor,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTurnCard() {
-    final isMyTurn = _isMyTurn;
-    final Color accent = isMyTurn ? Colors.green : Colors.orange;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: accent.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: accent,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              isMyTurn ? Icons.bolt : Icons.hourglass_bottom,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isMyTurn ? 'Your turn' : "Opponent's turn",
-                  style: TextStyle(
-                    color: accent.withValues(alpha: 0.9),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isMyTurn
-                      ? 'Set the pace by uploading a new trick.'
-                      : 'Waiting for your opponent to respond.',
-                  style: const TextStyle(fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _noop() {}
 
   Widget _buildActionButton({
@@ -840,7 +692,6 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       if (updatedBattle != null) {
         setState(() {
           _battle = updatedBattle;
-          _currentAttempt = attempt;
         });
       }
 
@@ -864,217 +715,6 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     }
   }
 
-  Future<void> _submitQuickFireVote(VoteType voteType) async {
-    if (widget.tutorialMode) {
-      _showInfoSnack('Tutorial mode: voting is disabled.');
-      return;
-    }
-    if (_currentAttempt == null) return;
-
-    final userId = _effectiveUserId;
-    if (userId == null) {
-      _showInfoSnack('No authenticated user found.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final updatedVote = await VerificationService.submitQuickFireVote(
-        attemptId: _currentAttempt!.id!,
-        playerId: userId,
-        vote: voteType,
-      );
-
-      setState(() {
-        _quickFireVote = updatedVote;
-      });
-
-      if (mounted) {
-        if (updatedVote?.bothPlayersVoted == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Vote recorded! Processing result...'),
-            ),
-          );
-          // Reload battle details after a delay
-          await Future.delayed(const Duration(seconds: 2));
-          await _loadBattleDetails();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Vote recorded! Waiting for other player...'),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error submitting vote: $e')));
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Widget _buildQuickFireVoting() {
-    final myId = _effectiveUserId;
-    final hasVoted =
-        _quickFireVote != null &&
-        ((_quickFireVote!.player1Id == myId &&
-                _quickFireVote!.player1Vote != null) ||
-            (_quickFireVote!.player2Id == myId &&
-                _quickFireVote!.player2Vote != null));
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Quick-Fire Voting',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.timer, size: 16, color: Colors.orange),
-                    SizedBox(width: 6),
-                    Text(
-                      'Real-time',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            hasVoted
-                ? 'Thanks! We’re waiting for the other player to vote.'
-                : 'How did the attempt look? Cast your vote to keep the battle moving.',
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 20),
-          if (hasVoted)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.hourglass_top, color: Colors.orange),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Vote recorded. Waiting for the other skater...',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading
-                        ? null
-                        : () => _submitQuickFireVote(VoteType.land),
-                    icon: const Icon(Icons.check_circle),
-                    label: const Text('Land'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading
-                        ? null
-                        : () => _submitQuickFireVote(VoteType.noLand),
-                    icon: const Icon(Icons.cancel),
-                    label: const Text('No Land'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading
-                        ? null
-                        : () => _submitQuickFireVote(VoteType.rebate),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Rebate'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1089,9 +729,6 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     final targetLetters = _battle.getGameLetters();
     final modeLabel = _modeLabel(_battle.gameMode);
     final baseCardColor = isDarkMode ? colorScheme.surface : Colors.white;
-    final baseShadowColor = isDarkMode
-        ? Colors.black.withValues(alpha: 0.3)
-        : Colors.black.withValues(alpha: 0.05);
     final baseTextColor = isDarkMode ? Colors.white : Colors.black87;
     final baseSubtextColor = isDarkMode
         ? Colors.white.withValues(alpha: 0.7)
