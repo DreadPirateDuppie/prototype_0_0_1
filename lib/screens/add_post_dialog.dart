@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/supabase_service.dart';
 import '../services/image_service.dart';
+import '../utils/error_helper.dart';
 
 class AddPostDialog extends StatefulWidget {
   final LatLng location;
@@ -102,39 +103,37 @@ class _AddPostDialogState extends State<AddPostDialog> {
 
     try {
       final user = SupabaseService.getCurrentUser();
-      if (user != null) {
-        String? photoUrl;
-        if (_selectedImage != null) {
-          photoUrl = await SupabaseService.uploadPostImage(
-            _selectedImage!,
-            user.id,
-          );
-        }
+      if (user == null) throw Exception('User not logged in');
 
-        final displayName =
-            await SupabaseService.getCurrentUserDisplayName() ?? 'User';
+      // Get user's display name
+      final userName = await SupabaseService.getCurrentUserDisplayName();
 
-        await SupabaseService.createMapPost(
-          userId: user.id,
-          userName: displayName,
-          userEmail: user.email,
-          latitude: widget.location.latitude,
-          longitude: widget.location.longitude,
-          title: _titleController.text,
-          description: _descriptionController.text,
-          photoUrl: photoUrl,
+      String? photoUrl;
+      if (_selectedImage != null) {
+        photoUrl = await SupabaseService.uploadPostImage(
+          _selectedImage!,
+          user.id,
         );
-
-        if (mounted) {
-          widget.onPostAdded();
-          Navigator.of(context).pop();
-        }
       }
-    } catch (e) {
+
+      await SupabaseService.createMapPost(
+        userId: user.id,
+        userName: userName ?? 'Anonymous',
+        userEmail: user.email ?? 'No Email',
+        latitude: widget.location.latitude,
+        longitude: widget.location.longitude,
+        title: _titleController.text,
+        description: _descriptionController.text,
+        photoUrl: photoUrl,
+      );
+
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error creating post: $e')));
+        widget.onPostAdded();
+        Navigator.of(context).pop();
+      }
+      } catch (e) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Error creating post: $e');
       }
     } finally {
       if (mounted) {

@@ -148,7 +148,7 @@ class _VsTabState extends State<VsTab> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('VS Battles'),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.green,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -210,7 +210,7 @@ class _VsTabState extends State<VsTab> {
             _loadBattles();
           }
         },
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.green,
         icon: const Icon(Icons.add),
         label: const Text('New Battle'),
       ),

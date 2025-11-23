@@ -483,19 +483,19 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.deepPurple.withValues(alpha: 0.08),
+        color: Colors.green.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.deepPurple.withValues(alpha: 0.15)),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.deepPurple.withValues(alpha: 0.15),
+              color: Colors.green.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.psychology_alt, color: Colors.deepPurple),
+            child: Icon(Icons.psychology_alt, color: Colors.green.shade700),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -505,7 +505,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                 Text(
                   'Tutorial Mode',
                   style: TextStyle(
-                    color: Colors.deepPurple.shade700,
+                    color: Colors.green.shade700,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -735,7 +735,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
         : Colors.grey[600]!;
     final overviewGradientColors = isDarkMode
         ? [colorScheme.primary, colorScheme.primaryContainer]
-        : [Colors.deepPurple, const Color(0xFF5C6BC0)];
+        : [Colors.green, Colors.green.shade700];
     final uploadPrimaryColor = colorScheme.primary;
     final uploadSecondaryColor = isDarkMode
         ? colorScheme.secondary
@@ -746,7 +746,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('$modeLabel Showdown'),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.green,
         foregroundColor: Colors.white,
         centerTitle: true,
         elevation: 0,
@@ -772,7 +772,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                       borderRadius: BorderRadius.circular(32),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.deepPurple.withValues(alpha: 0.35),
+                          color: Colors.green.withValues(alpha: 0.35),
                           blurRadius: 30,
                           offset: const Offset(0, 18),
                         ),

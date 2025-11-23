@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AdBanner extends StatefulWidget {
   const AdBanner({super.key});
@@ -9,57 +11,39 @@ class AdBanner extends StatefulWidget {
 }
 
 class _AdBannerState extends State<AdBanner> {
+  BannerAd? _bannerAd;
+  bool _isLoaded = false;
+  AdSize? _adSize;
+  
+  // Fallback banner state
   int _currentAdIndex = 0;
   Timer? _adTimer;
 
+  // Test Ad Unit IDs
+  final String _adUnitId = Platform.isAndroid
+      ? 'ca-app-pub-7811826984903792/5751991911'
+      : 'ca-app-pub-3940256099942544/2934735716';
+
   final List<Map<String, dynamic>> _advertisements = [
     {
-      'icon': Icons.local_offer,
-      'title': 'Special Offer!',
-      'subtitle': 'Discover amazing spots in your area',
-      'color': Colors.deepPurple,
-      'action': 'Learn More',
-    },
-    {
-      'icon': Icons.star,
-      'title': 'Premium Features',
-      'subtitle': 'Unlock exclusive content and rewards',
+      'icon': Icons.star_rounded,
+      'title': 'Remove Ads',
+      'subtitle': 'Sign up to Premium to remove ads',
       'color': Colors.amber,
       'action': 'Upgrade',
     },
-    {
-      'icon': Icons.explore,
-      'title': 'Explore More',
-      'subtitle': 'Find hidden gems near you',
-      'color': Colors.teal,
-      'action': 'Discover',
-    },
-    {
-      'icon': Icons.people,
-      'title': 'Join Community',
-      'subtitle': 'Connect with local explorers',
-      'color': Colors.blue,
-      'action': 'Connect',
-    },
-    {
-      'icon': Icons.trending_up,
-      'title': 'Popular Today',
-      'subtitle': 'Check out trending locations',
-      'color': Colors.orange,
-      'action': 'View',
-    },
   ];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadAd();
+  }
 
   @override
   void initState() {
     super.initState();
     _startAdRotation();
-  }
-
-  @override
-  void dispose() {
-    _adTimer?.cancel();
-    super.dispose();
   }
 
   void _startAdRotation() {
@@ -72,8 +56,58 @@ class _AdBannerState extends State<AdBanner> {
     });
   }
 
+  Future<void> _loadAd() async {
+    // Get the screen width to create an adaptive banner
+    final AnchoredAdaptiveBannerAdSize? size =
+        await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
+      MediaQuery.of(context).size.width.truncate(),
+    );
+
+    if (size == null) {
+      // Fallback to standard banner if adaptive fails
+      _createBannerAd(AdSize.banner);
+      return;
+    }
+
+    _createBannerAd(size);
+  }
+
+  void _createBannerAd(AdSize size) {
+    if (_bannerAd != null) {
+      _bannerAd!.dispose();
+    }
+
+    setState(() {
+      _adSize = size;
+    });
+
+    _bannerAd = BannerAd(
+      adUnitId: _adUnitId,
+      request: const AdRequest(),
+      size: size,
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          debugPrint('$ad loaded.');
+          setState(() {
+            _isLoaded = true;
+          });
+        },
+        onAdFailedToLoad: (ad, err) {
+          debugPrint('BannerAd failed to load: $err');
+          ad.dispose();
+        },
+      ),
+    )..load();
+  }
+
   @override
-  Widget build(BuildContext context) {
+  void dispose() {
+    _bannerAd?.dispose();
+    _adTimer?.cancel();
+    super.dispose();
+  }
+
+  Widget _buildFallbackBanner() {
     final currentAd = _advertisements[_currentAdIndex];
 
     return AnimatedSwitcher(
@@ -179,25 +213,6 @@ class _AdBannerState extends State<AdBanner> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  // Indicator dots
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(
-                      _advertisements.length,
-                      (index) => Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 2),
-                        width: 4,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: index == _currentAdIndex
-                              ? currentAd['color'] as Color
-                              : Colors.grey[400],
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -205,5 +220,19 @@ class _AdBannerState extends State<AdBanner> {
         ),
       ),
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoaded && _bannerAd != null && _adSize != null) {
+      return SizedBox(
+        width: _adSize!.width.toDouble(),
+        height: _adSize!.height.toDouble(),
+        child: AdWidget(ad: _bannerAd!),
+      );
+    }
+    
+    // Show fallback banner while loading or if failed
+    return _buildFallbackBanner();
   }
 }

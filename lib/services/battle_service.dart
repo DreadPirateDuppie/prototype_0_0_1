@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import '../models/battle.dart';
 import '../models/user_scores.dart';
+import 'supabase_service.dart';
 
 class BattleService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -12,8 +13,25 @@ class BattleService {
     required String player2Id,
     required GameMode gameMode,
     String? customLetters,
+    int wagerAmount = 0,
   }) async {
     try {
+      // Check if player has enough points for wager
+      if (wagerAmount > 0) {
+        final balance = await SupabaseService.getUserPoints(player1Id);
+        if (balance < wagerAmount) {
+          throw Exception('Insufficient points for wager');
+        }
+        
+        // Deduct wager from player 1
+        await SupabaseService.awardPoints(
+          player1Id, 
+          -wagerAmount, 
+          'wager_entry', 
+          description: 'Wager for battle vs $player2Id'
+        );
+      }
+
       final battle = Battle(
         player1Id: player1Id,
         player2Id: player2Id,
@@ -21,6 +39,7 @@ class BattleService {
         customLetters: customLetters ?? '',
         createdAt: DateTime.now(),
         currentTurnPlayerId: player1Id,
+        wagerAmount: wagerAmount,
       );
 
       final response = await _client
@@ -248,6 +267,22 @@ class BattleService {
 
       // Update player scores
       await updatePlayerScoreForBattle(battle);
+      
+      // Handle Wager Payout
+      if (battle.wagerAmount > 0) {
+        // Winner takes the pot (2x wager)
+        // Note: In this prototype, we assume the "House" or opponent matched the bet
+        // So winner gets 2x the wager amount
+        final potAmount = battle.wagerAmount * 2;
+        
+        await SupabaseService.awardPoints(
+          winnerId, 
+          potAmount, 
+          'wager_win', 
+          referenceId: battleId, 
+          description: 'Won battle wager'
+        );
+      }
 
       return battle;
     } catch (e) {

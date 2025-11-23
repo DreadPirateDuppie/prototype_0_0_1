@@ -13,7 +13,7 @@ class ThemeProvider extends ChangeNotifier {
 
   ThemeData getLightTheme() {
     return ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
       useMaterial3: true,
       brightness: Brightness.light,
     );
@@ -22,9 +22,12 @@ class ThemeProvider extends ChangeNotifier {
   ThemeData getDarkTheme() {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: Colors.deepPurple,
+        seedColor: Colors.green,
         brightness: Brightness.dark,
+        surface: const Color(0xFF121212), // Darker surface
       ),
+      scaffoldBackgroundColor: Colors.black,
+      cardColor: const Color(0xFF1E1E1E),
       useMaterial3: true,
       brightness: Brightness.dark,
     );

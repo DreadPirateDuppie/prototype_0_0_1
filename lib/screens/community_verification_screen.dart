@@ -207,7 +207,7 @@ class _CommunityVerificationScreenState extends State<CommunityVerificationScree
     return Scaffold(
       appBar: AppBar(
         title: const Text('Community Verification'),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.green,
         foregroundColor: Colors.white,
       ),
       body: _isLoading

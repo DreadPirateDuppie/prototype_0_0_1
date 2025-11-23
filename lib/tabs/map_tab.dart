@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import 'dart:ui' as ui;
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
 import '../widgets/ad_banner.dart';
+import '../utils/error_helper.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -60,6 +60,7 @@ class _MapTabState extends State<MapTab> {
         });
       }
     } catch (e) {
+      debugPrint('Error loading posts: $e');
       // Silently fail
     }
   }
@@ -70,7 +71,7 @@ class _MapTabState extends State<MapTab> {
         LatLng(post.latitude, post.longitude),
         post.title,
         post.description,
-        Colors.purple,
+        Colors.green,
         postId: post.id,
         post: post,
       );
@@ -135,9 +136,7 @@ class _MapTabState extends State<MapTab> {
         _isSharingLocation = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error getting location: $e')));
+        ErrorHelper.showError(context, 'Error getting location: $e');
       }
     }
   }
@@ -317,10 +316,13 @@ class _MapTabState extends State<MapTab> {
                   
                   // Location Share Slider (Top Center)
                   Positioned(
-                    top: 40, // Moved higher up
+                    top: 0,
                     left: 0,
                     right: 0,
-                    child: Center(
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 16.0),
+                        child: Center(
                       child: Material(
                         elevation: 4,
                         shadowColor: Colors.black26,
@@ -339,7 +341,7 @@ class _MapTabState extends State<MapTab> {
                               borderRadius: BorderRadius.circular(30),
                               border: Border.all(
                                 color: _isSharingLocation
-                                    ? Colors.deepPurple
+                                    ? Colors.green
                                     : Colors.grey.shade300,
                                 width: 1.5,
                               ),
@@ -353,7 +355,7 @@ class _MapTabState extends State<MapTab> {
                                       : Icons.location_disabled,
                                   size: 18,
                                   color: _isSharingLocation
-                                      ? Colors.deepPurple
+                                      ? Colors.green
                                       : Colors.grey,
                                 ),
                                 const SizedBox(width: 8),
@@ -365,7 +367,7 @@ class _MapTabState extends State<MapTab> {
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: _isSharingLocation
-                                        ? Colors.deepPurple
+                                        ? Colors.green
                                         : Colors.grey.shade700,
                                   ),
                                 ),
@@ -376,7 +378,7 @@ class _MapTabState extends State<MapTab> {
                                   child: Switch(
                                     value: _isSharingLocation,
                                     onChanged: _toggleLocationSharing,
-                                    activeColor: Colors.deepPurple,
+                                    activeThumbColor: Colors.green,
                                     materialTapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
                                   ),
@@ -387,6 +389,8 @@ class _MapTabState extends State<MapTab> {
                         ),
                       ),
                     ),
+                  ),
+                  ),
                   ),
 
                   // Action buttons (Zoom) - Removed Location FAB
@@ -404,7 +408,7 @@ class _MapTabState extends State<MapTab> {
                               mapController.camera.zoom + 1,
                             );
                           },
-                          backgroundColor: Colors.deepPurple,
+                          backgroundColor: Colors.green,
                           child: const Icon(Icons.add),
                         ),
                         const SizedBox(height: 8),
@@ -416,7 +420,7 @@ class _MapTabState extends State<MapTab> {
                               mapController.camera.zoom - 1,
                             );
                           },
-                          backgroundColor: Colors.deepPurple,
+                          backgroundColor: Colors.green,
                           child: const Icon(Icons.remove),
                         ),
                       ],
@@ -430,7 +434,7 @@ class _MapTabState extends State<MapTab> {
                       onPressed: _togglePinMode,
                       backgroundColor: _isPinMode
                           ? Colors.red
-                          : Colors.deepPurple,
+                          : Colors.green,
                       child: Icon(_isPinMode ? Icons.close : Icons.location_on),
                     ),
                   ),

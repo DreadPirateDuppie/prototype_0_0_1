@@ -3,6 +3,8 @@ import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../widgets/star_rating_display.dart';
 import '../widgets/ad_banner.dart';
+import '../widgets/vote_buttons.dart';
+import '../widgets/post_map_snapshot.dart';
 
 class FeedTab extends StatefulWidget {
   const FeedTab({super.key});
@@ -17,22 +19,24 @@ class _FeedTabState extends State<FeedTab> {
   @override
   void initState() {
     super.initState();
-    _allPostsFuture = SupabaseService.getAllMapPosts();
+    _allPostsFuture = SupabaseService.getAllMapPostsWithVotes();
   }
 
-  Future<void> _likePost(MapPost post) async {
-    await SupabaseService.likeMapPost(post.id!, post.likes);
-    if (mounted) {
-      setState(() {
-        _allPostsFuture = SupabaseService.getAllMapPosts();
-      });
-    }
+
+
+  void _refreshPosts() {
+    setState(() {
+      _allPostsFuture = SupabaseService.getAllMapPostsWithVotes();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Feed')),
+      appBar: AppBar(
+        title: const Text('Pushinn'),
+        centerTitle: true,
+      ),
       body: Column(
         children: [
           const AdBanner(),
@@ -66,51 +70,71 @@ class _FeedTabState extends State<FeedTab> {
                 return RefreshIndicator(
                   onRefresh: () async {
                     setState(() {
-                      _allPostsFuture = SupabaseService.getAllMapPosts();
+                      _allPostsFuture = SupabaseService.getAllMapPostsWithVotes();
                     });
                   },
                   child: ListView.builder(
                     itemCount: posts.length,
                     itemBuilder: (context, index) {
                       final post = posts[index];
+                      final currentUser = SupabaseService.getCurrentUser();
+                      final isOwnPost = currentUser?.id == post.userId;
+                      
                       return Card(
                         margin: const EdgeInsets.all(8.0),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
-                          child: Column(
+                          child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // User info header
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 20,
-                                    backgroundColor: Colors.deepPurple,
-                                    child: Text(
-                                      (post.userName?.isNotEmpty ?? false)
-                                          ? post.userName![0].toUpperCase()
-                                          : (post.userEmail?.isNotEmpty ?? false)
-                                              ? post.userEmail![0].toUpperCase()
-                                              : '?',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      post.userName ?? 'Unknown User',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              // Vote buttons on the left
+                              VoteButtons(
+                                postId: post.id!,
+                                voteScore: post.voteScore,
+                                userVote: post.userVote,
+                                isOwnPost: isOwnPost,
+                                onVoteChanged: _refreshPosts,
                               ),
+                              const SizedBox(width: 12),
+                              // Post content
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // User info header
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 20,
+                                          backgroundColor: Colors.green,
+                                          child: Text(
+                                            (post.userName?.isNotEmpty ?? false)
+                                                ? post.userName![0].toUpperCase()
+                                                : (post.userEmail?.isNotEmpty ?? false)
+                                                    ? post.userEmail![0].toUpperCase()
+                                                    : '?',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            post.userName ?? 
+                                                (post.userEmail != null 
+                                                    ? post.userEmail!.split('@')[0] 
+                                                    : 'Unknown User'),
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                               const SizedBox(height: 12),
                               if (post.photoUrl != null) ...[
                                 ClipRRect(
@@ -159,6 +183,11 @@ class _FeedTabState extends State<FeedTab> {
                                         ),
                               ),
                               const SizedBox(height: 12),
+                              PostMapSnapshot(
+                                latitude: post.latitude,
+                                longitude: post.longitude,
+                              ),
+                              const SizedBox(height: 12),
                               StarRatingDisplay(
                                 popularityRating: post.popularityRating,
                                 securityRating: post.securityRating,
@@ -166,19 +195,14 @@ class _FeedTabState extends State<FeedTab> {
                               ),
                               const SizedBox(height: 12),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  ElevatedButton.icon(
-                                    icon: const Icon(Icons.favorite_border),
-                                    label: Text('${post.likes}'),
-                                    onPressed: () => _likePost(post),
-                                  ),
                                   IconButton(
                                     icon: const Icon(Icons.comment),
                                     onPressed: () {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
-                                          content: Text('Comments feature coming soon!'),
+                                          content: Text('Comments coming in v1.1!'),
                                           duration: Duration(seconds: 2),
                                         ),
                                       );
@@ -189,13 +213,16 @@ class _FeedTabState extends State<FeedTab> {
                                     onPressed: () {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
-                                          content: Text('Share feature coming soon!'),
+                                          content: Text('Sharing coming in v1.1!'),
                                           duration: Duration(seconds: 2),
                                         ),
                                       );
                                     },
                                   ),
                                 ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),

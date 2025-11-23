@@ -6,6 +6,7 @@ import '../tabs/rewards_tab.dart';
 import '../tabs/settings_tab.dart';
 import '../tabs/vs_tab.dart';
 import '../services/connectivity_service.dart';
+import '../services/supabase_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +21,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Check daily streak on app launch
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SupabaseService.checkDailyStreak();
+    });
   }
 
   void _onItemTapped(int index) {
@@ -60,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
-          selectedItemColor: Colors.deepPurple,
+          selectedItemColor: Colors.green,
           unselectedItemColor: Colors.grey,
           items: const [
             BottomNavigationBarItem(

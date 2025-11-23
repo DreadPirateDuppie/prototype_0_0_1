@@ -179,7 +179,7 @@ class _AdminDashboardState extends State<AdminDashboard>
       return Scaffold(
         appBar: AppBar(
           title: const Text('Admin Dashboard'),
-          backgroundColor: Colors.deepPurple,
+          backgroundColor: Colors.green,
           bottom: TabBar(
             controller: _tabController,
             indicatorColor: Colors.white,
@@ -298,7 +298,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.deepPurple,
+                          backgroundColor: Colors.green,
                           child: Text(
                             post.likes.toString(),
                             style: const TextStyle(
@@ -690,7 +690,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                   ),
                   Chip(
                     label: Text('${users.length} users'),
-                    backgroundColor: Colors.deepPurple[100],
+                    backgroundColor: Colors.green[100],
                   ),
                 ],
               ),
@@ -704,7 +704,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: Colors.deepPurple,
+                      backgroundColor: Colors.green,
                       child: Text(
                         (userData['name'] as String)[0].toUpperCase(),
                         style: const TextStyle(color: Colors.white),

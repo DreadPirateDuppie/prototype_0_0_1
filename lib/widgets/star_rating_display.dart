@@ -12,58 +12,90 @@ class StarRatingDisplay extends StatelessWidget {
     required this.qualityRating,
   });
 
-  Widget _buildStarRating(double rating, String label) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: List.generate(5, (index) {
-            return Icon(
-              index < rating ? Icons.star : Icons.star_border,
-              color: Colors.amber,
-              size: 18,
-            );
-          }),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${rating.toStringAsFixed(1)}/5.0',
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-        ),
-      ],
+  Widget _buildRatingRow(
+    BuildContext context,
+    String label,
+    double rating,
+    IconData icon,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+            ),
+          ),
+          const Spacer(),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(5, (index) {
+              return Icon(
+                index < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                color: index < rating ? color : Colors.grey[300],
+                size: 18,
+              );
+            }),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 24,
+            child: Text(
+              rating.toStringAsFixed(1),
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Colors.grey[800]
-            : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
+        ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'Spot Ratings',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+          _buildRatingRow(
+            context,
+            'Popularity',
+            popularityRating,
+            Icons.local_fire_department_rounded,
+            Colors.orange,
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildStarRating(popularityRating, 'Popularity'),
-              _buildStarRating(securityRating, 'Security'),
-              _buildStarRating(qualityRating, 'Quality'),
-            ],
+          _buildRatingRow(
+            context,
+            'Security',
+            securityRating,
+            Icons.shield_rounded,
+            Colors.blue,
+          ),
+          _buildRatingRow(
+            context,
+            'Quality',
+            qualityRating,
+            Icons.star_rounded,
+            Colors.green,
           ),
         ],
       ),

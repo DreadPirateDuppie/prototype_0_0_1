@@ -32,6 +32,7 @@ class Battle {
   final DateTime? completedAt;
   final String? winnerId;
   final String currentTurnPlayerId;
+  final int wagerAmount;
 
   Battle({
     this.id,
@@ -48,6 +49,7 @@ class Battle {
     this.completedAt,
     this.winnerId,
     required this.currentTurnPlayerId,
+    this.wagerAmount = 0,
   });
 
   String getGameLetters() {
@@ -81,6 +83,7 @@ class Battle {
       'completed_at': completedAt?.toIso8601String(),
       'winner_id': winnerId,
       'current_turn_player_id': currentTurnPlayerId,
+      'wager_amount': wagerAmount,
     };
   }
 
@@ -108,6 +111,7 @@ class Battle {
           : null,
       winnerId: map['winner_id'] as String?,
       currentTurnPlayerId: map['current_turn_player_id'] as String,
+      wagerAmount: (map['wager_amount'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -126,6 +130,7 @@ class Battle {
     DateTime? completedAt,
     String? winnerId,
     String? currentTurnPlayerId,
+    int? wagerAmount,
   }) {
     return Battle(
       id: id ?? this.id,
@@ -142,6 +147,7 @@ class Battle {
       completedAt: completedAt ?? this.completedAt,
       winnerId: winnerId ?? this.winnerId,
       currentTurnPlayerId: currentTurnPlayerId ?? this.currentTurnPlayerId,
+      wagerAmount: wagerAmount ?? this.wagerAmount,
     );
   }
 }

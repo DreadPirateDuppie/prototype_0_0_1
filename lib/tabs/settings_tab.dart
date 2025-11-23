@@ -91,6 +91,90 @@ class _SettingsTabState extends State<SettingsTab> {
     }
   }
 
+  Future<void> _showFeedbackDialog() async {
+    final feedbackController = TextEditingController();
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Send Feedback'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('We would love to hear your thoughts!'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: feedbackController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'Type your feedback here...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        final text = feedbackController.text.trim();
+                        if (text.isEmpty) return;
+
+                        final navigator = Navigator.of(context);
+                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                        setState(() {
+                          isSubmitting = true;
+                        });
+
+                        try {
+                          await SupabaseService.submitFeedback(text);
+                          if (mounted) {
+                            navigator.pop();
+                            scaffoldMessenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Thank you for your feedback!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() {
+                              isSubmitting = false;
+                            });
+                            scaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Send'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -254,6 +338,20 @@ class _SettingsTabState extends State<SettingsTab> {
                 ),
               );
             },
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Support',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.feedback),
+            title: const Text('Send Feedback'),
+            subtitle: const Text('Report bugs or suggest features'),
+            onTap: _showFeedbackDialog,
           ),
           if (_isAdmin && !_isLoadingAdminStatus) ...[
             const Divider(),
