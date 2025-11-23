@@ -17,8 +17,9 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
   final _customLettersController = TextEditingController();
   final _wagerController = TextEditingController();
   GameMode _selectedMode = GameMode.skate;
-  bool _isLoading = false;
-  int _userBalance = 0;
+  int _selectedPot = 10;
+  double _userPoints = 0.0;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -32,7 +33,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
       final balance = await SupabaseService.getUserPoints(user.id);
       if (mounted) {
         setState(() {
-          _userBalance = balance;
+          _userPoints = balance;
         });
       }
     }
@@ -197,14 +198,15 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                   hintText: '0',
                   border: const OutlineInputBorder(),
                   suffixText: 'Points',
-                  helperText: 'Available: $_userBalance Points',
+                  helperText: 'Min: 5, Max: 100 | Available: ${_userPoints.toStringAsFixed(2)} Points',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) return null;
-                  final amount = int.tryParse(value);
-                  if (amount == null) return 'Invalid number';
-                  if (amount < 0) return 'Cannot be negative';
-                  if (amount > _userBalance) return 'Insufficient points';
+                  final amount = int.tryParse(value) ?? 0;
+                  if (amount <= 0) return 'Enter a valid amount';
+                  if (amount < 5) return 'Minimum bet is 5 points';
+                  if (amount > 100) return 'Maximum bet is 100 points';
+                  if (amount > _userPoints) return 'Insufficient points';
                   return null;
                 },
               ),

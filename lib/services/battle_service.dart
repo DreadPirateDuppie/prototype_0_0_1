@@ -26,7 +26,7 @@ class BattleService {
         // Deduct wager from player 1
         await SupabaseService.awardPoints(
           player1Id, 
-          -wagerAmount, 
+          -wagerAmount.toDouble(), 
           'wager_entry', 
           description: 'Wager for battle vs $player2Id'
         );
@@ -274,11 +274,11 @@ class BattleService {
         // Note: In this prototype, we assume the "House" or opponent matched the bet
         // So winner gets 2x the wager amount
         final potAmount = battle.wagerAmount * 2;
-        
-        await SupabaseService.awardPoints(
-          winnerId, 
-          potAmount, 
-          'wager_win', 
+      // Award winner (pot * 2)
+      await SupabaseService.awardPoints(
+        winnerId,
+        potAmount.toDouble(), // Cast potAmount to double
+        'battle_win', 
           referenceId: battleId, 
           description: 'Won battle wager'
         );

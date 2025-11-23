@@ -273,8 +273,8 @@ class SupabaseService {
       // Award XP for creating a post (e.g., 15 XP)
     await _updatePosterXP(userId, 15);
     
-    // Award Points for creating a post (e.g., 50 Points)
-    await awardPoints(userId, 50, 'post_reward', referenceId: post.id, description: 'Created a new spot');
+    // Award Points for creating a post (4.20 Points)
+    await awardPoints(userId, 4.20, 'post_reward', referenceId: post.id, description: 'Created a new spot');
     
     return post;
     } catch (e) {
@@ -384,12 +384,18 @@ class SupabaseService {
     required String title,
     required String description,
     String? photoUrl,
+    double? popularityRating,
+    double? securityRating,
+    double? qualityRating,
   }) async {
     try {
       final updateData = {
         'title': title,
         'description': description,
         if (photoUrl != null) 'photo_url': photoUrl,
+        if (popularityRating != null) 'popularity_rating': popularityRating,
+        if (securityRating != null) 'security_rating': securityRating,
+        if (qualityRating != null) 'quality_rating': qualityRating,
       };
 
       final response = await _client
@@ -696,7 +702,7 @@ class SupabaseService {
   // --- Rewards & Points System ---
 
   // Get user wallet balance
-  static Future<int> getUserPoints(String userId) async {
+  static Future<double> getUserPoints(String userId) async {
     try {
       final response = await _client
           .from('user_wallets')
@@ -704,10 +710,10 @@ class SupabaseService {
           .eq('user_id', userId)
           .maybeSingle();
       
-      return (response?['balance'] as num?)?.toInt() ?? 0;
+      return (response?['balance'] as num?)?.toDouble() ?? 0.0;
     } catch (e) {
       developer.log('Error getting user points: $e', name: 'SupabaseService');
-      return 0;
+      return 0.0;
     }
   }
 
@@ -775,13 +781,13 @@ class SupabaseService {
         final newLongest = newStreak > longestStreak ? newStreak : longestStreak;
         await _updateStreak(user.id, newStreak, newLongest, today);
         
-        // Calculate bonus: Base 10 + (Streak * 5)
-        final bonus = 10 + (newStreak * 5);
+        // Calculate bonus: Base 3.5 + (Streak * 0.5)
+        final bonus = 3.5 + (newStreak * 0.5);
         await awardPoints(user.id, bonus, 'daily_login', description: 'Daily streak: $newStreak days');
       } else {
         // Missed a day (or more), reset streak
         await _updateStreak(user.id, 1, longestStreak, today);
-        await awardPoints(user.id, 10, 'daily_login', description: 'Daily login (streak reset)');
+        await awardPoints(user.id, 3.5, 'daily_login', description: 'Daily login (streak reset)');
       }
     } catch (e) {
       developer.log('Error checking daily streak: $e', name: 'SupabaseService');
@@ -801,7 +807,7 @@ class SupabaseService {
   // Award points (or deduct if negative)
   static Future<void> awardPoints(
     String userId, 
-    int amount, 
+    double amount, 
     String type, 
     {String? referenceId, String? description}
   ) async {
@@ -863,4 +869,161 @@ class SupabaseService {
       throw Exception('Failed to submit feedback');
     }
   }
+
+  // --- Video History Methods ---
+
+  /// Get videos for a specific spot
+  static Future<List<Map<String, dynamic>>> getSpotVideos(String spotId, {String sortBy = 'recent'}) async {
+    try {
+      final user = getCurrentUser();
+      
+      // Build base query
+      var queryBuilder = _client
+          .from('spot_videos')
+          .select('*, user_vote:video_upvotes!left(vote_type)')
+          .eq('spot_id', spotId);
+      
+      // Only show approved videos OR user's own videos
+      if (user != null) {
+        queryBuilder = queryBuilder.or('status.eq.approved,submitted_by.eq.${user.id}');
+      } else {
+        queryBuilder = queryBuilder.eq('status', 'approved');
+      }
+      
+      // Apply sorting and execute query
+      final dynamic response;
+      switch (sortBy) {
+        case 'popular':
+          response = await queryBuilder.order('upvotes', ascending: false);
+          break;
+        case 'oldest':
+          response = await queryBuilder.order('created_at', ascending: true);
+          break;
+        case 'recent':
+        default:
+          response = await queryBuilder.order('created_at', ascending: false);
+      }
+      
+      // Process user votes
+      final videos = (response as List).cast<Map<String, dynamic>>();
+      for (var video in videos) {
+        final votes = video['user_vote'] as List?;
+        if (votes != null && votes.isNotEmpty && user != null) {
+          video['user_vote'] = votes.first['vote_type'];
+        } else {
+          video['user_vote'] = null;
+        }
+      }
+      
+      return videos;
+    } catch (e) {
+      developer.log('Error getting spot videos: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
+  /// Submit a new video for a spot
+  static Future<String?> submitSpotVideo({
+    required String spotId,
+    required String url,
+    String? skaterName,
+    String? description,
+  }) async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) throw Exception('User not logged in');
+      
+      // Detect platform from URL
+      String platform = 'other';
+      final lowerUrl = url.toLowerCase();
+      if (lowerUrl.contains('youtube.com') || lowerUrl.contains('youtu.be')) {
+        platform = 'youtube';
+      } else if (lowerUrl.contains('instagram.com')) {
+        platform = 'instagram';
+      } else if (lowerUrl.contains('tiktok.com')) {
+        platform = 'tiktok';
+      } else if (lowerUrl.contains('vimeo.com')) {
+        platform = 'vimeo';
+      }
+      
+      final response = await _client.from('spot_videos').insert({
+        'spot_id': spotId,
+        'url': url,
+        'platform': platform,
+        'skater_name': skaterName,
+        'description': description,
+        'submitted_by': user.id,
+        'status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+      }).select().single();
+      
+      return response['id'] as String;
+    } catch (e) {
+      developer.log('Error submitting video: $e', name: 'SupabaseService');
+      rethrow;
+    }
+  }
+
+  /// Vote on a video (upvote or downvote)
+  static Future<void> voteVideo(String videoId, int voteType) async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) throw Exception('User not logged in');
+      
+      // Check if user has already voted
+      final existing = await _client
+          .from('video_upvotes')
+          .select()
+          .eq('video_id', videoId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+      
+      if (existing != null) {
+        // Update existing vote
+        if (existing['vote_type'] == voteType) {
+          // Remove vote if clicking same button
+          await _client
+              .from('video_upvotes')
+              .delete()
+              .eq('video_id', videoId)
+              .eq('user_id', user.id);
+        } else {
+          // Change vote
+          await _client
+              .from('video_upvotes')
+              .update({'vote_type': voteType})
+              .eq('video_id', videoId)
+              .eq('user_id', user.id);
+        }
+      } else {
+        // Insert new vote
+        await _client.from('video_upvotes').insert({
+          'video_id': videoId,
+          'user_id': user.id,
+          'vote_type': voteType,
+        });
+      }
+    } catch (e) {
+      developer.log('Error voting on video: $e', name: 'SupabaseService');
+      rethrow;
+    }
+  }
+
+  /// Delete a video (only if user is the submitter)
+  static Future<void> deleteSpotVideo(String videoId) async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) throw Exception('User not logged in');
+      
+      await _client
+          .from('spot_videos')
+          .delete()
+          .eq('id', videoId)
+          .eq('submitted_by', user.id);
+    } catch (e) {
+      developer.log('Error deleting video: $e', name: 'SupabaseService');
+      rethrow;
+    }
+  }
 }
+

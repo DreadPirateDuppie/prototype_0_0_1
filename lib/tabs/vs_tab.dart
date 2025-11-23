@@ -5,6 +5,7 @@ import '../services/battle_service.dart';
 import '../screens/battle_detail_screen.dart';
 import '../screens/create_battle_dialog.dart';
 import '../screens/community_verification_screen.dart';
+import '../widgets/ad_banner.dart';
 
 class VsTab extends StatefulWidget {
   const VsTab({super.key});
@@ -170,36 +171,43 @@ class _VsTabState extends State<VsTab> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _battles.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.sports_kabaddi, size: 80, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No active battles',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Start a new battle to compete!',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadBattles,
-              child: ListView.builder(
-                itemCount: _battles.length,
-                itemBuilder: (context, index) {
-                  return _buildBattleCard(_battles[index]);
-                },
-              ),
-            ),
+      body: Column(
+        children: [
+          const AdBanner(),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _battles.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.sports_kabaddi, size: 80, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No active battles',
+                              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Start a new battle to compete!',
+                              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadBattles,
+                        child: ListView.builder(
+                          itemCount: _battles.length,
+                          itemBuilder: (context, index) {
+                            return _buildBattleCard(_battles[index]);
+                          },
+                        ),
+                      ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final result = await showDialog<bool>(

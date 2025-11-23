@@ -5,6 +5,7 @@ import '../widgets/star_rating_display.dart';
 import '../widgets/ad_banner.dart';
 import '../widgets/vote_buttons.dart';
 import '../widgets/post_map_snapshot.dart';
+import '../screens/trick_history_screen.dart';
 
 class FeedTab extends StatefulWidget {
   const FeedTab({super.key});
@@ -187,16 +188,36 @@ class _FeedTabState extends State<FeedTab> {
                                 latitude: post.latitude,
                                 longitude: post.longitude,
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 8),
+                              // Star Ratings
                               StarRatingDisplay(
                                 popularityRating: post.popularityRating,
                                 securityRating: post.securityRating,
                                 qualityRating: post.qualityRating,
                               ),
                               const SizedBox(height: 12),
+                              // Bottom action row
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
+                                  // History button - bottom left
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => TrickHistoryScreen(spot: post),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.history, size: 18),
+                                    label: const Text('History'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.green.shade700,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    ),
+                                  ),
+                                  // Comment button - bottom right
                                   IconButton(
                                     icon: const Icon(Icons.comment),
                                     onPressed: () {
@@ -220,8 +241,8 @@ class _FeedTabState extends State<FeedTab> {
                                     },
                                   ),
                                 ],
-                                    ),
-                                  ],
+                              ),
+                                    ],
                                 ),
                               ),
                             ],

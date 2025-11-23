@@ -5,6 +5,7 @@ import '../screens/edit_post_dialog.dart';
 import '../services/supabase_service.dart';
 import '../widgets/star_rating_display.dart';
 import '../widgets/vote_buttons.dart';
+import 'trick_history_screen.dart';
 
 class SpotDetailsBottomSheet extends StatefulWidget {
   final MapPost post;
@@ -160,13 +161,32 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Close button
-              Align(
-                alignment: Alignment.topRight,
-                child: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: widget.onClose,
-                ),
+              // Top buttons row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // History button
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TrickHistoryScreen(spot: currentPost),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.history, size: 20),
+                    label: const Text('History'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.green.shade700,
+                    ),
+                  ),
+                  // Close button
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: widget.onClose,
+                  ),
+                ],
               ),
 
               // User info

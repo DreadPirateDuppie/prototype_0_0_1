@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
+import '../services/rewarded_ad_service.dart';
+import '../widgets/ad_banner.dart';
 
 class RewardsTab extends StatefulWidget {
   const RewardsTab({super.key});
@@ -10,7 +12,7 @@ class RewardsTab extends StatefulWidget {
 }
 
 class _RewardsTabState extends State<RewardsTab> {
-  int _points = 0;
+  double _points = 0.0;
   int _streak = 0;
   List<Map<String, dynamic>> _transactions = [];
   bool _isLoading = true;
@@ -58,7 +60,7 @@ class _RewardsTabState extends State<RewardsTab> {
           ),
         ],
       ),
-      extendBodyBehindAppBar: true,
+      extendBodyBehindAppBar: false,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -67,6 +69,7 @@ class _RewardsTabState extends State<RewardsTab> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
                   children: [
+                    const AdBanner(),
                     _buildHeroSection(),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -216,7 +219,7 @@ class _RewardsTabState extends State<RewardsTab> {
                                 textBaseline: TextBaseline.alphabetic,
                                 children: [
                                   Text(
-                                    '$_points',
+                                    _points.toStringAsFixed(2),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 48,
@@ -388,15 +391,10 @@ class _RewardsTabState extends State<RewardsTab> {
                 icon: Icons.add_location_alt,
                 color: Colors.blue,
                 title: 'Create Spot',
-                points: '+50',
+                points: '+4',
               ),
               const SizedBox(width: 12),
-              _buildEarnCard(
-                icon: Icons.favorite,
-                color: Colors.red,
-                title: 'Get Upvote',
-                points: '+5',
-              ),
+              _buildWatchAdCard(),
               const SizedBox(width: 12),
               _buildEarnCard(
                 icon: Icons.login,
@@ -411,6 +409,10 @@ class _RewardsTabState extends State<RewardsTab> {
                 title: 'Win Battle',
                 points: '2x Pot',
               ),
+              const SizedBox(width: 12),
+              _buildBettingCard(context),
+              const SizedBox(width: 12),
+              _buildWatchAdCard(),
             ],
           ),
         ),
@@ -467,6 +469,62 @@ class _RewardsTabState extends State<RewardsTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBettingCard(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        // Navigate to VS tab (index 2 in bottom navigation)
+        DefaultTabController.of(context).animateTo(2);
+      },
+      child: Container(
+        width: 140,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.orange.shade400, Colors.orange.shade600],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.orange.shade200,
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.casino,
+              color: Colors.white,
+              size: 48,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Bet Points',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Win 2x',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -668,5 +726,114 @@ class _RewardsTabState extends State<RewardsTab> {
           ),
       ],
     );
+  }
+
+  Widget _buildWatchAdCard() {
+    final adService = RewardedAdService.instance;
+    final bool isReady = adService.isAdReady;
+    final bool isLoading = adService.isLoading;
+
+    return GestureDetector(
+      onTap: isReady ? _showRewardedAd : null,
+      child: Container(
+        width: 120,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isReady ? Colors.amber : Theme.of(context).dividerColor,
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.amber,
+                      ),
+                    )
+                  : Icon(
+                      Icons.play_circle_filled,
+                      color: isReady ? Colors.amber : Colors.grey,
+                      size: 24,
+                    ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Watch Ad',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '+4',
+              style: TextStyle(
+                color: isReady ? Colors.amber : Colors.grey,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showRewardedAd() async {
+    final adService = RewardedAdService.instance;
+    
+    if (!adService.isAdReady) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ad not ready yet, please wait...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    await adService.showAd();
+    
+    // Reload data to show new points
+    await _loadData();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Earned 4 points!'),
+            ],
+          ),
+          backgroundColor: Colors.green.shade700,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 }

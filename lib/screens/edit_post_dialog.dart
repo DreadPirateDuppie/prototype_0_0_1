@@ -24,12 +24,18 @@ class _EditPostDialogState extends State<EditPostDialog> {
   bool _isLoading = false;
   File? _selectedImage;
   bool _imageChanged = false;
+  double _popularityRating = 0;
+  double _securityRating = 0;
+  double _qualityRating = 0;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.post.title);
     _descriptionController = TextEditingController(text: widget.post.description);
+    _popularityRating = widget.post.popularityRating;
+    _securityRating = widget.post.securityRating;
+    _qualityRating = widget.post.qualityRating;
   }
 
   @override
@@ -89,6 +95,9 @@ class _EditPostDialogState extends State<EditPostDialog> {
         title: _titleController.text,
         description: _descriptionController.text,
         photoUrl: _imageChanged ? newPhotoUrl : null,
+        popularityRating: _popularityRating,
+        securityRating: _securityRating,
+        qualityRating: _qualityRating,
       );
 
       if (mounted) {
@@ -209,6 +218,41 @@ class _EditPostDialogState extends State<EditPostDialog> {
                 ],
               ),
               const SizedBox(height: 16),
+              // Ratings section
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ratings',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRatingSlider(
+                    label: 'Popularity',
+                    value: _popularityRating,
+                    icon: Icons.local_fire_department_rounded,
+                    color: Colors.orange,
+                    onChanged: (val) => setState(() => _popularityRating = val),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRatingSlider(
+                    label: 'Security',
+                    value: _securityRating,
+                    icon: Icons.shield_rounded,
+                    color: Colors.blue,
+                    onChanged: (val) => setState(() => _securityRating = val),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRatingSlider(
+                    label: 'Quality',
+                    value: _qualityRating,
+                    icon: Icons.star_rounded,
+                    color: Colors.green,
+                    onChanged: (val) => setState(() => _qualityRating = val),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -234,6 +278,62 @@ class _EditPostDialogState extends State<EditPostDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRatingSlider({
+    required String label,
+    required double value,
+    required IconData icon,
+    required Color color,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              value.toStringAsFixed(1),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: List.generate(5, (index) {
+            final starValue = index + 1;
+            final isSelected = starValue <= value;
+            
+            return GestureDetector(
+              onTap: () => onChanged(starValue.toDouble()),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: Icon(
+                  isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
+                  color: isSelected ? color : Colors.grey[300],
+                  size: 28,
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
     );
   }
 }
