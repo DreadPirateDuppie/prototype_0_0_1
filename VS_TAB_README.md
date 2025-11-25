@@ -74,6 +74,13 @@ lib/tabs/profile_tab.dart
 VS_TAB_SETUP_CHECKLIST.md
 ```
 
+#### Tutorial/Test Mode
+If you just need to preview the VS battle UI without full backend setup:
+1. Open the **VS** tab inside the app.
+2. Tap the **? (help)** icon in the app bar.
+3. A mock "Tutorial Battle" opens in read-only mode so you can explore the full battle flow (scoreboard, turn indicators, action buttons, etc.) without hitting Supabase.
+4. Upload/vote actions are disabled and will show snackbar hints explaining that you are in tutorial mode.
+
 ### 5. Deploy
 ```bash
 # Once tests pass, deploy to production

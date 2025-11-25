@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
 import '../screens/admin_dashboard.dart';
+import '../utils/error_helper.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -13,11 +14,46 @@ class SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<SettingsTab> {
   bool _notificationsEnabled = true;
+  bool _isAdmin = false;
+  bool _isLoadingAdminStatus = true;
 
   @override
   void initState() {
     super.initState();
     _loadNotificationPreference();
+    _checkAdminStatus();
+  }
+
+  Future<void> _checkAdminStatus() async {
+    try {
+      final isAdmin = await SupabaseService.isCurrentUserAdmin();
+      if (mounted) {
+        setState(() {
+          _isAdmin = isAdmin;
+          _isLoadingAdminStatus = false;
+        });
+
+        // Show welcome message if user is admin
+        if (isAdmin) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Hello Admin :)'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAdmin = false;
+          _isLoadingAdminStatus = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadNotificationPreference() async {
@@ -49,11 +85,88 @@ class _SettingsTabState extends State<SettingsTab> {
       await SupabaseService.signOut();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sign out error: $error')),
-        );
+        ErrorHelper.showError(context, 'Sign out error: $error');
       }
     }
+  }
+
+  Future<void> _showFeedbackDialog() async {
+    final feedbackController = TextEditingController();
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Send Feedback'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('We would love to hear your thoughts!'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: feedbackController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'Type your feedback here...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        final text = feedbackController.text.trim();
+                        if (text.isEmpty) return;
+
+                        final navigator = Navigator.of(context);
+                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                        setState(() {
+                          isSubmitting = true;
+                        });
+
+                        try {
+                          await SupabaseService.submitFeedback(text);
+                          if (mounted) {
+                            navigator.pop();
+                            scaffoldMessenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Thank you for your feedback!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() {
+                              isSubmitting = false;
+                            });
+                            ErrorHelper.showError(context, 'Error: $e');
+                          }
+                        }
+                      },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Send'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -61,15 +174,91 @@ class _SettingsTabState extends State<SettingsTab> {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        children: [
-          const Padding(
+      children: [
+        const SizedBox(height: 16),
+        
+        // Premium Banner
+        Padding(
+         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.amber.shade600, Colors.amber.shade900],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.amber.shade900.withValues(alpha: 0.4),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.star_rounded,
+                  color: Colors.white,
+                  size: 40,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Upgrade to Premium',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Remove ads and unlock exclusive features',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Premium coming soon!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.amber.shade900,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Upgrade'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(
               'Preferences',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           SwitchListTile(
@@ -96,10 +285,7 @@ class _SettingsTabState extends State<SettingsTab> {
             padding: EdgeInsets.all(16.0),
             child: Text(
               'Account',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           ListTile(
@@ -230,28 +416,41 @@ class _SettingsTabState extends State<SettingsTab> {
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(
-              'Administration',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              'Support',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           ListTile(
-            leading: const Icon(Icons.admin_panel_settings),
-            title: const Text('Admin Dashboard'),
-            subtitle: const Text('Content moderation'),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AdminDashboard(),
-                ),
-              );
-            },
+            leading: const Icon(Icons.feedback),
+            title: const Text('Send Feedback'),
+            subtitle: const Text('Report bugs or suggest features'),
+            onTap: _showFeedbackDialog,
           ),
-          const Divider(),
+          if (_isAdmin && !_isLoadingAdminStatus) ...[
+            const Divider(),
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                'Administration',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings),
+              title: const Text('Admin Dashboard'),
+              subtitle: const Text('Content moderation'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminDashboard(),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+          ],
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: ElevatedButton.icon(

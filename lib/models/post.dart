@@ -13,6 +13,12 @@ class MapPost {
   final double popularityRating;
   final double securityRating;
   final double qualityRating;
+  final int upvotes;
+  final int downvotes;
+  final int voteScore;
+  final int? userVote;
+  final String category;
+  final List<String> tags;
 
   MapPost({
     this.id,
@@ -29,6 +35,12 @@ class MapPost {
     this.popularityRating = 0.0,
     this.securityRating = 0.0,
     this.qualityRating = 0.0,
+    this.upvotes = 0,
+    this.downvotes = 0,
+    this.voteScore = 0,
+    this.userVote,
+    this.category = 'Other',
+    this.tags = const [],
   });
 
   Map<String, dynamic> toMap() {
@@ -46,6 +58,11 @@ class MapPost {
       'popularity_rating': popularityRating,
       'security_rating': securityRating,
       'quality_rating': qualityRating,
+      'upvotes': upvotes,
+      'downvotes': downvotes,
+      'vote_score': voteScore,
+      'category': category,
+      'tags': tags,
     };
   }
 
@@ -65,6 +82,12 @@ class MapPost {
       popularityRating: (map['popularity_rating'] as num?)?.toDouble() ?? 0.0,
       securityRating: (map['security_rating'] as num?)?.toDouble() ?? 0.0,
       qualityRating: (map['quality_rating'] as num?)?.toDouble() ?? 0.0,
+      upvotes: map['upvotes'] as int? ?? 0,
+      downvotes: map['downvotes'] as int? ?? 0,
+      voteScore: map['vote_score'] as int? ?? 0,
+      userVote: map['user_vote'] as int?,
+      category: map['category'] as String? ?? 'Other',
+      tags: (map['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
     );
   }
 }

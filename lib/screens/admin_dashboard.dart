@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
+import '../utils/error_helper.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -15,12 +16,44 @@ class _AdminDashboardState extends State<AdminDashboard>
   late Future<List<Map<String, dynamic>>> _reportsFuture;
   late Future<List<MapPost>> _allPostsFuture;
   late Future<Map<String, dynamic>> _analyticsData;
+  bool _isCheckingAuth = true;
+  bool _isAuthorized = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _loadData();
+    _checkAuthorization();
+  }
+
+  Future<void> _checkAuthorization() async {
+    try {
+      final isAdmin = await SupabaseService.isCurrentUserAdmin();
+      if (mounted) {
+        setState(() {
+          _isAuthorized = isAdmin;
+          _isCheckingAuth = false;
+        });
+
+        if (!isAdmin) {
+          // Not authorized, show error and go back
+          ErrorHelper.showError(context, 'Access denied: Admin privileges required');
+          Navigator.of(context).pop();
+        } else {
+          // Authorized, load data
+          _loadData();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAuthorized = false;
+          _isCheckingAuth = false;
+        });
+        ErrorHelper.showError(context, 'Authorization check failed');
+        Navigator.of(context).pop();
+      }
+    }
   }
 
   @override
@@ -41,16 +74,20 @@ class _AdminDashboardState extends State<AdminDashboard>
     try {
       final posts = await SupabaseService.getAllMapPosts();
       final reports = await SupabaseService.getReportedPosts();
-      
+
       // Calculate analytics
       final totalPosts = posts.length;
       final totalLikes = posts.fold<int>(0, (sum, post) => sum + post.likes);
       final totalReports = reports.length;
-      final avgLikesPerPost = totalPosts > 0 ? (totalLikes / totalPosts).toStringAsFixed(1) : '0';
-      
+      final avgLikesPerPost = totalPosts > 0
+          ? (totalLikes / totalPosts).toStringAsFixed(1)
+          : '0';
+
       // Get posts with photos
-      final postsWithPhotos = posts.where((p) => p.photoUrl != null && p.photoUrl!.isNotEmpty).length;
-      
+      final postsWithPhotos = posts
+          .where((p) => p.photoUrl != null && p.photoUrl!.isNotEmpty)
+          .length;
+
       return {
         'totalPosts': totalPosts,
         'totalLikes': totalLikes,
@@ -98,13 +135,11 @@ class _AdminDashboardState extends State<AdminDashboard>
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Post deleted successfully')),
           );
-          _loadReports();
+          _loadData();
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting post: $e')),
-          );
+          ErrorHelper.showError(context, 'Error deleting post: $e');
         }
       }
     }
@@ -112,29 +147,62 @@ class _AdminDashboardState extends State<AdminDashboard>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Dashboard'),
-        backgroundColor: Colors.deepPurple,
-        bottom: TabBar(
+    // Show loading while checking authorization
+    if (_isCheckingAuth) {
+      return Scaffold(
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Checking authorization...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show dashboard if authorized
+    if (_isAuthorized) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Admin Dashboard'),
+          backgroundColor: Colors.green,
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: Colors.white,
+            tabs: const [
+              Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
+              Tab(icon: Icon(Icons.analytics), text: 'Analytics'),
+              Tab(icon: Icon(Icons.report), text: 'Reports'),
+              Tab(icon: Icon(Icons.people), text: 'Users'),
+            ],
+          ),
+        ),
+        body: TabBarView(
           controller: _tabController,
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
-            Tab(icon: Icon(Icons.analytics), text: 'Analytics'),
-            Tab(icon: Icon(Icons.report), text: 'Reports'),
-            Tab(icon: Icon(Icons.people), text: 'Users'),
+          children: [
+            _buildOverviewTab(),
+            _buildAnalyticsTab(),
+            _buildReportsTab(),
+            _buildUsersTab(),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildOverviewTab(),
-          _buildAnalyticsTab(),
-          _buildReportsTab(),
-          _buildUsersTab(),
-        ],
+      );
+    }
+
+    // Should not reach here, but just in case
+    return Scaffold(
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error, size: 80, color: Colors.red),
+            SizedBox(height: 16),
+            Text('Access denied: Admin privileges required'),
+          ],
+        ),
       ),
     );
   }
@@ -212,28 +280,32 @@ class _AdminDashboardState extends State<AdminDashboard>
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              ...recentPosts.take(5).map((post) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.deepPurple,
-                        child: Text(
-                          post.likes.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
+              ...recentPosts
+                  .take(5)
+                  .map(
+                    (post) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.green,
+                          child: Text(
+                            post.likes.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
-                      ),
-                      title: Text(post.title),
-                      subtitle: Text(post.userName ?? 'Unknown User'),
-                      trailing: Icon(
-                        post.photoUrl != null
-                            ? Icons.photo
-                            : Icons.text_fields,
+                        title: Text(post.title),
+                        subtitle: Text(post.userName ?? 'Unknown User'),
+                        trailing: Icon(
+                          post.photoUrl != null
+                              ? Icons.photo
+                              : Icons.text_fields,
+                        ),
                       ),
                     ),
-                  )),
+                  ),
             ],
           );
         },
@@ -242,7 +314,11 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _buildStatCard(
-      String label, String value, IconData icon, Color color) {
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 4,
       child: Padding(
@@ -253,17 +329,11 @@ class _AdminDashboardState extends State<AdminDashboard>
             const SizedBox(height: 8),
             Text(
               value,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
           ],
@@ -390,10 +460,7 @@ class _AdminDashboardState extends State<AdminDashboard>
           Text(label),
           Text(
             value,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ],
       ),
@@ -421,10 +488,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               children: [
                 Icon(Icons.check_circle, size: 80, color: Colors.green),
                 SizedBox(height: 16),
-                Text(
-                  'No reports to review',
-                  style: TextStyle(fontSize: 18),
-                ),
+                Text('No reports to review', style: TextStyle(fontSize: 18)),
               ],
             ),
           );
@@ -561,13 +625,13 @@ class _AdminDashboardState extends State<AdminDashboard>
           }
 
           final posts = snapshot.data ?? [];
-          
+
           // Extract unique users from posts
           final userMap = <String, Map<String, dynamic>>{};
           for (var post in posts) {
             final userId = post.userId;
             final userName = post.userName ?? 'Unknown User';
-            
+
             if (!userMap.containsKey(userId)) {
               userMap[userId] = {
                 'name': userName,
@@ -576,16 +640,19 @@ class _AdminDashboardState extends State<AdminDashboard>
                 'totalLikes': post.likes,
               };
             } else {
-              userMap[userId]!['postCount'] = 
+              userMap[userId]!['postCount'] =
                   (userMap[userId]!['postCount'] as int) + 1;
-              userMap[userId]!['totalLikes'] = 
+              userMap[userId]!['totalLikes'] =
                   (userMap[userId]!['totalLikes'] as int) + post.likes;
             }
           }
 
           final users = userMap.entries.toList()
-            ..sort((a, b) => (b.value['postCount'] as int)
-                .compareTo(a.value['postCount'] as int));
+            ..sort(
+              (a, b) => (b.value['postCount'] as int).compareTo(
+                a.value['postCount'] as int,
+              ),
+            );
 
           if (users.isEmpty) {
             return const Center(
@@ -594,10 +661,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                 children: [
                   Icon(Icons.people_outline, size: 80, color: Colors.grey),
                   SizedBox(height: 16),
-                  Text(
-                    'No users found',
-                    style: TextStyle(fontSize: 18),
-                  ),
+                  Text('No users found', style: TextStyle(fontSize: 18)),
                 ],
               ),
             );
@@ -611,27 +675,25 @@ class _AdminDashboardState extends State<AdminDashboard>
                 children: [
                   const Text(
                     'User Directory',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   Chip(
                     label: Text('${users.length} users'),
-                    backgroundColor: Colors.deepPurple[100],
+                    backgroundColor: Colors.green[100],
                   ),
                 ],
               ),
               const SizedBox(height: 16),
               ...users.map((entry) {
-                final userId = entry.key;
+                final _ = entry
+                    .key; // userId is currently unused but kept for future use
                 final userData = entry.value;
-                
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: Colors.deepPurple,
+                      backgroundColor: Colors.green,
                       child: Text(
                         (userData['name'] as String)[0].toUpperCase(),
                         style: const TextStyle(color: Colors.white),

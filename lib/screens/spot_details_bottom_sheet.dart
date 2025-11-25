@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/post.dart';
 import '../screens/edit_post_dialog.dart';
-import '../screens/rate_post_dialog.dart';
+import '../screens/trick_history_screen.dart';
 import '../services/supabase_service.dart';
+import '../widgets/star_rating_display.dart';
+import '../widgets/vote_buttons.dart';
+import '../utils/error_helper.dart';
 
 class SpotDetailsBottomSheet extends StatefulWidget {
   final MapPost post;
@@ -22,36 +25,43 @@ class SpotDetailsBottomSheet extends StatefulWidget {
 
 class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
   late MapPost currentPost;
+  bool _isOwnPost = false;
 
   @override
   void initState() {
     super.initState();
     currentPost = widget.post;
+    _checkOwnership();
   }
 
-  bool get _isOwnPost {
-    final user = SupabaseService.getCurrentUser();
-    return user != null && user.id == currentPost.userId;
+  void _checkOwnership() {
+    final userId = SupabaseService.getCurrentUser()?.id;
+    if (userId != null) {
+      setState(() {
+        _isOwnPost = currentPost.userId == userId;
+      });
+    }
   }
 
-  void _showEditDialog() {
+  Future<void> _showEditDialog() async {
     showDialog(
       context: context,
       builder: (context) => EditPostDialog(
         post: currentPost,
         onPostUpdated: () async {
-          // Refresh the post data
+          // Refresh post data
           try {
             final updatedPosts = await SupabaseService.getAllMapPosts();
             final updated = updatedPosts.firstWhere(
               (p) => p.id == currentPost.id,
               orElse: () => currentPost,
             );
-            setState(() {
-              currentPost = updated;
-            });
-            widget.onPostUpdated?.call();
-            Navigator.of(context).pop();
+            if (mounted) {
+              setState(() {
+                currentPost = updated;
+              });
+              widget.onPostUpdated?.call();
+            }
           } catch (e) {
             // Silently fail
           }
@@ -68,31 +78,30 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Report Post'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Why are you reporting this post?'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Reason',
-                  hintText: 'e.g., Inappropriate content',
-                  border: OutlineInputBorder(),
-                ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Why are you reporting this post?'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Reason',
+                hintText: 'e.g., Inappropriate content, Spam',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: detailsController,
-                decoration: const InputDecoration(
-                  labelText: 'Additional Details (Optional)',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: detailsController,
+              decoration: const InputDecoration(
+                labelText: 'Details (Optional)',
+                hintText: 'Provide more context...',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
+              maxLines: 3,
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -102,9 +111,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
           ElevatedButton(
             onPressed: () async {
               if (reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please provide a reason')),
-                );
+                ErrorHelper.showError(context, 'Please provide a reason');
                 return;
               }
 
@@ -127,9 +134,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
+                  ErrorHelper.showError(context, 'Error: $e');
                 }
               }
             },
@@ -138,32 +143,6 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStarRating(double rating, String label) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: List.generate(5, (index) {
-            return Icon(
-              index < rating ? Icons.star : Icons.star_border,
-              color: Colors.amber,
-              size: 18,
-            );
-          }),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${rating.toStringAsFixed(1)}/5.0',
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-        ),
-      ],
     );
   }
 
@@ -180,13 +159,32 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Close button
-              Align(
-                alignment: Alignment.topRight,
-                child: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: widget.onClose,
-                ),
+              // Top buttons row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // History button
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TrickHistoryScreen(spot: currentPost),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.history, size: 20),
+                    label: const Text('History'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.green.shade700,
+                    ),
+                  ),
+                  // Close button
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: widget.onClose,
+                  ),
+                ],
               ),
 
               // User info
@@ -194,13 +192,11 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: Colors.green,
                     child: Text(
-                      (currentPost.userName?.isNotEmpty ?? false)
+                      (currentPost.userName?.isNotEmpty == true)
                           ? currentPost.userName![0].toUpperCase()
-                          : (currentPost.userEmail?.isNotEmpty ?? false)
-                              ? currentPost.userEmail![0].toUpperCase()
-                              : '?',
+                          : 'U',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -211,7 +207,9 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      currentPost.userName ?? 'Unknown User',
+                      currentPost.userName?.isNotEmpty == true
+                          ? currentPost.userName!
+                          : 'User',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -262,43 +260,44 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
               ),
               const SizedBox(height: 16),
 
-              // Star Ratings Section
+              // Image Carousel Placeholder
               Container(
-                padding: const EdgeInsets.all(12),
+                width: double.infinity,
+                height: 150,
+                margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Colors.grey[200],
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
                 ),
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    Icon(Icons.view_carousel_rounded, size: 40, color: Colors.grey[400]),
+                    const SizedBox(height: 8),
                     Text(
-                      'Spot Ratings',
+                      'Image Carousel Space',
                       style: TextStyle(
-                        fontSize: 16,
+                        color: Colors.grey[600],
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey[700],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildStarRating(
-                          currentPost.popularityRating,
-                          'Popularity',
-                        ),
-                        _buildStarRating(
-                          currentPost.securityRating,
-                          'Security',
-                        ),
-                        _buildStarRating(
-                          currentPost.qualityRating,
-                          'Quality',
-                        ),
-                      ],
+                    Text(
+                      '(Coming Soon)',
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
+              ),
+
+              // Star Ratings Section
+              StarRatingDisplay(
+                popularityRating: currentPost.popularityRating,
+                securityRating: currentPost.securityRating,
+                qualityRating: currentPost.qualityRating,
               ),
 
               const SizedBox(height: 16),
@@ -310,10 +309,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                   const SizedBox(width: 8),
                   Text(
                     '${currentPost.latitude.toStringAsFixed(4)}, ${currentPost.longitude.toStringAsFixed(4)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -326,10 +322,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                   const SizedBox(width: 8),
                   Text(
                     currentPost.createdAt.toString().substring(0, 16),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -338,68 +331,40 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
               // Engagement buttons
               Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.star),
-                      label: const Text('Rate'),
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => RatePostDialog(
-                            post: currentPost,
-                            onRated: () async {
-                              // Refresh post data
-                              try {
-                                final updatedPosts = await SupabaseService.getAllMapPosts();
-                                final updated = updatedPosts.firstWhere(
-                                  (p) => p.id == currentPost.id,
-                                  orElse: () => currentPost,
-                                );
-                                setState(() {
-                                  currentPost = updated;
-                                });
-                                widget.onPostUpdated?.call();
-                              } catch (e) {
-                                // Silently fail
-                              }
-                            },
-                          ),
+                  // Vote Buttons
+                  VoteButtons(
+                    postId: currentPost.id!,
+                    voteScore: currentPost.voteScore,
+                    userVote: currentPost.userVote,
+                    isOwnPost: _isOwnPost,
+                    orientation: Axis.horizontal,
+                    onVoteChanged: () async {
+                      // Refresh post data
+                      try {
+                        final updatedPosts = await SupabaseService.getAllMapPosts();
+                        final updated = updatedPosts.firstWhere(
+                          (p) => p.id == currentPost.id,
+                          orElse: () => currentPost,
                         );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.flag),
-                      label: const Text('Report'),
-                      onPressed: () {
-                        _showReportDialog();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.favorite),
-                      label: Text('${currentPost.likes}'),
-                      onPressed: () async {
-                        await SupabaseService.likeMapPost(currentPost.id!, currentPost.likes);
-                        // Refresh post data
-                        try {
-                          final updatedPosts = await SupabaseService.getAllMapPosts();
-                          final updated = updatedPosts.firstWhere(
-                            (p) => p.id == currentPost.id,
-                            orElse: () => currentPost,
-                          );
+                        if (mounted) {
                           setState(() {
                             currentPost = updated;
                           });
-                        } catch (e) {
-                          // Silently fail
+                          widget.onPostUpdated?.call();
                         }
-                      },
-                    ),
+                      } catch (e) {
+                        // Silently fail
+                      }
+                    },
+                  ),
+                  const Spacer(),
+                  // Report Button
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.flag),
+                    label: const Text('Report'),
+                    onPressed: () {
+                      _showReportDialog();
+                    },
                   ),
                 ],
               ),

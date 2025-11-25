@@ -12,58 +12,78 @@ class StarRatingDisplay extends StatelessWidget {
     required this.qualityRating,
   });
 
-  Widget _buildStarRating(double rating, String label) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: List.generate(5, (index) {
-            return Icon(
-              index < rating ? Icons.star : Icons.star_border,
-              color: Colors.amber,
-              size: 18,
-            );
-          }),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${rating.toStringAsFixed(1)}/5.0',
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-        ),
-      ],
+  Widget _buildRatingRow(
+    BuildContext context,
+    String label,
+    double rating,
+    IconData icon,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label.substring(0, 3), // Just first 3 letters
+            style: const TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 10,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(5, (index) {
+              return Icon(
+                index < rating ? Icons.star : Icons.star_border,
+                color: index < rating ? color : Colors.grey[300],
+                size: 10,
+              );
+            }),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Colors.grey[800]
-            : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withOpacity(0.1),
+        ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'Spot Ratings',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+          _buildRatingRow(
+            context,
+            'Popularity',
+            popularityRating,
+            Icons.local_fire_department_rounded,
+            Colors.orange,
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildStarRating(popularityRating, 'Popularity'),
-              _buildStarRating(securityRating, 'Security'),
-              _buildStarRating(qualityRating, 'Quality'),
-            ],
+          _buildRatingRow(
+            context,
+            'Security',
+            securityRating,
+            Icons.shield_rounded,
+            Colors.blue,
+          ),
+          _buildRatingRow(
+            context,
+            'Quality',
+            qualityRating,
+            Icons.star_rounded,
+            Colors.green,
           ),
         ],
       ),

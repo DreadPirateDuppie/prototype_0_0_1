@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../services/supabase_service.dart';
 import '../models/post.dart';
-import '../widgets/star_rating_display.dart';
+import '../services/supabase_service.dart';
+import '../widgets/post_card.dart';
 import '../widgets/ad_banner.dart';
+import '../utils/error_helper.dart';
 
 class FeedTab extends StatefulWidget {
   const FeedTab({super.key});
@@ -12,200 +13,211 @@ class FeedTab extends StatefulWidget {
 }
 
 class _FeedTabState extends State<FeedTab> {
-  late Future<List<MapPost>> _allPostsFuture;
+  List<MapPost> _posts = [];
+  bool _isLoading = true;
+  String _searchQuery = '';
+  String _selectedCategory = 'All';
+  final List<String> _categories = ['All', 'Street', 'Park', 'DIY', 'Shop', 'Other'];
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _allPostsFuture = SupabaseService.getAllMapPosts();
+    _loadPosts();
   }
 
-  Future<void> _likePost(MapPost post) async {
-    await SupabaseService.likeMapPost(post.id!, post.likes);
-    if (mounted) {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPosts() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      List<MapPost> posts = await SupabaseService.getAllMapPostsWithVotes();
+      
+      // Apply filters
+      if (_selectedCategory != 'All') {
+        posts = posts.where((post) => post.category == _selectedCategory).toList();
+      }
+      
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        posts = posts.where((post) {
+          return post.title.toLowerCase().contains(query) ||
+                 post.description.toLowerCase().contains(query) ||
+                 post.tags.any((tag) => tag.toLowerCase().contains(query));
+        }).toList();
+      }
+
+      if (mounted) {
+        setState(() {
+          _posts = posts;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
       setState(() {
-        _allPostsFuture = SupabaseService.getAllMapPosts();
+        _isLoading = false;
       });
+      if (mounted) {
+        ErrorHelper.showError(context, 'Error loading posts: $e');
+      }
+    }
+  }
+
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+    _loadPosts();
+  }
+
+  void _onCategoryChanged(String? category) {
+    if (category != null) {
+      setState(() {
+        _selectedCategory = category;
+      });
+      _loadPosts();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    const matrixGreen = Color(0xFF00FF41);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Feed')),
+      appBar: AppBar(
+        title: const Text(
+          '> PUSHINN_',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: matrixGreen,
+            letterSpacing: 2,
+          ),
+        ),
+        centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: matrixGreen, width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: matrixGreen.withOpacity(0.2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(
+                        color: matrixGreen,
+                        fontFamily: 'monospace',
+                      ),
+                      cursorColor: matrixGreen,
+                      decoration: InputDecoration(
+                        hintText: 'Search posts...',
+                        hintStyle: TextStyle(
+                          color: matrixGreen.withOpacity(0.5),
+                          fontFamily: 'monospace',
+                        ),
+                        prefixIcon: const Icon(Icons.search, color: matrixGreen),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      onChanged: _onSearchChanged,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: matrixGreen, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: matrixGreen.withOpacity(0.2),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedCategory,
+                      icon: const Icon(Icons.filter_list, color: matrixGreen),
+                      dropdownColor: Colors.black,
+                      style: const TextStyle(
+                        color: matrixGreen,
+                        fontFamily: 'monospace',
+                      ),
+                      items: _categories.map((String category) {
+                        return DropdownMenuItem<String>(
+                          value: category,
+                          child: Text(category),
+                        );
+                      }).toList(),
+                      onChanged: _onCategoryChanged,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
       body: Column(
         children: [
           const AdBanner(),
           Expanded(
-            child: FutureBuilder<List<MapPost>>(
-              future: _allPostsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-
-                final posts = snapshot.data ?? [];
-
-                if (posts.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        'No posts yet. Create a post from the Map tab!',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    ),
-                  );
-                }
-
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    setState(() {
-                      _allPostsFuture = SupabaseService.getAllMapPosts();
-                    });
-                  },
-                  child: ListView.builder(
-                    itemCount: posts.length,
-                    itemBuilder: (context, index) {
-                      final post = posts[index];
-                      return Card(
-                        margin: const EdgeInsets.all(8.0),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // User info header
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 20,
-                                    backgroundColor: Colors.deepPurple,
-                                    child: Text(
-                                      (post.userName?.isNotEmpty ?? false)
-                                          ? post.userName![0].toUpperCase()
-                                          : (post.userEmail?.isNotEmpty ?? false)
-                                              ? post.userEmail![0].toUpperCase()
-                                              : '?',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      post.userName ?? 'Unknown User',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _posts.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 64,
+                              color: const Color(0xFF00FF41).withOpacity(0.5),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No posts found',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Theme.of(context).textTheme.bodyLarge?.color,
                               ),
-                              const SizedBox(height: 12),
-                              if (post.photoUrl != null) ...[
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    post.photoUrl!,
-                                    height: 200,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        height: 200,
-                                        color: Colors.grey[300],
-                                        child: const Center(
-                                          child: Icon(Icons.image_not_supported),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                              Text(
-                                post.title,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                post.description,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Location: ${post.latitude.toStringAsFixed(4)}, ${post.longitude.toStringAsFixed(4)}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                post.createdAt.toString().substring(0, 16),
-                                style:
-                                    Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: Colors.grey,
-                                        ),
-                              ),
-                              const SizedBox(height: 12),
-                              StarRatingDisplay(
-                                popularityRating: post.popularityRating,
-                                securityRating: post.securityRating,
-                                qualityRating: post.qualityRating,
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  ElevatedButton.icon(
-                                    icon: const Icon(Icons.favorite_border),
-                                    label: Text('${post.likes}'),
-                                    onPressed: () => _likePost(post),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.comment),
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Comments feature coming soon!'),
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.share),
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Share feature coming soon!'),
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadPosts,
+                        child: ListView.builder(
+                          itemCount: _posts.length,
+                          itemBuilder: (context, index) {
+                            return PostCard(
+                              post: _posts[index],
+                              onPostUpdated: _loadPosts,
+                            );
+                          },
+                        ),
+                      ),
           ),
         ],
       ),
