@@ -9,6 +9,7 @@ import 'providers/theme_provider.dart';
 import 'services/error_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/rewarded_ad_service.dart';
+import 'config/service_locator.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +35,9 @@ Future<void> main() async {
     url: supabaseUrl,
     anonKey: supabaseAnonKey,
   );
+
+  // Set up service locator for dependency injection
+  setupServiceLocator();
 
   // Initialize error tracking
   ErrorService.initialize();
