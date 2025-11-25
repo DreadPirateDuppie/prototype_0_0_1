@@ -11,6 +11,8 @@
 - ✅ All services now have robust fallback: injected client → getIt → Supabase.instance
 - ✅ User methods in `SupabaseService` now delegate to `UserService`
 - ✅ XP calculation delegates to `PointsService`
+- ✅ `profile_tab.dart` migrated to use `UserProvider` (removed 3 FutureBuilders)
+- ✅ `vs_tab.dart` migrated to use `BattleProvider`
 
 ---
 

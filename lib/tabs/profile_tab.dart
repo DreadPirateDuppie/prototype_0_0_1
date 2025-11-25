@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
-import '../services/battle_service.dart';
 import '../models/post.dart';
 import '../models/user_scores.dart';
 import '../screens/edit_post_dialog.dart';
@@ -8,6 +8,7 @@ import '../screens/edit_username_dialog.dart';
 import '../widgets/star_rating_display.dart';
 import '../widgets/mini_map_snapshot.dart';
 import '../widgets/user_stats_card.dart';
+import '../providers/user_provider.dart';
 import 'settings_tab.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -24,9 +25,6 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateMixin {
   late Future<List<MapPost>> _userPostsFuture;
-  late Future<String?> _usernameFuture;
-  late Future<String?> _avatarUrlFuture;
-  late Future<UserScores> _userScoresFuture;
   late TabController _tabController;
   bool _isStatsExpanded = true;
   bool _isUploadingImage = false;
@@ -36,28 +34,23 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     
-    // Initialize futures immediately to prevent LateInitializationError
+    // Initialize posts future
     final user = SupabaseService.getCurrentUser();
     if (user != null) {
       _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
-      _usernameFuture = SupabaseService.getUserUsername(user.id);
-      _avatarUrlFuture = SupabaseService.getUserAvatarUrl(user.id);
-      _userScoresFuture = BattleService.getUserScores(user.id);
     } else {
-      // Fallback for no user (shouldn't happen in this tab usually)
       _userPostsFuture = Future.value([]);
-      _usernameFuture = Future.value('Guest');
-      _avatarUrlFuture = Future.value(null);
-      _userScoresFuture = Future.value(UserScores(
-        userId: '',
-        mapScore: 0,
-        playerScore: 0,
-        rankingScore: 500,
-      ));
     }
     
-    // Then trigger a refresh to ensure data is up to date (including XP recalculation)
-    _refreshAll();
+    // Initialize user provider after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      if (userProvider.currentUser == null) {
+        userProvider.initialize();
+      } else {
+        userProvider.loadUserProfile();
+      }
+    });
   }
 
   @override
@@ -69,15 +62,14 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
   Future<void> _refreshAll() async {
     final user = SupabaseService.getCurrentUser();
     if (user != null) {
-      // Recalculate XP to ensure stats are up to date
-      await SupabaseService.recalculateUserXP(user.id);
+      // Refresh user provider (handles XP recalculation)
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      await userProvider.refreshScores();
       
+      // Refresh posts
       if (mounted) {
         setState(() {
           _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
-          _usernameFuture = SupabaseService.getUserUsername(user.id);
-          _avatarUrlFuture = SupabaseService.getUserAvatarUrl(user.id);
-          _userScoresFuture = BattleService.getUserScores(user.id);
         });
       }
     }
@@ -95,8 +87,10 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
       try {
         final user = SupabaseService.getCurrentUser();
         if (user != null) {
-          await SupabaseService.uploadProfileImage(File(pickedFile.path), user.id);
-          await _refreshAll();
+          final newUrl = await SupabaseService.uploadProfileImage(File(pickedFile.path), user.id);
+          // Update provider with new avatar URL
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          userProvider.updateAvatarUrl(newUrl);
           widget.onProfileUpdated?.call(); // Notify parent to refresh nav bar
         }
       } catch (e) {
@@ -118,10 +112,9 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
       context: context,
       builder: (context) => EditUsernameDialog(
         currentUsername: currentUsername,
-        onUsernameSaved: (newUsername) {
-          setState(() {
-            _usernameFuture = SupabaseService.getUserUsername(SupabaseService.getCurrentUser()!.id);
-          });
+        onUsernameSaved: (newUsername) async {
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          await userProvider.updateUsername(newUsername);
           widget.onProfileUpdated?.call();
         },
       ),
@@ -408,33 +401,35 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final user = SupabaseService.getCurrentUser();
 
-    return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            SliverAppBar(
-              expandedHeight: 380.0,
-              floating: false,
-              pinned: true,
-              backgroundColor: Colors.green,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white),
-                  onPressed: _refreshAll,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings, color: Colors.white),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsTab(),
-                      ),
-                    );
-                  },
-                ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        return Scaffold(
+          body: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverAppBar(
+                  expandedHeight: 380.0,
+                  floating: false,
+                  pinned: true,
+                  backgroundColor: Colors.green,
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Colors.white),
+                      onPressed: _refreshAll,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.settings, color: Colors.white),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SettingsTab(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                  flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -469,9 +464,8 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                                   ),
                                 ],
                               ),
-                              child: FutureBuilder<String?>(
-                                future: _avatarUrlFuture,
-                                builder: (context, snapshot) {
+                              child: Builder(
+                                builder: (context) {
                                   if (_isUploadingImage) {
                                     return CircleAvatar(
                                       radius: 50,
@@ -480,10 +474,10 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                                     );
                                   }
                                   
-                                  if (snapshot.hasData && snapshot.data != null) {
+                                  if (userProvider.avatarUrl != null) {
                                     return CircleAvatar(
                                       radius: 50,
-                                      backgroundImage: NetworkImage(snapshot.data!),
+                                      backgroundImage: NetworkImage(userProvider.avatarUrl!),
                                       backgroundColor: Colors.green.shade200,
                                     );
                                   }
@@ -524,32 +518,26 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Username
-                      FutureBuilder<String?>(
-                        future: _usernameFuture,
-                        builder: (context, snapshot) {
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                snapshot.data ?? 'Loading...',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  // color: Colors.black87,
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.edit, size: 20, color: Colors.grey),
-                                onPressed: () {
-                                  _usernameFuture.then((username) {
-                                    _editUsername(username ?? '');
-                                  });
-                                },
-                              ),
-                            ],
-                          );
-                        },
+                      // Username - now from UserProvider
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            userProvider.isLoading 
+                                ? 'Loading...' 
+                                : userProvider.displayName,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 20, color: Colors.grey),
+                            onPressed: () {
+                              _editUsername(userProvider.username ?? '');
+                            },
+                          ),
+                        ],
                       ),
                       // Bio / Email
                       Text(
@@ -589,20 +577,19 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                 ],
               ),
             ),
-            // User Stats Section (Scrollable)
+            // User Stats Section (Scrollable) - now from UserProvider
             SliverToBoxAdapter(
-              child: FutureBuilder<UserScores>(
-                future: _userScoresFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+              child: Builder(
+                builder: (context) {
+                  if (userProvider.isLoading) {
                     return Container(
                       margin: const EdgeInsets.all(16),
                       padding: const EdgeInsets.all(24),
                       child: const Center(child: CircularProgressIndicator()),
                     );
                   }
-                  if (snapshot.hasData) {
-                    return _buildStatsSection(snapshot.data!);
+                  if (userProvider.userScores != null) {
+                    return _buildStatsSection(userProvider.userScores!);
                   }
                   return const SizedBox.shrink();
                 },
@@ -713,6 +700,8 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
           ],
         ),
       ),
+    );
+      },
     );
   }
 
