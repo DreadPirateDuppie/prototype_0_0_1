@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../services/battle_service.dart';
 import '../models/post.dart';
@@ -9,7 +8,6 @@ import '../screens/edit_username_dialog.dart';
 import '../widgets/star_rating_display.dart';
 import '../widgets/mini_map_snapshot.dart';
 import '../widgets/user_stats_card.dart';
-import '../providers/user_provider.dart';
 import 'settings_tab.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
