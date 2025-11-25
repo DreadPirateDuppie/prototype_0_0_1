@@ -3,7 +3,7 @@
 **Date**: November 25, 2025  
 **Reviewer**: @copilot  
 **Codebase Size**: ~17,000 lines of Dart code across 60 files  
-**Test Coverage**: 18 test files with 65+ unit tests
+**Test Coverage**: 22 test files with 100+ unit tests
 
 **Update**: Following fixes have been applied:
 - ✅ Removed duplicate admin check from `SupabaseService` (now delegates to `AdminService`)
@@ -236,8 +236,8 @@ catch (e) {
 
 | Metric | Current | Target | Status |
 |--------|---------|--------|--------|
-| Test Files | 18 | 25+ | 🟡 Good |
-| Test Coverage | ~40% (est.) | 70%+ | 🟠 Needs Work |
+| Test Files | 22 | 25+ | ✅ Good |
+| Test Coverage | ~55% (est.) | 70%+ | 🟡 Improving |
 | Largest File | 1,249 lines | <500 lines | 🟠 Improved (was 1,392) |
 | profile_tab.dart | 721 lines | <500 lines | ✅ Improved (was 989) |
 | Static Methods in Services | 100 | <20 | 🟠 Needs Work |
@@ -245,7 +245,7 @@ catch (e) {
 | CI/CD Workflows | 2 | 2 | ✅ Complete |
 | Provider Classes | 4 | 4 | ✅ Complete |
 | Security Issues | 0 | 0 | ✅ Fixed |
-| Widget Reuse | 1 screen | All screens | 🟠 In Progress |
+| Widget Reuse | 2 screens | All screens | 🟡 Improved |
 
 ---
 
