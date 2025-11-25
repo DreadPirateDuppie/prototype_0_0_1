@@ -24,8 +24,15 @@ class AdminService {
         return false;
       }
 
-      // Check if the user is the hardcoded admin
-      if (user.email == 'admin@example.com' || user.email == '123@123.com') {
+      // Check if the user is a hardcoded admin (emergency fallback)
+      // Note: In production, move these to environment variables for security
+      // These should be removed once proper admin management is in place
+      final hardcodedAdmins = const String.fromEnvironment(
+        'ADMIN_EMAILS',
+        defaultValue: 'admin@example.com,123@123.com',
+      ).split(',');
+      
+      if (hardcodedAdmins.contains(user.email)) {
         developer.log('User is hardcoded admin', name: 'AdminCheck');
         return true;
       }

@@ -36,23 +36,9 @@ void setupServiceLocator() {
 
 /// Set up the service locator for testing with mock dependencies.
 /// [mockSupabaseClient] - optional mock Supabase client for testing
-void setupServiceLocatorForTesting({SupabaseClient? mockSupabaseClient}) {
-  // Reset any existing registrations
-  if (getIt.isRegistered<SupabaseClient>()) {
-    getIt.unregister<SupabaseClient>();
-  }
-  if (getIt.isRegistered<PostService>()) {
-    getIt.unregister<PostService>();
-  }
-  if (getIt.isRegistered<UserService>()) {
-    getIt.unregister<UserService>();
-  }
-  if (getIt.isRegistered<PointsService>()) {
-    getIt.unregister<PointsService>();
-  }
-  if (getIt.isRegistered<AdminService>()) {
-    getIt.unregister<AdminService>();
-  }
+Future<void> setupServiceLocatorForTesting({SupabaseClient? mockSupabaseClient}) async {
+  // Reset all registrations to start fresh
+  await getIt.reset();
 
   // Register mock client if provided
   if (mockSupabaseClient != null) {

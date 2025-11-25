@@ -115,12 +115,18 @@ class UserService {
     }
   }
 
+  /// Normalize username for storage (lowercase, trimmed)
+  static String normalizeUsername(String username) {
+    return username.toLowerCase().trim();
+  }
+
   /// Save user username (with uniqueness constraint)
   Future<void> saveUserUsername(String userId, String username) async {
     try {
+      final normalizedUsername = normalizeUsername(username);
       await _client.from('user_profiles').upsert({
         'id': userId,
-        'username': username.toLowerCase().trim(),
+        'username': normalizedUsername,
         'display_name': username.trim(),
       });
 

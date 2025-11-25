@@ -22,25 +22,25 @@ void main() {
     });
 
     group('Hardcoded admin email checks', () {
-      test('admin@example.com is hardcoded admin', () {
+      test('default admin emails list contains expected values', () {
+        const defaultAdmins = 'admin@example.com,123@123.com';
+        final adminList = defaultAdmins.split(',');
+        expect(adminList, contains('admin@example.com'));
+        expect(adminList, contains('123@123.com'));
+      });
+
+      test('admin email check works with split list', () {
         const email = 'admin@example.com';
-        final isHardcodedAdmin =
-            email == 'admin@example.com' || email == '123@123.com';
-        expect(isHardcodedAdmin, true);
+        const adminEmails = 'admin@example.com,123@123.com';
+        final adminList = adminEmails.split(',');
+        expect(adminList.contains(email), true);
       });
 
-      test('123@123.com is hardcoded admin', () {
-        const email = '123@123.com';
-        final isHardcodedAdmin =
-            email == 'admin@example.com' || email == '123@123.com';
-        expect(isHardcodedAdmin, true);
-      });
-
-      test('regular email is not hardcoded admin', () {
+      test('regular email is not in admin list', () {
         const email = 'user@example.com';
-        final isHardcodedAdmin =
-            email == 'admin@example.com' || email == '123@123.com';
-        expect(isHardcodedAdmin, false);
+        const adminEmails = 'admin@example.com,123@123.com';
+        final adminList = adminEmails.split(',');
+        expect(adminList.contains(email), false);
       });
     });
 

@@ -22,23 +22,22 @@ void main() {
     });
 
     group('Username validation helpers', () {
-      test('username should be trimmed and lowercased', () {
-        // This is a unit test for the expected behavior
+      test('normalizeUsername lowercases and trims', () {
         const username = '  TestUser  ';
-        final trimmed = username.toLowerCase().trim();
-        expect(trimmed, 'testuser');
+        final normalized = UserService.normalizeUsername(username);
+        expect(normalized, 'testuser');
       });
 
-      test('empty username should remain empty after processing', () {
+      test('normalizeUsername handles empty string', () {
         const username = '';
-        final processed = username.toLowerCase().trim();
-        expect(processed, '');
+        final normalized = UserService.normalizeUsername(username);
+        expect(normalized, '');
       });
 
-      test('username with special characters is preserved', () {
+      test('normalizeUsername preserves special characters', () {
         const username = 'test_user_123';
-        final processed = username.toLowerCase().trim();
-        expect(processed, 'test_user_123');
+        final normalized = UserService.normalizeUsername(username);
+        expect(normalized, 'test_user_123');
       });
     });
 
