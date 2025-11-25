@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
-import '../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/error_helper.dart';
 
 class TrickSubmissionDialog extends StatefulWidget {
   final String spotId;
+  final VoidCallback onTrickSubmitted;
 
-  const TrickSubmissionDialog({super.key, required this.spotId});
+  const TrickSubmissionDialog({
+    super.key,
+    required this.spotId,
+    required this.onTrickSubmitted,
+  });
 
   @override
   State<TrickSubmissionDialog> createState() => _TrickSubmissionDialogState();
@@ -12,38 +18,27 @@ class TrickSubmissionDialog extends StatefulWidget {
 
 class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _urlController = TextEditingController();
   final _skaterNameController = TextEditingController();
+  final _urlController = TextEditingController();
   final _descriptionController = TextEditingController();
   bool _isSubmitting = false;
 
   @override
   void dispose() {
-    _urlController.dispose();
     _skaterNameController.dispose();
+    _urlController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
 
   String? _validateUrl(String? value) {
-    // URL is optional now
     if (value == null || value.isEmpty) {
-      return null; // Allow empty for tricks without videos
+      return null; // Optional
     }
-    
-    final lowerValue = value.toLowerCase();
-    final supportedPlatforms = [
-      'youtube.com',
-      'youtu.be',
-      'instagram.com',
-      'tiktok.com',
-      'vimeo.com',
-    ];
-    
-    if (!supportedPlatforms.any((platform) => lowerValue.contains(platform))) {
-      return 'URL must be from YouTube, Instagram, TikTok, or Vimeo';
+    final uri = Uri.tryParse(value);
+    if (uri == null || !uri.hasAbsolutePath) {
+      return 'Please enter a valid URL';
     }
-    
     return null;
   }
 
@@ -53,37 +48,28 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
     setState(() => _isSubmitting = true);
 
     try {
-      await SupabaseService.submitSpotVideo(
-        spotId: widget.spotId,
-        url: _urlController.text.trim(),
-        skaterName: _skaterNameController.text.trim().isEmpty 
-            ? null 
-            : _skaterNameController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-      );
-      
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      await Supabase.instance.client.from('spot_videos').insert({
+        'spot_id': widget.spotId,
+        'user_id': user.id,
+        'trick_name': _skaterNameController.text.trim(),
+        'video_url': _urlController.text.trim().isEmpty ? null : _urlController.text.trim(),
+        'description': _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
       if (mounted) {
-        Navigator.of(context).pop(true);
+        widget.onTrickSubmitted();
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Video submitted for review!'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Trick submitted successfully!')),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ErrorHelper.showError(context, 'Error: $e');
       }
     } finally {
       if (mounted) {
@@ -94,8 +80,15 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    const matrixGreen = Color(0xFF00FF41);
+    const matrixBlack = Color(0xFF000000);
+    
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: matrixBlack,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: matrixGreen, width: 2),
+      ),
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -108,16 +101,19 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
                 Row(
                   children: [
                     const Text(
-                      'Submit Trick',
+                      'SUBMIT TRICK',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: matrixGreen,
+                        fontFamily: 'monospace',
+                        letterSpacing: 1.5,
                       ),
                     ),
                     const Spacer(),
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
+                      icon: Icon(Icons.close, color: matrixGreen),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
@@ -178,28 +174,54 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
                   children: [
                     TextButton(
                       onPressed: _isSubmitting ? null : () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submitVideo,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade600,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
+                      child: Text(
+                        'CANCEL',
+                        style: TextStyle(
+                          color: matrixGreen.withOpacity(0.7),
+                          fontFamily: 'monospace',
                         ),
                       ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: matrixGreen, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: matrixGreen.withOpacity(0.3),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting ? null : _submitVideo,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: matrixBlack,
+                          foregroundColor: matrixGreen,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                        child: _isSubmitting
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: matrixGreen,
+                                ),
+                              )
+                            : const Text(
+                                'SUBMIT TRICK',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            )
-                          : const Text('Submit Trick'),
+                      ),
                     ),
                   ],
                 ),

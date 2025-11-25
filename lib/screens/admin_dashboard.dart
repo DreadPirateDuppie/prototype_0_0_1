@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
+import '../utils/error_helper.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -36,12 +37,7 @@ class _AdminDashboardState extends State<AdminDashboard>
 
         if (!isAdmin) {
           // Not authorized, show error and go back
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Access denied: Admin privileges required'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ErrorHelper.showError(context, 'Access denied: Admin privileges required');
           Navigator.of(context).pop();
         } else {
           // Authorized, load data
@@ -54,12 +50,7 @@ class _AdminDashboardState extends State<AdminDashboard>
           _isAuthorized = false;
           _isCheckingAuth = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Authorization check failed'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ErrorHelper.showError(context, 'Authorization check failed');
         Navigator.of(context).pop();
       }
     }
@@ -148,9 +139,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error deleting post: $e')));
+          ErrorHelper.showError(context, 'Error deleting post: $e');
         }
       }
     }

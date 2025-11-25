@@ -8,9 +8,14 @@ import '../screens/edit_username_dialog.dart';
 import '../widgets/star_rating_display.dart';
 import '../widgets/mini_map_snapshot.dart';
 import 'settings_tab.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import '../utils/error_helper.dart';
 
 class ProfileTab extends StatefulWidget {
-  const ProfileTab({super.key});
+  final VoidCallback? onProfileUpdated;
+
+  const ProfileTab({super.key, this.onProfileUpdated});
 
   @override
   State<ProfileTab> createState() => _ProfileTabState();
@@ -19,9 +24,11 @@ class ProfileTab extends StatefulWidget {
 class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateMixin {
   late Future<List<MapPost>> _userPostsFuture;
   late Future<String?> _usernameFuture;
+  late Future<String?> _avatarUrlFuture;
   late Future<UserScores> _userScoresFuture;
   late TabController _tabController;
   bool _isStatsExpanded = true;
+  bool _isUploadingImage = false;
 
   @override
   void initState() {
@@ -33,11 +40,13 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
     if (user != null) {
       _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
       _usernameFuture = SupabaseService.getUserUsername(user.id);
+      _avatarUrlFuture = SupabaseService.getUserAvatarUrl(user.id);
       _userScoresFuture = BattleService.getUserScores(user.id);
     } else {
       // Fallback for no user (shouldn't happen in this tab usually)
       _userPostsFuture = Future.value([]);
       _usernameFuture = Future.value('Guest');
+      _avatarUrlFuture = Future.value(null);
       _userScoresFuture = Future.value(UserScores(
         userId: '',
         mapScore: 0,
@@ -66,8 +75,39 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
         setState(() {
           _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
           _usernameFuture = SupabaseService.getUserUsername(user.id);
+          _avatarUrlFuture = SupabaseService.getUserAvatarUrl(user.id);
           _userScoresFuture = BattleService.getUserScores(user.id);
         });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, maxHeight: 800);
+
+    if (pickedFile != null) {
+      setState(() {
+        _isUploadingImage = true;
+      });
+
+      try {
+        final user = SupabaseService.getCurrentUser();
+        if (user != null) {
+          await SupabaseService.uploadProfileImage(File(pickedFile.path), user.id);
+          await _refreshAll();
+          widget.onProfileUpdated?.call(); // Notify parent to refresh nav bar
+        }
+      } catch (e) {
+        if (mounted) {
+          ErrorHelper.showError(context, 'Error uploading image: $e');
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isUploadingImage = false;
+          });
+        }
       }
     }
   }
@@ -81,6 +121,7 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
           setState(() {
             _usernameFuture = SupabaseService.getUserUsername(SupabaseService.getCurrentUser()!.id);
           });
+          widget.onProfileUpdated?.call();
         },
       ),
     );
@@ -684,30 +725,75 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                     children: [
                       const SizedBox(height: 60),
                       // Avatar
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
+                      GestureDetector(
+                        onTap: _pickAndUploadImage,
+                        child: Stack(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 3),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: FutureBuilder<String?>(
+                                future: _avatarUrlFuture,
+                                builder: (context, snapshot) {
+                                  if (_isUploadingImage) {
+                                    return CircleAvatar(
+                                      radius: 50,
+                                      backgroundColor: Colors.black54,
+                                      child: const CircularProgressIndicator(color: Colors.green),
+                                    );
+                                  }
+                                  
+                                  if (snapshot.hasData && snapshot.data != null) {
+                                    return CircleAvatar(
+                                      radius: 50,
+                                      backgroundImage: NetworkImage(snapshot.data!),
+                                      backgroundColor: Colors.green.shade200,
+                                    );
+                                  }
+                                  
+                                  return CircleAvatar(
+                                    radius: 50,
+                                    backgroundColor: Colors.green.shade200,
+                                    child: Text(
+                                      user?.email?.substring(0, 1).toUpperCase() ?? 'U',
+                                      style: const TextStyle(
+                                        fontSize: 40,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                           ],
-                        ),
-                        child: CircleAvatar(
-                          radius: 50,
-                          backgroundColor: Colors.green.shade200,
-                          child: Text(
-                            user?.email?.substring(0, 1).toUpperCase() ?? 'U',
-                            style: const TextStyle(
-                              fontSize: 40,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -771,8 +857,8 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                 labelColor: Colors.green,
                 unselectedLabelColor: Colors.grey,
                 tabs: const [
-                  Tab(icon: Icon(Icons.grid_on)),
-                  Tab(icon: Icon(Icons.list)),
+                  Tab(text: 'My Posts', icon: Icon(Icons.grid_on)),
+                  Tab(text: 'Saved', icon: Icon(Icons.bookmark)),
                 ],
               ),
             ),
@@ -797,43 +883,110 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
             ),
           ];
         },
-        body: FutureBuilder<List<MapPost>>(
-          future: _userPostsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final posts = snapshot.data ?? [];
-
-            return TabBarView(
-              controller: _tabController,
-              children: [
-                // Grid View
-                posts.isEmpty
-                    ? const Center(child: Text('No posts yet'))
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(2),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 2,
-                          mainAxisSpacing: 2,
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            // Tab 1: My Posts (Grid)
+            FutureBuilder<List<MapPost>>(
+              future: _userPostsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                final posts = snapshot.data ?? [];
+                
+                if (posts.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No posts yet',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        itemCount: posts.length,
-                        itemBuilder: (context, index) => _buildGridPost(posts[index]),
-                      ),
-                // List View
-                posts.isEmpty
-                    ? const Center(child: Text('No posts yet'))
-                    : ListView.builder(
-                        padding: const EdgeInsets.only(top: 8),
-                        itemCount: posts.length,
-                        itemBuilder: (context, index) => _buildListPost(posts[index]),
-                      ),
-              ],
-            );
-          },
+                      ],
+                    ),
+                  );
+                }
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(2),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 2,
+                    mainAxisSpacing: 2,
+                  ),
+                  itemCount: posts.length,
+                  itemBuilder: (context, index) {
+                    return _buildGridPost(posts[index]);
+                  },
+                );
+              },
+            ),
+            
+            // Tab 2: Saved Posts (Grid)
+            FutureBuilder<List<MapPost>>(
+              future: SupabaseService.getSavedPosts(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                final posts = snapshot.data ?? [];
+                
+                if (posts.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No saved posts',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Save posts from the feed to see them here',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(2),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 2,
+                    mainAxisSpacing: 2,
+                  ),
+                  itemCount: posts.length,
+                  itemBuilder: (context, index) {
+                    return _buildGridPost(posts[index]);
+                  },
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
   }
+
 }

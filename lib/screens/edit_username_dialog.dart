@@ -122,19 +122,46 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
 
   @override
   Widget build(BuildContext context) {
+    const matrixGreen = Color(0xFF00FF41);
+    const matrixBlack = Color(0xFF000000);
+    
     return AlertDialog(
-      title: const Text('Edit Username'),
+      backgroundColor: matrixBlack,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: matrixGreen, width: 2),
+      ),
+      title: const Text(
+        'EDIT USERNAME',
+        style: TextStyle(
+          color: matrixGreen,
+          fontFamily: 'monospace',
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.5,
+        ),
+      ),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: _usernameController,
+              style: const TextStyle(color: matrixGreen),
               decoration: InputDecoration(
                 hintText: 'Enter your username',
+                hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
                 helperText: '3-20 characters, letters, numbers, dashes, underscores',
+                helperStyle: TextStyle(color: matrixGreen.withOpacity(0.5), fontSize: 11),
                 helperMaxLines: 2,
-                border: const OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen, width: 2),
+                ),
                 enabled: !_isLoading,
               ),
               maxLength: 20,
@@ -170,17 +197,49 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(
+            'CANCEL',
+            style: TextStyle(
+              color: matrixGreen.withOpacity(0.7),
+              fontFamily: 'monospace',
+            ),
+          ),
         ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _saveUsername,
-          child: _isLoading
-              ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Save'),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: matrixGreen, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: matrixGreen.withOpacity(0.3),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _saveUsername,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: matrixBlack,
+              foregroundColor: matrixGreen,
+              elevation: 0,
+            ),
+            child: _isLoading
+                ? SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: matrixGreen,
+                    ),
+                  )
+                : const Text(
+                    'SAVE',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
         ),
       ],
     );

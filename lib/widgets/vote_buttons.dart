@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
+import '../utils/error_helper.dart';
 
 class VoteButtons extends StatefulWidget {
   final String postId;
@@ -7,7 +8,6 @@ class VoteButtons extends StatefulWidget {
   final int? userVote;
   final bool isOwnPost;
   final VoidCallback onVoteChanged;
-
   final Axis orientation;
 
   const VoteButtons({
@@ -29,12 +29,7 @@ class _VoteButtonsState extends State<VoteButtons> {
 
   Future<void> _vote(int voteType) async {
     if (widget.isOwnPost) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You cannot vote on your own post'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      ErrorHelper.showError(context, 'You cannot vote on your own post');
       return;
     }
 
@@ -47,12 +42,7 @@ class _VoteButtonsState extends State<VoteButtons> {
       widget.onVoteChanged();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to vote: $e'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        ErrorHelper.showError(context, 'Failed to vote: $e');
       }
     } finally {
       if (mounted) {

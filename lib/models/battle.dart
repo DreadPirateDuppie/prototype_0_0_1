@@ -33,6 +33,10 @@ class Battle {
   final String? winnerId;
   final String currentTurnPlayerId;
   final int wagerAmount;
+  final int betAmount;
+  final bool isQuickfire;
+  final DateTime? turnDeadline;
+  final bool betAccepted;
 
   Battle({
     this.id,
@@ -50,6 +54,10 @@ class Battle {
     this.winnerId,
     required this.currentTurnPlayerId,
     this.wagerAmount = 0,
+    this.betAmount = 0,
+    this.isQuickfire = false,
+    this.turnDeadline,
+    this.betAccepted = false,
   });
 
   String getGameLetters() {
@@ -68,6 +76,24 @@ class Battle {
     return player1Letters == targetLetters || player2Letters == targetLetters;
   }
 
+  bool isTimerExpired() {
+    if (turnDeadline == null) return false;
+    return DateTime.now().isAfter(turnDeadline!);
+  }
+
+  Duration? getRemainingTime() {
+    if (turnDeadline == null) return null;
+    final now = DateTime.now();
+    if (now.isAfter(turnDeadline!)) return Duration.zero;
+    return turnDeadline!.difference(now);
+  }
+
+  Duration getTimerDuration() {
+    return isQuickfire 
+        ? const Duration(minutes: 4, seconds: 20)
+        : const Duration(hours: 24);
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'player1_id': player1Id,
@@ -84,6 +110,10 @@ class Battle {
       'winner_id': winnerId,
       'current_turn_player_id': currentTurnPlayerId,
       'wager_amount': wagerAmount,
+      'bet_amount': betAmount,
+      'is_quickfire': isQuickfire,
+      'turn_deadline': turnDeadline?.toIso8601String(),
+      'bet_accepted': betAccepted,
     };
   }
 
@@ -112,6 +142,12 @@ class Battle {
       winnerId: map['winner_id'] as String?,
       currentTurnPlayerId: map['current_turn_player_id'] as String,
       wagerAmount: (map['wager_amount'] as num?)?.toInt() ?? 0,
+      betAmount: (map['bet_amount'] as num?)?.toInt() ?? 0,
+      isQuickfire: map['is_quickfire'] as bool? ?? false,
+      turnDeadline: map['turn_deadline'] != null
+          ? DateTime.parse(map['turn_deadline'] as String)
+          : null,
+      betAccepted: map['bet_accepted'] as bool? ?? false,
     );
   }
 
@@ -131,6 +167,10 @@ class Battle {
     String? winnerId,
     String? currentTurnPlayerId,
     int? wagerAmount,
+    int? betAmount,
+    bool? isQuickfire,
+    DateTime? turnDeadline,
+    bool? betAccepted,
   }) {
     return Battle(
       id: id ?? this.id,
@@ -148,6 +188,10 @@ class Battle {
       winnerId: winnerId ?? this.winnerId,
       currentTurnPlayerId: currentTurnPlayerId ?? this.currentTurnPlayerId,
       wagerAmount: wagerAmount ?? this.wagerAmount,
+      betAmount: betAmount ?? this.betAmount,
+      isQuickfire: isQuickfire ?? this.isQuickfire,
+      turnDeadline: turnDeadline ?? this.turnDeadline,
+      betAccepted: betAccepted ?? this.betAccepted,
     );
   }
 }

@@ -23,6 +23,9 @@ class AddPostDialog extends StatefulWidget {
 class _AddPostDialogState extends State<AddPostDialog> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _tagsController = TextEditingController();
+  String _selectedCategory = 'Other';
+  final List<String> _categories = ['Street', 'Park', 'DIY', 'Shop', 'Other'];
   bool _isLoading = false;
   File? _selectedImage;
 
@@ -30,6 +33,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _tagsController.dispose();
     super.dispose();
   }
 
@@ -69,9 +73,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+        ErrorHelper.showError(context, 'Error picking image: $e');
       }
     }
   }
@@ -116,6 +118,12 @@ class _AddPostDialogState extends State<AddPostDialog> {
         );
       }
 
+      final tags = _tagsController.text
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
       await SupabaseService.createMapPost(
         userId: user.id,
         userName: userName ?? 'Anonymous',
@@ -125,6 +133,8 @@ class _AddPostDialogState extends State<AddPostDialog> {
         title: _titleController.text,
         description: _descriptionController.text,
         photoUrl: photoUrl,
+        category: _selectedCategory,
+        tags: tags,
       );
 
       if (mounted) {
@@ -146,33 +156,127 @@ class _AddPostDialogState extends State<AddPostDialog> {
 
   @override
   Widget build(BuildContext context) {
+    const matrixGreen = Color(0xFF00FF41);
+    const matrixBlack = Color(0xFF000000);
+    
     return AlertDialog(
-      title: const Text('Add Pin/Post'),
+      backgroundColor: matrixBlack,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: matrixGreen, width: 2),
+      ),
+      title: const Text(
+        'ADD PIN/POST',
+        style: TextStyle(
+          color: matrixGreen,
+          fontFamily: 'monospace',
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.5,
+        ),
+      ),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'Location: ${widget.location.latitude.toStringAsFixed(4)}, ${widget.location.longitude.toStringAsFixed(4)}',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: TextStyle(
+                color: matrixGreen.withOpacity(0.6),
+                fontSize: 12,
+                fontFamily: 'monospace',
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(
+              style: const TextStyle(color: matrixGreen),
+              decoration: InputDecoration(
                 labelText: 'Title',
+                labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
                 hintText: 'Enter post title',
-                border: OutlineInputBorder(),
+                hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen, width: 2),
+                ),
+              ),
+              enabled: !_isLoading,
+            ),
+            const SizedBox(height: 12),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedCategory,
+              dropdownColor: matrixBlack,
+              style: const TextStyle(color: matrixGreen),
+              decoration: InputDecoration(
+                labelText: 'Category',
+                labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen, width: 2),
+                ),
+              ),
+              items: _categories.map((category) {
+                return DropdownMenuItem(
+                  value: category,
+                  child: Text(category),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedCategory = value!;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _tagsController,
+              style: const TextStyle(color: matrixGreen),
+              decoration: InputDecoration(
+                labelText: 'Tags',
+                labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
+                hintText: 'stairs, ledge, covered (comma separated)',
+                hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen, width: 2),
+                ),
               ),
               enabled: !_isLoading,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _descriptionController,
-              decoration: const InputDecoration(
+              style: const TextStyle(color: matrixGreen),
+              decoration: InputDecoration(
                 labelText: 'Description',
+                labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
                 hintText: 'Enter post description',
-                border: OutlineInputBorder(),
+                hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen, width: 2),
+                ),
               ),
               maxLines: 3,
               enabled: !_isLoading,
@@ -181,20 +285,36 @@ class _AddPostDialogState extends State<AddPostDialog> {
             if (_selectedImage != null) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  _selectedImage!,
-                  height: 150,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: matrixGreen.withOpacity(0.5)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Image.file(
+                    _selectedImage!,
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
             ],
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _pickImage,
-              icon: const Icon(Icons.image),
-              label: Text(
-                _selectedImage != null ? 'Change Photo' : 'Add Photo',
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: matrixGreen.withOpacity(0.5)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _pickImage,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: matrixBlack,
+                  foregroundColor: matrixGreen,
+                ),
+                icon: const Icon(Icons.image),
+                label: Text(
+                  _selectedImage != null ? 'Change Photo' : 'Add Photo',
+                ),
               ),
             ),
           ],
@@ -203,17 +323,49 @@ class _AddPostDialogState extends State<AddPostDialog> {
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(
+            'CANCEL',
+            style: TextStyle(
+              color: matrixGreen.withOpacity(0.7),
+              fontFamily: 'monospace',
+            ),
+          ),
         ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _createPost,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Create Post'),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: matrixGreen, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: matrixGreen.withOpacity(0.3),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _createPost,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: matrixBlack,
+              foregroundColor: matrixGreen,
+              elevation: 0,
+            ),
+            child: _isLoading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: matrixGreen,
+                    ),
+                  )
+                : const Text(
+                    'CREATE POST',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
         ),
       ],
     );

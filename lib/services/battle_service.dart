@@ -8,29 +8,37 @@ class BattleService {
   static final SupabaseClient _client = Supabase.instance.client;
 
   // Create a new battle
-  static Future<Battle?> createBattle({
+    static Future<Battle?> createBattle({
     required String player1Id,
     required String player2Id,
     required GameMode gameMode,
     String? customLetters,
     int wagerAmount = 0,
+    int betAmount = 0,
+    bool isQuickfire = false,
   }) async {
     try {
-      // Check if player has enough points for wager
-      if (wagerAmount > 0) {
+      // Check if player has enough points for bet
+      if (betAmount > 0) {
         final balance = await SupabaseService.getUserPoints(player1Id);
-        if (balance < wagerAmount) {
-          throw Exception('Insufficient points for wager');
+        if (balance < betAmount) {
+          throw Exception('Insufficient points for bet');
         }
         
-        // Deduct wager from player 1
+        // Deduct bet from player 1 (player 2 must match to accept)
         await SupabaseService.awardPoints(
           player1Id, 
-          -wagerAmount.toDouble(), 
-          'wager_entry', 
-          description: 'Wager for battle vs $player2Id'
+          -betAmount.toDouble(), 
+          'bet_entry', 
+          description: 'Bet for battle vs $player2Id'
         );
       }
+
+      // Calculate turn deadline
+      final Duration timerDuration = isQuickfire 
+          ? const Duration(minutes: 4, seconds: 20)
+          : const Duration(hours: 24);
+      final turnDeadline = DateTime.now().add(timerDuration);
 
       final battle = Battle(
         player1Id: player1Id,
@@ -40,6 +48,10 @@ class BattleService {
         createdAt: DateTime.now(),
         currentTurnPlayerId: player1Id,
         wagerAmount: wagerAmount,
+        betAmount: betAmount,
+        isQuickfire: isQuickfire,
+        turnDeadline: turnDeadline,
+        betAccepted: betAmount == 0, // Auto-accept if no bet
       );
 
       final response = await _client
@@ -53,10 +65,41 @@ class BattleService {
       throw Exception('Failed to create battle: $e');
     }
   }
+  // Opponent accepts bet
+  static Future<void> acceptBet({
+    required String battleId,
+    required String opponentId,
+    required int betAmount,
+  }) async {
+    try {
+      // Verify opponent has enough points
+      final balance = await SupabaseService.getUserPoints(opponentId);
+      if (balance < betAmount) {
+        throw Exception('Opponent has insufficient points for bet');
+      }
+      // Deduct bet from opponent
+      await SupabaseService.awardPoints(
+        opponentId,
+        -betAmount.toDouble(),
+        'bet_entry',
+        description: 'Bet match for battle $battleId',
+      );
+      // Update battle to mark bet accepted
+      await _client.from('battles').update({
+        'bet_accepted': true,
+      }).eq('id', battleId);
+    } catch (e) {
+      throw Exception('Failed to accept bet: $e');
+    }
+  }
+
 
   // Get all battles for a user
   static Future<List<Battle>> getUserBattles(String userId) async {
     try {
+      // Check for expired turns first
+      await checkExpiredTurns(userId);
+
       final response = await _client
           .from('battles')
           .select()
@@ -269,16 +312,13 @@ class BattleService {
       await updatePlayerScoreForBattle(battle);
       
       // Handle Wager Payout
-      if (battle.wagerAmount > 0) {
-        // Winner takes the pot (2x wager)
-        // Note: In this prototype, we assume the "House" or opponent matched the bet
-        // So winner gets 2x the wager amount
-        final potAmount = battle.wagerAmount * 2;
-      // Award winner (pot * 2)
-      await SupabaseService.awardPoints(
-        winnerId,
-        potAmount.toDouble(), // Cast potAmount to double
-        'battle_win', 
+      if (battle.betAmount > 0) {
+        // Winner takes the pot (2x bet)
+        final potAmount = battle.betAmount * 2;
+        await SupabaseService.awardPoints(
+          winnerId,
+          potAmount.toDouble(),
+          'battle_win', 
           referenceId: battleId, 
           description: 'Won battle wager'
         );
@@ -399,6 +439,12 @@ class BattleService {
           ? battle.player2Id
           : battle.player1Id;
 
+      // Calculate new deadline
+      final Duration timerDuration = battle.isQuickfire
+          ? const Duration(minutes: 4, seconds: 20)
+          : const Duration(hours: 24);
+      final newDeadline = DateTime.now().add(timerDuration);
+
       final response = await _client
           .from('battles')
           .update({
@@ -407,6 +453,7 @@ class BattleService {
                 .toString()
                 .split('.')
                 .last,
+            'turn_deadline': newDeadline.toIso8601String(),
           })
           .eq('id', battleId)
           .select()
@@ -415,6 +462,46 @@ class BattleService {
       return Battle.fromMap(response);
     } catch (e) {
       throw Exception('Failed to switch turn: $e');
+    }
+  }
+
+  // Check for expired turns and auto-assign letters
+  static Future<void> checkExpiredTurns(String userId) async {
+    try {
+      final now = DateTime.now().toIso8601String();
+      
+      // Find active battles where deadline has passed
+      final response = await _client
+          .from('battles')
+          .select()
+          .or('player1_id.eq.$userId,player2_id.eq.$userId')
+          .isFilter('winner_id', null)
+          .lt('turn_deadline', now);
+
+      final expiredBattles = (response as List).map((b) => Battle.fromMap(b)).toList();
+
+      for (final battle in expiredBattles) {
+        // Only process if it's THIS user's turn (or maybe any turn? 
+        // If I check for my own expired turns, I assign myself a letter.
+        // If I check for opponent's expired turns, I assign THEM a letter.
+        // Since we query all battles involving the user, we can handle both.)
+        
+        // Assign letter to current turn player (who missed the deadline)
+        await assignLetter(
+          battleId: battle.id!,
+          playerId: battle.currentTurnPlayerId,
+        );
+        
+        // Switch turn to keep game moving (and reset timer)
+        // Note: assignLetter might have ended the game. Check if it's still active.
+        final updatedBattle = await getBattle(battle.id!);
+        if (updatedBattle != null && !updatedBattle.isComplete()) {
+           await switchTurn(battle.id!);
+        }
+      }
+    } catch (e) {
+      // Silently fail to avoid blocking UI
+      print('Error checking expired turns: $e');
     }
   }
 }

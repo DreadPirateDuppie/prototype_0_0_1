@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/post.dart';
 import '../screens/edit_post_dialog.dart';
-
+import '../screens/trick_history_screen.dart';
 import '../services/supabase_service.dart';
 import '../widgets/star_rating_display.dart';
 import '../widgets/vote_buttons.dart';
-import 'trick_history_screen.dart';
+import '../utils/error_helper.dart';
 
 class SpotDetailsBottomSheet extends StatefulWidget {
   final MapPost post;
@@ -25,38 +25,43 @@ class SpotDetailsBottomSheet extends StatefulWidget {
 
 class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
   late MapPost currentPost;
+  bool _isOwnPost = false;
 
   @override
   void initState() {
     super.initState();
     currentPost = widget.post;
+    _checkOwnership();
   }
 
-  bool get _isOwnPost {
-    final user = SupabaseService.getCurrentUser();
-    return user != null && user.id == currentPost.userId;
+  void _checkOwnership() {
+    final userId = SupabaseService.getCurrentUser()?.id;
+    if (userId != null) {
+      setState(() {
+        _isOwnPost = currentPost.userId == userId;
+      });
+    }
   }
 
-  void _showEditDialog() {
+  Future<void> _showEditDialog() async {
     showDialog(
       context: context,
       builder: (context) => EditPostDialog(
         post: currentPost,
         onPostUpdated: () async {
-          // Refresh the post data
+          // Refresh post data
           try {
             final updatedPosts = await SupabaseService.getAllMapPosts();
             final updated = updatedPosts.firstWhere(
               (p) => p.id == currentPost.id,
               orElse: () => currentPost,
             );
-          if (context.mounted) {
-            setState(() {
-              currentPost = updated;
-            });
-            widget.onPostUpdated?.call();
-            Navigator.of(context).pop();
-          }
+            if (mounted) {
+              setState(() {
+                currentPost = updated;
+              });
+              widget.onPostUpdated?.call();
+            }
           } catch (e) {
             // Silently fail
           }
@@ -73,31 +78,30 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Report Post'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Why are you reporting this post?'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Reason',
-                  hintText: 'e.g., Inappropriate content',
-                  border: OutlineInputBorder(),
-                ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Why are you reporting this post?'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Reason',
+                hintText: 'e.g., Inappropriate content, Spam',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: detailsController,
-                decoration: const InputDecoration(
-                  labelText: 'Additional Details (Optional)',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: detailsController,
+              decoration: const InputDecoration(
+                labelText: 'Details (Optional)',
+                hintText: 'Provide more context...',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
+              maxLines: 3,
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -107,9 +111,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
           ElevatedButton(
             onPressed: () async {
               if (reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please provide a reason')),
-                );
+                ErrorHelper.showError(context, 'Please provide a reason');
                 return;
               }
 
@@ -132,9 +134,7 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  ErrorHelper.showError(context, 'Error: $e');
                 }
               }
             },
@@ -145,8 +145,6 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
       ),
     );
   }
-
-
 
   @override
   Widget build(BuildContext context) {

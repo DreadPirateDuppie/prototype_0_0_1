@@ -13,12 +13,12 @@ class MapPost {
   final double popularityRating;
   final double securityRating;
   final double qualityRating;
-  
-  // Vote fields
   final int upvotes;
   final int downvotes;
-  final int voteScore; // upvotes - downvotes
-  final int? userVote; // -1 = downvote, 0 = no vote, 1 = upvote
+  final int voteScore;
+  final int? userVote;
+  final String category;
+  final List<String> tags;
 
   MapPost({
     this.id,
@@ -39,6 +39,8 @@ class MapPost {
     this.downvotes = 0,
     this.voteScore = 0,
     this.userVote,
+    this.category = 'Other',
+    this.tags = const [],
   });
 
   Map<String, dynamic> toMap() {
@@ -59,6 +61,8 @@ class MapPost {
       'upvotes': upvotes,
       'downvotes': downvotes,
       'vote_score': voteScore,
+      'category': category,
+      'tags': tags,
     };
   }
 
@@ -82,6 +86,8 @@ class MapPost {
       downvotes: map['downvotes'] as int? ?? 0,
       voteScore: map['vote_score'] as int? ?? 0,
       userVote: map['user_vote'] as int?,
+      category: map['category'] as String? ?? 'Other',
+      tags: (map['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
     );
   }
 }

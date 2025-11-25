@@ -67,6 +67,20 @@ class SupabaseService {
     }
   }
 
+  // Get user avatar URL
+  static Future<String?> getUserAvatarUrl(String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('avatar_url')
+          .eq('id', userId)
+          .maybeSingle();
+      return response?['avatar_url'];
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// Checks if the current user has admin privileges.
   /// Returns false if the user is not logged in, the user profile doesn't exist,
   /// or if there's any error during the check.
@@ -239,6 +253,37 @@ class SupabaseService {
     }
   }
 
+  // Upload profile image
+  static Future<String> uploadProfileImage(File imageFile, String userId) async {
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filename = 'profiles/avatar_${userId}_$timestamp.jpg';
+
+      final bytes = await imageFile.readAsBytes();
+      await _client.storage
+          .from('post_images')
+          .uploadBinary(
+            filename,
+            bytes,
+            fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
+          );
+
+      final publicUrl = _client.storage
+          .from('post_images')
+          .getPublicUrl(filename);
+
+      // Update user profile with new avatar URL
+      await _client.from('user_profiles').upsert({
+        'id': userId,
+        'avatar_url': publicUrl,
+      });
+
+      return publicUrl;
+    } catch (e) {
+      throw Exception('Failed to upload profile image: $e');
+    }
+  }
+
   // Create a map post
   static Future<MapPost?> createMapPost({
     required String userId,
@@ -249,6 +294,8 @@ class SupabaseService {
     String? photoUrl,
     String? userName,
     String? userEmail,
+    String category = 'Other',
+    List<String> tags = const [],
   }) async {
     try {
       final response = await _client
@@ -264,6 +311,8 @@ class SupabaseService {
             'created_at': DateTime.now().toIso8601String(),
             'likes': 0,
             'photo_url': photoUrl,
+            'category': category,
+            'tags': tags,
           })
           .select()
           .single();
@@ -324,17 +373,49 @@ class SupabaseService {
     }
   }
 
-  // Get all map posts
-  static Future<List<MapPost>> getAllMapPosts() async {
+  // Get all map posts with optional filters
+  static Future<List<MapPost>> getAllMapPosts({
+    String? category,
+    String? tag,
+    String? searchQuery,
+  }) async {
     try {
-      final response = await _client
+      var query = _client
           .from('map_posts')
-          .select()
-          .order('created_at', ascending: false);
+          .select();
+
+      if (category != null && category != 'All') {
+        query = query.eq('category', category);
+      }
+
+      if (tag != null && tag.isNotEmpty) {
+        query = query.contains('tags', [tag]);
+      }
+
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        query = query.or('title.ilike.%$searchQuery%,description.ilike.%$searchQuery%');
+      }
+
+      final response = await query.order('created_at', ascending: false);
 
       return (response as List).map((post) => MapPost.fromMap(post)).toList();
     } catch (e) {
       // Table may not exist yet
+      return [];
+    }
+  }
+
+  // Search map posts
+  static Future<List<MapPost>> searchPosts(String query) async {
+    try {
+      final response = await _client
+          .from('map_posts')
+          .select()
+          .or('title.ilike.%$query%,description.ilike.%$query%')
+          .order('created_at', ascending: false);
+
+      return (response as List).map((post) => MapPost.fromMap(post)).toList();
+    } catch (e) {
       return [];
     }
   }
@@ -387,6 +468,8 @@ class SupabaseService {
     double? popularityRating,
     double? securityRating,
     double? qualityRating,
+    String? category,
+    List<String>? tags,
   }) async {
     try {
       final updateData = {
@@ -396,6 +479,8 @@ class SupabaseService {
         if (popularityRating != null) 'popularity_rating': popularityRating,
         if (securityRating != null) 'security_rating': securityRating,
         if (qualityRating != null) 'quality_rating': qualityRating,
+        if (category != null) 'category': category,
+        if (tags != null) 'tags': tags,
       };
 
       final response = await _client
@@ -1025,5 +1110,158 @@ class SupabaseService {
       rethrow;
     }
   }
-}
+  // --- Saved Posts Methods ---
 
+  // Toggle save post status
+  static Future<bool> toggleSavePost(String postId) async {
+    final user = getCurrentUser();
+    if (user == null) throw Exception('User not logged in');
+
+    try {
+      // Check if already saved
+      final existing = await _client
+          .from('saved_posts')
+          .select()
+          .eq('user_id', user.id)
+          .eq('post_id', postId)
+          .maybeSingle();
+
+      if (existing != null) {
+        // Unsave
+        await _client
+            .from('saved_posts')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('post_id', postId);
+        return false; // Not saved anymore
+      } else {
+        // Save
+        await _client.from('saved_posts').insert({
+          'user_id': user.id,
+          'post_id': postId,
+        });
+        return true; // Saved
+      }
+    } catch (e) {
+      developer.log('Error toggling save post: $e', name: 'SupabaseService');
+      rethrow;
+    }
+  }
+
+  // Check if post is saved
+  static Future<bool> isPostSaved(String postId) async {
+    final user = getCurrentUser();
+    if (user == null) return false;
+
+    try {
+      final response = await _client
+          .from('saved_posts')
+          .select()
+          .eq('user_id', user.id)
+          .eq('post_id', postId)
+          .maybeSingle();
+      return response != null;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Get user's saved posts
+  static Future<List<MapPost>> getSavedPosts() async {
+    final user = getCurrentUser();
+    if (user == null) return [];
+
+    try {
+      // First get saved post IDs
+      final savedData = await _client
+          .from('saved_posts')
+          .select('post_id')
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
+
+      if (savedData.isEmpty) return [];
+
+      final postIds = (savedData as List)
+          .map((e) => e['post_id'] as String)
+          .toList();
+
+      // Then fetch the posts
+      final postsData = await _client
+          .from('map_posts')
+          .select()
+          .filter('id', 'in', postIds);
+
+      // Map to MapPost objects
+        final posts = (postsData as List)
+          .map((data) => MapPost.fromMap(data))
+          .toList();
+
+      // Sort to match saved order (most recent saved first)
+      // This is a bit inefficient but necessary since we can't easily join and sort in one go with the current setup
+      // A better approach would be a join query, but this works for now
+      final postMap = {for (var p in posts) p.id!: p};
+      return postIds
+          .map((id) => postMap[id])
+          .where((p) => p != null)
+          .cast<MapPost>()
+          .toList();
+    } catch (e) {
+      developer.log('Error getting saved posts: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
+  // --- Notifications Methods ---
+
+  // Get user notifications
+  static Future<List<Map<String, dynamic>>> getNotifications() async {
+    final user = getCurrentUser();
+    if (user == null) return [];
+
+    try {
+      final response = await _client
+          .from('notifications')
+          .select()
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
+
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Mark notification as read
+  static Future<void> markNotificationRead(String notificationId) async {
+    try {
+      await _client
+          .from('notifications')
+          .update({'is_read': true})
+          .eq('id', notificationId);
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
+  // Create a notification (system use)
+  static Future<void> createNotification({
+    required String userId,
+    required String type,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      await _client.from('notifications').insert({
+        'user_id': userId,
+        'type': type,
+        'title': title,
+        'body': body,
+        'data': data ?? {},
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      developer.log('Error creating notification: $e', name: 'SupabaseService');
+    }
+  }
+}

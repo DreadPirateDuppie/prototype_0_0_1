@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
 import '../screens/admin_dashboard.dart';
+import '../utils/error_helper.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -84,9 +85,7 @@ class _SettingsTabState extends State<SettingsTab> {
       await SupabaseService.signOut();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Sign out error: $error')));
+        ErrorHelper.showError(context, 'Sign out error: $error');
       }
     }
   }
@@ -151,12 +150,7 @@ class _SettingsTabState extends State<SettingsTab> {
                             setState(() {
                               isSubmitting = false;
                             });
-                            scaffoldMessenger.showSnackBar(
-                              SnackBar(
-                                content: Text('Error: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
+                            ErrorHelper.showError(context, 'Error: $e');
                           }
                         }
                       },

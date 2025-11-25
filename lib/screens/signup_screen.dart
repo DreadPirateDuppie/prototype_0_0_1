@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
+import '../utils/error_helper.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -10,32 +11,28 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
-  final _displayNameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _displayNameController = TextEditingController();
   bool _isLoading = false;
-  String? _errorMessage;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _displayNameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _displayNameController.dispose();
     super.dispose();
   }
 
   Future<void> _signUp() async {
     if (_passwordController.text != _confirmPasswordController.text) {
-      setState(() {
-        _errorMessage = 'Passwords do not match';
-      });
+      ErrorHelper.showError(context, 'Passwords do not match');
       return;
     }
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
@@ -51,9 +48,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
         Navigator.of(context).pop();
       }
     } catch (error) {
-      setState(() {
-        _errorMessage = error.toString();
-      });
+      if (mounted) {
+        ErrorHelper.showError(context, error.toString());
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -107,12 +104,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
               obscureText: true,
             ),
-            const SizedBox(height: 16),
-            if (_errorMessage != null)
-              Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.red),
-              ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _isLoading ? null : _signUp,

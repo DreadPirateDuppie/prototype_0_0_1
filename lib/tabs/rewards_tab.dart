@@ -103,8 +103,8 @@ class _RewardsTabState extends State<RewardsTab> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.green.shade900,
-            Colors.green.shade800,
+            const Color(0xFF000000), // Matrix Black
+            const Color(0xFF0D0D0D), // Matrix Surface
             Theme.of(context).scaffoldBackgroundColor,
           ],
           stops: const [0.0, 0.7, 0.7],
@@ -125,14 +125,15 @@ class _RewardsTabState extends State<RewardsTab> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color(0xFF1B5E20), // Dark Green
-                      Color(0xFF000000), // Black
+                      Color(0xFF000000), // Matrix Black
+                      Color(0xFF003300), // Dark Green
                     ],
                   ),
                   borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFF00FF41), width: 1),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.green.shade900.withValues(alpha: 0.5),
+                      color: const Color(0xFF00FF41).withOpacity(0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -231,9 +232,10 @@ class _RewardsTabState extends State<RewardsTab> {
                                   Text(
                                     'PTS',
                                     style: TextStyle(
-                                      color: Colors.amber.shade400,
+                                      color: Color(0xFF00FF41),
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
                                     ),
                                   ),
                                 ],
@@ -280,7 +282,7 @@ class _RewardsTabState extends State<RewardsTab> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      // color: Colors.black87, // Removed to use theme default
+                      color: Color(0xFF00FF41),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -296,19 +298,20 @@ class _RewardsTabState extends State<RewardsTab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: const Color(0xFF00FF41).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.shade100),
+                  border: Border.all(color: const Color(0xFF00FF41).withOpacity(0.3)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.local_fire_department, color: Colors.orange.shade700, size: 20),
+                    const Icon(Icons.local_fire_department, color: Color(0xFF00FF41), size: 20),
                     const SizedBox(width: 4),
                     Text(
                       '$_streak Days',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade900,
+                        color: Color(0xFF00FF41),
+                        fontFamily: 'monospace',
                       ),
                     ),
                   ],
@@ -324,6 +327,7 @@ class _RewardsTabState extends State<RewardsTab> {
               // In a real app, we'd map this to actual days of the week
               final isActive = index < (_streak % 8); 
               final isToday = index == (_streak % 8);
+              const matrixGreen = Color(0xFF00FF41);
               
               return Column(
                 children: [
@@ -332,12 +336,15 @@ class _RewardsTabState extends State<RewardsTab> {
                     height: 36,
                     decoration: BoxDecoration(
                       color: isActive 
-                          ? Colors.orange.shade500 
-                          : (isToday ? Colors.orange.shade100 : Theme.of(context).dividerColor.withValues(alpha: 0.1)),
+                          ? matrixGreen.withOpacity(0.2)
+                          : (isToday ? matrixGreen.withOpacity(0.1) : Colors.transparent),
                       shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isActive || isToday ? matrixGreen : matrixGreen.withOpacity(0.2),
+                      ),
                       boxShadow: isActive ? [
                         BoxShadow(
-                          color: Colors.orange.shade300,
+                          color: matrixGreen.withOpacity(0.3),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         )
@@ -346,9 +353,7 @@ class _RewardsTabState extends State<RewardsTab> {
                     child: Icon(
                       Icons.local_fire_department,
                       size: 20,
-                      color: isActive 
-                          ? Colors.white 
-                          : (isToday ? Colors.orange.shade300 : Theme.of(context).disabledColor),
+                      color: isActive || isToday ? matrixGreen : matrixGreen.withOpacity(0.3),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -356,8 +361,9 @@ class _RewardsTabState extends State<RewardsTab> {
                     'Day ${index + 1}',
                     style: TextStyle(
                       fontSize: 10,
-                      color: isActive ? Colors.orange.shade800 : Theme.of(context).disabledColor,
+                      color: isActive || isToday ? matrixGreen : matrixGreen.withOpacity(0.5),
                       fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                      fontFamily: 'monospace',
                     ),
                   ),
                 ],
@@ -378,7 +384,7 @@ class _RewardsTabState extends State<RewardsTab> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            // color: Colors.black87,
+            color: Color(0xFF00FF41),
           ),
         ),
         const SizedBox(height: 16),
@@ -389,7 +395,7 @@ class _RewardsTabState extends State<RewardsTab> {
             children: [
               _buildEarnCard(
                 icon: Icons.add_location_alt,
-                color: Colors.blue,
+                color: const Color(0xFF00FF41),
                 title: 'Create Spot',
                 points: '+4',
               ),
@@ -398,14 +404,14 @@ class _RewardsTabState extends State<RewardsTab> {
               const SizedBox(width: 12),
               _buildEarnCard(
                 icon: Icons.login,
-                color: Colors.green,
+                color: const Color(0xFF00FF41),
                 title: 'Daily Login',
                 points: '+10+',
               ),
               const SizedBox(width: 12),
               _buildEarnCard(
                 icon: Icons.sports_kabaddi,
-                color: Colors.purple,
+                color: const Color(0xFF00FF41),
                 title: 'Win Battle',
                 points: '2x Pot',
               ),
@@ -483,15 +489,12 @@ class _RewardsTabState extends State<RewardsTab> {
         width: 140,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.orange.shade400, Colors.orange.shade600],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF00FF41), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.orange.shade200,
+              color: const Color(0xFF00FF41).withOpacity(0.2),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -501,7 +504,7 @@ class _RewardsTabState extends State<RewardsTab> {
           children: [
             const Icon(
               Icons.casino,
-              color: Colors.white,
+              color: Color(0xFF00FF41),
               size: 48,
             ),
             const SizedBox(height: 8),
@@ -515,14 +518,15 @@ class _RewardsTabState extends State<RewardsTab> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Win 2x',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 18,
+              const Text(
+                'Win 2x',
+                style: TextStyle(
+                  color: Color(0xFF00FF41),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  fontFamily: 'monospace',
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -534,15 +538,12 @@ class _RewardsTabState extends State<RewardsTab> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2E004F), Color(0xFF6200EA)], // Deep Purple
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.black,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF00FF41), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.purple.shade900.withValues(alpha: 0.4),
+            color: const Color(0xFF00FF41).withOpacity(0.2),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -556,7 +557,7 @@ class _RewardsTabState extends State<RewardsTab> {
               color: Colors.white.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.currency_bitcoin, color: Colors.white, size: 32),
+            child: const Icon(Icons.currency_bitcoin, color: Color(0xFF00FF41), size: 32),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -565,28 +566,30 @@ class _RewardsTabState extends State<RewardsTab> {
               children: [
                 Row(
                   children: [
-                    const Text(
-                      'WEB3 READY',
-                      style: TextStyle(
-                        color: Colors.cyanAccent,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
-                        letterSpacing: 1.5,
+                      const Text(
+                        'WEB3 READY',
+                        style: TextStyle(
+                          color: Color(0xFF00D9FF),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                          letterSpacing: 1.5,
+                          fontFamily: 'monospace',
+                        ),
                       ),
-                    ),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.cyanAccent.withValues(alpha: 0.2),
+                        color: const Color(0xFFFFD700).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
                         'COMING SOON',
                         style: TextStyle(
-                          color: Colors.cyanAccent,
+                          color: Color(0xFFFFD700),
                           fontSize: 8,
                           fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
                         ),
                       ),
                     ),
@@ -596,7 +599,7 @@ class _RewardsTabState extends State<RewardsTab> {
                 const Text(
                   'Crypto Conversion',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF00D9FF),
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -629,7 +632,7 @@ class _RewardsTabState extends State<RewardsTab> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                // color: Colors.black87,
+                color: Color(0xFF00FF41),
               ),
             ),
             TextButton(
@@ -683,8 +686,8 @@ class _RewardsTabState extends State<RewardsTab> {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        isPositive ? Icons.arrow_downward : Icons.arrow_upward, // Downward arrow for incoming (deposit)
-                        color: isPositive ? Colors.green : Colors.red,
+                        isPositive ? Icons.arrow_downward : Icons.arrow_upward,
+                        color: isPositive ? const Color(0xFF00FF41) : Colors.red,
                         size: 20,
                       ),
                     ),
@@ -715,8 +718,9 @@ class _RewardsTabState extends State<RewardsTab> {
                       '${isPositive ? '+' : ''}$amount',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
-                        color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
+                        color: isPositive ? const Color(0xFF00FF41) : Colors.red.shade700,
                         fontSize: 16,
+                        fontFamily: 'monospace',
                       ),
                     ),
                   ],
@@ -742,8 +746,8 @@ class _RewardsTabState extends State<RewardsTab> {
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isReady ? Colors.amber : Theme.of(context).dividerColor,
-            width: 2,
+            color: isReady ? const Color(0xFF00FF41) : Theme.of(context).dividerColor,
+            width: 1,
           ),
           boxShadow: [
             BoxShadow(
@@ -759,7 +763,7 @@ class _RewardsTabState extends State<RewardsTab> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.1),
+                color: const Color(0xFF00FF41).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: isLoading
@@ -768,12 +772,12 @@ class _RewardsTabState extends State<RewardsTab> {
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.amber,
+                        color: Color(0xFF00FF41),
                       ),
                     )
                   : Icon(
                       Icons.play_circle_filled,
-                      color: isReady ? Colors.amber : Colors.grey,
+                      color: isReady ? const Color(0xFF00FF41) : Colors.grey,
                       size: 24,
                     ),
             ),
@@ -789,9 +793,10 @@ class _RewardsTabState extends State<RewardsTab> {
             Text(
               '+4',
               style: TextStyle(
-                color: isReady ? Colors.amber : Colors.grey,
+                color: isReady ? const Color(0xFF00FF41) : Colors.grey,
                 fontWeight: FontWeight.w900,
                 fontSize: 16,
+                fontFamily: 'monospace',
               ),
             ),
           ],

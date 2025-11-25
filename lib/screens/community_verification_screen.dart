@@ -4,17 +4,20 @@ import '../models/verification.dart';
 import '../models/battle.dart';
 import '../services/verification_service.dart';
 import '../services/battle_service.dart';
+import '../utils/error_helper.dart';
 
 class CommunityVerificationScreen extends StatefulWidget {
   const CommunityVerificationScreen({super.key});
 
   @override
-  State<CommunityVerificationScreen> createState() => _CommunityVerificationScreenState();
+  State<CommunityVerificationScreen> createState() =>
+      _CommunityVerificationScreenState();
 }
 
-class _CommunityVerificationScreenState extends State<CommunityVerificationScreen> {
-  List<VerificationAttempt> _attempts = [];
+class _CommunityVerificationScreenState
+    extends State<CommunityVerificationScreen> {
   bool _isLoading = true;
+  List<VerificationAttempt> _attempts = [];
   final _currentUser = Supabase.instance.client.auth.currentUser;
 
   @override
@@ -24,24 +27,26 @@ class _CommunityVerificationScreenState extends State<CommunityVerificationScree
   }
 
   Future<void> _loadVerificationQueue() async {
+    if (_currentUser == null) return;
+
     setState(() {
       _isLoading = true;
     });
 
     try {
       final attempts = await VerificationService.getCommunityVerificationQueue();
-      setState(() {
-        _attempts = attempts;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _attempts = attempts;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading verification queue: $e')),
-        );
+        ErrorHelper.showError(context, 'Error loading verification queue: $e');
       }
     }
   }
@@ -64,9 +69,7 @@ class _CommunityVerificationScreenState extends State<CommunityVerificationScree
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error submitting vote: $e')),
-        );
+        ErrorHelper.showError(context, 'Error submitting vote: $e');
       }
     }
   }

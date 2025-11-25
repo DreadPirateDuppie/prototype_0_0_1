@@ -1,12 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import '../services/supabase_service.dart';
 import '../models/post.dart';
+import '../services/supabase_service.dart';
+import '../utils/error_helper.dart';
 
 class EditPostDialog extends StatefulWidget {
   final MapPost post;
-  final Function() onPostUpdated;
+  final VoidCallback onPostUpdated;
 
   const EditPostDialog({
     super.key,
@@ -21,18 +22,28 @@ class EditPostDialog extends StatefulWidget {
 class _EditPostDialogState extends State<EditPostDialog> {
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
-  bool _isLoading = false;
+  late TextEditingController _tagsController;
+  String _selectedCategory = 'Street';
+  final List<String> _categories = ['Street', 'Park', 'DIY', 'Shop', 'Other'];
   File? _selectedImage;
-  bool _imageChanged = false;
-  double _popularityRating = 0;
-  double _securityRating = 0;
-  double _qualityRating = 0;
+  bool _isLoading = false;
+  
+  // Ratings
+  late double _popularityRating;
+  late double _securityRating;
+  late double _qualityRating;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.post.title);
     _descriptionController = TextEditingController(text: widget.post.description);
+    _tagsController = TextEditingController(text: widget.post.tags?.join(', ') ?? '');
+    _selectedCategory = widget.post.category ?? 'Street';
+    if (!_categories.contains(_selectedCategory)) {
+      _selectedCategory = 'Other';
+    }
+    
     _popularityRating = widget.post.popularityRating;
     _securityRating = widget.post.securityRating;
     _qualityRating = widget.post.qualityRating;
@@ -42,33 +53,29 @@ class _EditPostDialogState extends State<EditPostDialog> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _tagsController.dispose();
     super.dispose();
   }
 
   Future<void> _pickImage() async {
+    final picker = ImagePicker();
     try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
+      final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
         setState(() {
-          _selectedImage = File(image.path);
-          _imageChanged = true;
+          _selectedImage = File(pickedFile.path);
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        ErrorHelper.showError(context, 'Error picking image: $e');
       }
     }
   }
 
   Future<void> _updatePost() async {
     if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      ErrorHelper.showError(context, 'Please fill in all fields');
       return;
     }
 
@@ -77,24 +84,28 @@ class _EditPostDialogState extends State<EditPostDialog> {
     });
 
     try {
-      String? newPhotoUrl = widget.post.photoUrl;
-      
-      // Upload new image if one was selected
-      if (_selectedImage != null && _imageChanged) {
+      String? photoUrl = widget.post.photoUrl;
+      if (_selectedImage != null) {
+        // Upload new image
         final user = SupabaseService.getCurrentUser();
         if (user != null) {
-          newPhotoUrl = await SupabaseService.uploadPostImage(
-            _selectedImage!,
-            user.id,
-          );
+          photoUrl = await SupabaseService.uploadPostImage(_selectedImage!, user.id);
         }
       }
+
+      final tags = _tagsController.text
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
 
       await SupabaseService.updateMapPost(
         postId: widget.post.id!,
         title: _titleController.text,
         description: _descriptionController.text,
-        photoUrl: _imageChanged ? newPhotoUrl : null,
+        photoUrl: photoUrl,
+        category: _selectedCategory,
+        tags: tags,
         popularityRating: _popularityRating,
         securityRating: _securityRating,
         qualityRating: _qualityRating,
@@ -103,12 +114,13 @@ class _EditPostDialogState extends State<EditPostDialog> {
       if (mounted) {
         widget.onPostUpdated();
         Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post updated successfully!')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating post: $e')),
-        );
+        ErrorHelper.showError(context, 'Error updating post: $e');
       }
     } finally {
       if (mounted) {
@@ -121,9 +133,14 @@ class _EditPostDialogState extends State<EditPostDialog> {
 
   @override
   Widget build(BuildContext context) {
+    const matrixGreen = Color(0xFF00FF41);
+    const matrixBlack = Color(0xFF000000);
+    
     return Dialog(
+      backgroundColor: matrixBlack,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: matrixGreen, width: 2),
       ),
       child: SingleChildScrollView(
         child: Padding(
@@ -131,18 +148,33 @@ class _EditPostDialogState extends State<EditPostDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Edit Post',
-                style: Theme.of(context).textTheme.headlineSmall,
+              const Text(
+                'EDIT POST',
+                style: TextStyle(
+                  color: matrixGreen,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                  fontSize: 18,
+                ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _titleController,
+                style: const TextStyle(color: matrixGreen),
                 decoration: InputDecoration(
                   labelText: 'Title',
+                  labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
                   hintText: 'Enter post title',
+                  hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: matrixGreen, width: 2),
+                  ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
                   ),
                 ),
                 maxLines: 1,
@@ -158,6 +190,40 @@ class _EditPostDialogState extends State<EditPostDialog> {
                   ),
                 ),
                 maxLines: 4,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                decoration: InputDecoration(
+                  labelText: 'Category',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                items: _categories.map((category) {
+                  return DropdownMenuItem(
+                    value: category,
+                    child: Text(category),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _selectedCategory = value;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _tagsController,
+                decoration: InputDecoration(
+                  labelText: 'Tags (comma separated)',
+                  hintText: 'stairs, ledge, rail',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               // Image section
@@ -260,17 +326,49 @@ class _EditPostDialogState extends State<EditPostDialog> {
                     onPressed: _isLoading
                         ? null
                         : () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+                    child: Text(
+                      'CANCEL',
+                      style: TextStyle(
+                        color: matrixGreen.withOpacity(0.7),
+                        fontFamily: 'monospace',
+                      ),
+                    ),
                   ),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _updatePost,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Update'),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: matrixGreen, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: matrixGreen.withOpacity(0.3),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _updatePost,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: matrixBlack,
+                        foregroundColor: matrixGreen,
+                        elevation: 0,
+                      ),
+                      child: _isLoading
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: matrixGreen,
+                              ),
+                            )
+                          : const Text(
+                              'UPDATE',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
                   ),
                 ],
               ),

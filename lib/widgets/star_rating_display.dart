@@ -20,41 +20,29 @@ class StarRatingDisplay extends StatelessWidget {
     Color color,
   ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(width: 12),
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
           Text(
-            label,
+            label.substring(0, 3), // Just first 3 letters
             style: const TextStyle(
               fontWeight: FontWeight.w500,
-              fontSize: 14,
+              fontSize: 10,
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 4),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: List.generate(5, (index) {
               return Icon(
-                index < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                index < rating ? Icons.star : Icons.star_border,
                 color: index < rating ? color : Colors.grey[300],
-                size: 18,
+                size: 10,
               );
             }),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 24,
-            child: Text(
-              rating.toStringAsFixed(1),
-              textAlign: TextAlign.end,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: color,
-                fontSize: 14,
-              ),
-            ),
           ),
         ],
       ),
@@ -64,12 +52,12 @@ class StarRatingDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
+          color: Theme.of(context).dividerColor.withOpacity(0.1),
         ),
       ),
       child: Column(

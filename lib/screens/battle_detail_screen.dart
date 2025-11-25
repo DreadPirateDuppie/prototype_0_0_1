@@ -1,43 +1,21 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/battle.dart';
 import '../services/battle_service.dart';
-import '../services/verification_service.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-
-class _TutorialScene {
-  final String description;
-  final String trickName;
-  final String player1Letters;
-  final String player2Letters;
-  final String? setTrickVideoUrl;
-  final String? attemptVideoUrl;
-  final VerificationStatus verificationStatus;
-  final String currentTurnPlayerId;
-  final String? winnerId;
-
-  const _TutorialScene({
-    required this.description,
-    required this.trickName,
-    required this.player1Letters,
-    required this.player2Letters,
-    required this.setTrickVideoUrl,
-    required this.attemptVideoUrl,
-    required this.verificationStatus,
-    required this.currentTurnPlayerId,
-    this.winnerId,
-  });
-}
+import '../utils/error_helper.dart';
 
 class BattleDetailScreen extends StatefulWidget {
-  final Battle battle;
+  final String? battleId;
+  final Battle? battle;
   final bool tutorialMode;
   final String? tutorialUserId;
 
   const BattleDetailScreen({
-    super.key,
-    required this.battle,
+    super.key, 
+    this.battleId,
+    this.battle,
     this.tutorialMode = false,
     this.tutorialUserId,
   });
@@ -48,351 +26,168 @@ class BattleDetailScreen extends StatefulWidget {
 
 class _BattleDetailScreenState extends State<BattleDetailScreen> {
   late Battle _battle;
-  bool _isLoading = false;
-  final _currentUser = Supabase.instance.client.auth.currentUser;
-  List<_TutorialScene> _tutorialScenes = [];
-  int _tutorialSceneIndex = 0;
-  bool _tutorialPlaying = false;
+  bool _isLoading = true;
+  bool _isTutorial = false;
+  bool _isPlayer1 = false;
+  bool _isMyTurn = false;
 
-  String? get _effectiveUserId {
-    if (widget.tutorialMode) {
-      return widget.tutorialUserId ?? 'tutorial_user';
-    }
-    return _currentUser?.id;
-  }
-
-  Widget _buildTutorialControls({
-    required Color cardColor,
-    required Color borderColor,
-    required Color primaryTextColor,
-    required Color mutedTextColor,
-  }) {
-    if (!_isTutorial || _tutorialScenes.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final scene = _tutorialScenes[_tutorialSceneIndex];
-    final progress = (_tutorialSceneIndex + 1) / _tutorialScenes.length;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Tutorial walkthrough',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: primaryTextColor,
-                ),
-              ),
-              Text(
-                '${_tutorialSceneIndex + 1}/${_tutorialScenes.length}',
-                style: TextStyle(color: mutedTextColor, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(scene.description, style: TextStyle(color: primaryTextColor)),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: mutedTextColor.withValues(alpha: 0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).colorScheme.primary,
-              ),
-              minHeight: 6,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              IconButton(
-                tooltip: 'Previous step',
-                onPressed: _tutorialSceneIndex == 0
-                    ? null
-                    : () => _goToTutorialScene(-1),
-                icon: const Icon(Icons.skip_previous_rounded),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _tutorialScenes.length <= 1
-                      ? null
-                      : _playTutorialDemo,
-                  icon: Icon(
-                    _tutorialPlaying ? Icons.stop : Icons.play_arrow_rounded,
-                  ),
-                  label: Text(
-                    _tutorialPlaying ? 'Stop autoplay' : 'Play walkthrough',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: 'Next step',
-                onPressed: _tutorialSceneIndex == _tutorialScenes.length - 1
-                    ? null
-                    : () => _goToTutorialScene(1),
-                icon: const Icon(Icons.skip_next_rounded),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  bool get _isTutorial => widget.tutorialMode;
-
-  void _showInfoSnack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
+  // Matrix green color for consistent theming
+  static const Color matrixGreen = Color(0xFF00FF41);
 
   @override
   void initState() {
     super.initState();
-    _battle = widget.battle;
-    if (_isTutorial) {
-      _setupTutorialScenes();
-    } else {
-      _loadBattleDetails();
-    }
+    _isTutorial = widget.tutorialMode;
+    _loadBattle();
   }
 
-  String _currentTrickLabel() {
-    if (_isTutorial && _tutorialScenes.isNotEmpty) {
-      return _tutorialScenes[_tutorialSceneIndex].trickName;
-    }
-    // For real battles we dont yet track trick names, so show a generic hint.
-    return 'Current line: street trick in progress.';
-  }
-
-  void _setupTutorialScenes() {
-    final baseBattle = widget.battle;
-    _tutorialScenes = [
-      _TutorialScene(
-        description:
-            'Step 1 · Rock–paper–scissors! You and your opponent throw hands to decide who sets first.',
-        trickName: 'RPS to decide the opener.',
-        player1Letters: '',
-        player2Letters: '',
-        setTrickVideoUrl: null,
-        attemptVideoUrl: null,
-        verificationStatus: VerificationStatus.pending,
-        currentTurnPlayerId: baseBattle.player1Id,
-      ),
-      _TutorialScene(
-        description:
-            'Step 2 · You win RPS. You get to set first in this SK8 battle.',
-        trickName: 'Winner sets first.',
-        player1Letters: '',
-        player2Letters: '',
-        setTrickVideoUrl: null,
-        attemptVideoUrl: null,
-        verificationStatus: VerificationStatus.pending,
-        currentTurnPlayerId: baseBattle.player1Id,
-      ),
-      _TutorialScene(
-        description:
-            'Step 3 · Round 1 starts. You have 4:20 on the clock to film and upload your set trick.',
-        trickName: 'Warm-up kickflip on flat.',
-        player1Letters: '',
-        player2Letters: '',
-        setTrickVideoUrl: null,
-        attemptVideoUrl: null,
-        verificationStatus: VerificationStatus.pending,
-        currentTurnPlayerId: baseBattle.player1Id,
-      ),
-      _TutorialScene(
-        description:
-            'Step 4 · Set trick clip is up. Your opponent watches and gets ready to answer it.',
-        trickName: 'Treflip down the three stair.',
-        player1Letters: '',
-        player2Letters: '',
-        setTrickVideoUrl:
-            baseBattle.setTrickVideoUrl ??
-            baseBattle.setTrickVideoUrl ??
-            'https://example.com/tutorial_set.mp4',
-        attemptVideoUrl: null,
-        verificationStatus: VerificationStatus.pending,
-        currentTurnPlayerId: baseBattle.player2Id,
-      ),
-      _TutorialScene(
-        description:
-            'Step 5 · Your opponent has 4:20 to drop their best attempt clip.',
-        trickName: 'Nollie backside bigspin over the hip.',
-        player1Letters: '',
-        player2Letters: '',
-        setTrickVideoUrl:
-            baseBattle.setTrickVideoUrl ??
-            'https://example.com/tutorial_set.mp4',
-        attemptVideoUrl: null,
-        verificationStatus: VerificationStatus.pending,
-        currentTurnPlayerId: baseBattle.player2Id,
-      ),
-      _TutorialScene(
-        description:
-            'Step 6 · Attempt clip uploaded. Quick-Fire voting kicks in.',
-        trickName: 'Nollie backside bigspin over the hip.',
-        player1Letters: '',
-        player2Letters: '',
-        setTrickVideoUrl:
-            baseBattle.setTrickVideoUrl ??
-            'https://example.com/tutorial_set.mp4',
-        attemptVideoUrl:
-            baseBattle.attemptVideoUrl ??
-            'https://example.com/tutorial_attempt.mp4',
-        verificationStatus: VerificationStatus.quickFireVoting,
-        currentTurnPlayerId: baseBattle.player2Id,
-      ),
-      _TutorialScene(
-        description:
-            'Step 7 · Voting finishes. Your opponent misses and picks up a letter (S).',
-        trickName: 'Clean fakie heelflip on the bank.',
-        player1Letters: '',
-        player2Letters: 'S',
-        setTrickVideoUrl: null,
-        attemptVideoUrl: null,
-        verificationStatus: VerificationStatus.pending,
-        currentTurnPlayerId: baseBattle.player2Id,
-      ),
-      _TutorialScene(
-        description:
-            'Step 8 · Final exchange. Your opponent reaches SK8 and the battle ends.',
-        trickName: 'Ender: switch frontside flip on flat.',
-        player1Letters: '',
-        player2Letters: 'SK8',
-        setTrickVideoUrl: null,
-        attemptVideoUrl: null,
-        verificationStatus: VerificationStatus.resolved,
-        currentTurnPlayerId: baseBattle.player1Id,
-        winnerId: baseBattle.player1Id,
-      ),
-    ];
-    _applyTutorialScene(0, announce: false);
-  }
-
-  void _applyTutorialScene(int index, {bool announce = true}) {
-    final scene = _tutorialScenes[index];
-    setState(() {
-      _tutorialSceneIndex = index;
-      _battle = _battle.copyWith(
-        player1Letters: scene.player1Letters,
-        player2Letters: scene.player2Letters,
-        setTrickVideoUrl: scene.setTrickVideoUrl,
-        attemptVideoUrl: scene.attemptVideoUrl,
-        verificationStatus: scene.verificationStatus,
-        currentTurnPlayerId: scene.currentTurnPlayerId,
-        winnerId: scene.winnerId,
-      );
-    });
-  }
-
-  void _goToTutorialScene(int delta) {
-    final nextIndex = (_tutorialSceneIndex + delta).clamp(
-      0,
-      _tutorialScenes.length - 1,
-    );
-    if (nextIndex != _tutorialSceneIndex) {
-      _applyTutorialScene(nextIndex);
-    }
-  }
-
-  Future<void> _playTutorialDemo() async {
-    if (_tutorialPlaying) {
-      setState(() {
-        _tutorialPlaying = false;
-      });
+  Future<void> _loadBattle() async {
+    if (widget.battle != null) {
+      _initBattle(widget.battle!);
       return;
     }
 
-    setState(() {
-      _tutorialPlaying = true;
-    });
-
-    var index = _tutorialSceneIndex;
-    while (mounted && _tutorialPlaying && index < _tutorialScenes.length - 1) {
-      await Future.delayed(const Duration(seconds: 3));
-      if (!_tutorialPlaying || !mounted) break;
-      index++;
-      _applyTutorialScene(index);
-    }
-
-    if (mounted) {
-      setState(() {
-        _tutorialPlaying = false;
-      });
-    }
-  }
-
-  Future<void> _loadBattleDetails() async {
-    if (widget.tutorialMode) {
-      return;
-    }
-    try {
-      final battle = await BattleService.getBattle(_battle.id!);
-      if (battle != null) {
-        setState(() {
-          _battle = battle;
-        });
+    if (widget.battleId == null) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Battle ID is required');
+        Navigator.pop(context);
       }
+      return;
+    }
 
-      // Load Quick-Fire vote if in voting status
-      if (_battle.verificationStatus == VerificationStatus.quickFireVoting) {
-        await _loadQuickFireVote();
+    try {
+      final battle = await BattleService.getBattle(widget.battleId!);
+      if (battle != null) {
+        _initBattle(battle);
+      } else {
+        if (mounted) {
+          ErrorHelper.showError(context, 'Battle not found');
+          Navigator.pop(context);
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading battle: $e')));
+        ErrorHelper.showError(context, 'Error loading battle: $e');
+        setState(() => _isLoading = false);
       }
     }
   }
 
-  Future<void> _loadQuickFireVote() async {
-    // In a real implementation, we'd need to get the current attempt ID
-    // For now, we'll skip this
+  void _initBattle(Battle battle) {
+    if (mounted) {
+      setState(() {
+        _battle = battle;
+        final userId = widget.tutorialMode 
+            ? widget.tutorialUserId 
+            : Supabase.instance.client.auth.currentUser?.id;
+        _isPlayer1 = _battle.player1Id == userId;
+        _isMyTurn = _battle.currentTurnPlayerId == userId;
+        _isLoading = false;
+      });
+    }
   }
 
-  bool get _isPlayer1 => _battle.player1Id == _effectiveUserId;
-  bool get _isMyTurn => _battle.currentTurnPlayerId == _effectiveUserId;
+  Future<void> _uploadSetTrick() async {
+    final picker = ImagePicker();
+    final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
+    
+    if (video == null) return;
 
-  double _lettersProgress(String letters, String targetLetters) {
-    if (targetLetters.isEmpty) return 0;
-    return (letters.length / targetLetters.length).clamp(0, 1).toDouble();
+    setState(() => _isLoading = true);
+
+    try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final videoUrl = await BattleService.uploadTrickVideo(
+        File(video.path),
+        _battle.id!,
+        userId,
+        'set',
+      );
+
+      final updatedBattle = await BattleService.uploadSetTrick(
+        battleId: _battle.id!,
+        videoUrl: videoUrl,
+      );
+
+      if (updatedBattle != null && mounted) {
+        setState(() {
+          _battle = updatedBattle;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Error uploading video: $e');
+        setState(() => _isLoading = false);
+      }
+    }
   }
+
+  Future<void> _uploadAttempt() async {
+    final picker = ImagePicker();
+    final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
+    
+    if (video == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final videoUrl = await BattleService.uploadTrickVideo(
+        File(video.path),
+        _battle.id!,
+        userId,
+        'attempt',
+      );
+
+      final updatedBattle = await BattleService.uploadAttempt(
+        battleId: _battle.id!,
+        videoUrl: videoUrl,
+      );
+
+      if (updatedBattle != null && mounted) {
+        setState(() {
+          _battle = updatedBattle;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Error uploading attempt: $e');
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _noop() {}
 
   String _modeLabel(GameMode mode) {
     switch (mode) {
       case GameMode.skate:
-        return 'SKATE';
+        return 'S.K.A.T.E';
       case GameMode.sk8:
-        return 'SK8';
+        return 'S.K.8';
       case GameMode.custom:
         return 'Custom';
+    }
+  }
+
+  String _currentTrickLabel() {
+    if (_battle.setTrickVideoUrl == null) {
+      return 'Setting Trick';
+    } else if (_battle.attemptVideoUrl == null) {
+      return 'Attempting Trick';
+    } else {
+      return 'Voting';
     }
   }
 
   String _verificationLabel(VerificationStatus status) {
     switch (status) {
       case VerificationStatus.pending:
-        return 'Awaiting Attempt';
+        return 'Pending';
       case VerificationStatus.quickFireVoting:
-        return 'Quick-Fire Voting';
+        return 'Voting';
       case VerificationStatus.communityVerification:
         return 'Community Review';
       case VerificationStatus.resolved:
@@ -400,31 +195,27 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     }
   }
 
-  Widget _buildInfoChip({
-    required IconData icon,
-    required String label,
-    required Color color,
-    Color? background,
-    Color? textColor,
-  }) {
+  Widget _buildTutorialBanner() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: background ?? Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
+        color: Colors.blue.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: textColor ?? Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+          const Icon(Icons.info_outline, color: Colors.blue),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Welcome to Battle Mode! Follow the steps to play.',
+              style: TextStyle(fontSize: 14),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            onPressed: () => setState(() => _isTutorial = false),
           ),
         ],
       ),
@@ -441,88 +232,51 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     required Color progressBackgroundColor,
     required Color progressValueColor,
   }) {
-    final progress = _lettersProgress(letters, targetLetters);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: TextStyle(color: secondaryTextColor, fontSize: 14)),
-        const SizedBox(height: 4),
+        Text(
+          title,
+          style: TextStyle(
+            color: secondaryTextColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
         Text(
           letters.isEmpty ? '-' : letters,
           style: TextStyle(
             color: primaryTextColor,
-            fontSize: 32,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
+            letterSpacing: 4,
           ),
         ),
-        Text(
-          'of $targetLetters',
-          style: TextStyle(color: secondaryTextColor, fontSize: 12),
-        ),
-        const SizedBox(height: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: progress,
-            backgroundColor: progressBackgroundColor,
-            valueColor: AlwaysStoppedAnimation<Color>(
-              highlight
-                  ? progressValueColor
-                  : progressValueColor.withValues(alpha: 0.7),
-            ),
-            minHeight: 6,
-          ),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(
+          value: letters.length / targetLetters.length,
+          backgroundColor: progressBackgroundColor,
+          valueColor: AlwaysStoppedAnimation<Color>(progressValueColor),
         ),
       ],
     );
   }
 
-  Widget _buildTutorialBanner() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.green.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.green.withValues(alpha: 0.15)),
+  Widget _buildInfoChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: color),
+      label: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 12),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.psychology_alt, color: Colors.green.shade700),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tutorial Mode',
-                  style: TextStyle(
-                    color: Colors.green.shade700,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'This is a read-only preview. Uploads and votes are disabled so you can safely explore the UI.',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      backgroundColor: color.withValues(alpha: 0.1),
+      side: BorderSide.none,
     );
   }
-
-  void _noop() {}
 
   Widget _buildActionButton({
     required String label,
@@ -531,188 +285,69 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     required Color color,
     required VoidCallback onPressed,
   }) {
-    final theme = Theme.of(context);
-    final onPrimary = theme.colorScheme.onPrimary;
-    final helperColor = theme.colorScheme.onSurface.withValues(alpha: 0.7);
-    final bool isDisabled = identical(onPressed, _noop);
-
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: Opacity(
-            opacity: isDisabled ? 0.35 : 1.0,
-            child: ElevatedButton.icon(
-              onPressed: isDisabled ? null : onPressed,
-              icon: Icon(icon, size: 20),
-              label: Text(
-                label,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                foregroundColor: onPrimary,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 16,
-                  horizontal: 20,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                  side: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    width: 1.0,
-                  ),
-                ),
-                elevation: 6,
-                shadowColor: color.withValues(alpha: 0.5),
-              ),
+        ElevatedButton.icon(
+          onPressed: onPressed,
+          icon: Icon(icon),
+          label: Text(label),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
             ),
           ),
         ),
         const SizedBox(height: 8),
         Text(
           helper,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.7),
+            fontSize: 12,
+          ),
           textAlign: TextAlign.center,
-          style: TextStyle(color: helperColor, fontSize: 12),
         ),
       ],
     );
   }
 
-  Future<void> _uploadSetTrick() async {
-    if (widget.tutorialMode) {
-      _showInfoSnack('Tutorial mode: uploads are disabled.');
-      return;
-    }
-    final userId = _effectiveUserId;
-    if (userId == null) {
-      _showInfoSnack('No authenticated user found.');
-      return;
-    }
-    final picker = ImagePicker();
-    final video = await picker.pickVideo(source: ImageSource.gallery);
-
-    if (video == null) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final videoFile = File(video.path);
-      final videoUrl = await BattleService.uploadTrickVideo(
-        videoFile,
-        _battle.id!,
-        userId,
-        'set',
-      );
-
-      final updatedBattle = await BattleService.uploadSetTrick(
-        battleId: _battle.id!,
-        videoUrl: videoUrl,
-      );
-
-      if (updatedBattle != null) {
-        setState(() {
-          _battle = updatedBattle;
-        });
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Set trick uploaded!')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error uploading video: $e')));
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _uploadAttempt() async {
-    if (widget.tutorialMode) {
-      _showInfoSnack('Tutorial mode: uploads are disabled.');
-      return;
-    }
-    final userId = _effectiveUserId;
-    if (userId == null) {
-      _showInfoSnack('No authenticated user found.');
-      return;
-    }
-    final picker = ImagePicker();
-    final video = await picker.pickVideo(source: ImageSource.gallery);
-
-    if (video == null) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final videoFile = File(video.path);
-      final videoUrl = await BattleService.uploadTrickVideo(
-        videoFile,
-        _battle.id!,
-        userId,
-        'attempt',
-      );
-
-      // Create verification attempt
-      final attempt = await VerificationService.createVerificationAttempt(
-        battleId: _battle.id!,
-        attemptingPlayerId: userId,
-        attemptVideoUrl: videoUrl,
-      );
-
-      // Create Quick-Fire vote session
-      if (attempt != null && !widget.tutorialMode) {
-        await VerificationService.createQuickFireVote(
-          attemptId: attempt.id!,
-          player1Id: _battle.player1Id,
-          player2Id: _battle.player2Id,
-        );
-      }
-
-      final updatedBattle = await BattleService.uploadAttempt(
-        battleId: _battle.id!,
-        videoUrl: videoUrl,
-      );
-
-      if (updatedBattle != null) {
-        setState(() {
-          _battle = updatedBattle;
-        });
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Attempt uploaded! Waiting for votes...'),
+  Widget _buildTutorialControls({
+    required Color cardColor,
+    required Color borderColor,
+    required Color primaryTextColor,
+    required Color mutedTextColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'How to Play',
+            style: TextStyle(
+              color: primaryTextColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
           ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error uploading attempt: $e')));
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+          const SizedBox(height: 8),
+          Text(
+            '1. Set a trick by uploading a video.\n'
+            '2. Opponent attempts the trick.\n'
+            '3. Vote on the attempt.\n'
+            '4. If they miss, they get a letter.',
+            style: TextStyle(color: mutedTextColor, height: 1.5),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -720,6 +355,15 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDarkMode = theme.brightness == Brightness.dark;
+    
+    // Ensure battle is loaded before accessing properties
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Loading...')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final myLetters = _isPlayer1
         ? _battle.player1Letters
         : _battle.player2Letters;
@@ -751,9 +395,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
         centerTitle: true,
         elevation: 0,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -930,6 +572,74 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
+                        // Bet and Timer Display
+                        if (_battle.betAmount > 0) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: matrixGreen.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: matrixGreen.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Bet: ${_battle.betAmount} pts (pot: ${_battle.betAmount * 2} pts)',
+                                  style: const TextStyle(
+                                    color: matrixGreen,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                                if (!_battle.betAccepted && !_isMyTurn) ...[
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      setState(() => _isLoading = true);
+                                      try {
+                                        final userId = Supabase.instance.client.auth.currentUser!.id;
+                                        await BattleService.acceptBet(
+                                          battleId: _battle.id!,
+                                          opponentId: userId,
+                                          betAmount: _battle.betAmount,
+                                        );
+                                        final refreshed = await BattleService.getBattle(_battle.id!);
+                                        if (refreshed != null && mounted) {
+                                          setState(() {
+                                            _battle = refreshed;
+                                            _isLoading = false;
+                                          });
+                                        }
+                                      } catch (e) {
+                                        if (mounted) {
+                                          ErrorHelper.showError(context, 'Failed to accept bet: $e');
+                                          setState(() => _isLoading = false);
+                                        }
+                                      }
+                                    },
+                                    icon: const Icon(Icons.check_circle),
+                                    label: const Text('Accept Bet'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.amber,
+                                      foregroundColor: Colors.black,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Timer countdown
+                          if (_battle.turnDeadline != null) ...[
+                            Text(
+                              'Time left: ${_formatDuration(_battle.getRemainingTime())}',
+                              style: TextStyle(
+                                color: matrixGreen.withOpacity(0.8),
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ],
+                        ],
                         Builder(
                           builder: (context) {
                             final bool canUploadSet =
@@ -993,5 +703,18 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
               ),
             ),
     );
+  }
+
+  // Helper method to format duration
+  String _formatDuration(Duration? duration) {
+    if (duration == null) return '';
+    if (duration.inHours > 0) {
+      final h = duration.inHours;
+      final m = duration.inMinutes % 60;
+      return '${h}h ${m}m';
+    }
+    final m = duration.inMinutes;
+    final s = duration.inSeconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }

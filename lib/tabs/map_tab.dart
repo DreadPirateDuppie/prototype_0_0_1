@@ -8,6 +8,7 @@ import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
 import '../widgets/ad_banner.dart';
 import '../utils/error_helper.dart';
+import 'feed_tab.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -26,6 +27,9 @@ class _MapTabState extends State<MapTab> {
   bool _isPinMode = false;
   bool _isSharingLocation = false; // Slider state
 
+  String _selectedCategory = 'All';
+  final List<String> _categories = ['All', 'Street', 'Park', 'DIY', 'Shop', 'Other'];
+
   @override
   void initState() {
     super.initState();
@@ -38,8 +42,10 @@ class _MapTabState extends State<MapTab> {
 
   Future<void> _loadUserPosts() async {
     try {
-      // Load ALL posts from ALL users, not just current user's posts
-      final posts = await SupabaseService.getAllMapPosts();
+      // Load posts with filter
+      final posts = await SupabaseService.getAllMapPosts(
+        category: _selectedCategory == 'All' ? null : _selectedCategory,
+      );
       if (mounted) {
         setState(() {
           userPosts = posts;
@@ -64,6 +70,51 @@ class _MapTabState extends State<MapTab> {
       // Silently fail
     }
   }
+
+  void _showFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Filter Map'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Category'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: _categories.map((category) {
+                final isSelected = _selectedCategory == category;
+                return FilterChip(
+                  label: Text(category),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() {
+                        _selectedCategory = category;
+                      });
+                      _loadUserPosts();
+                      Navigator.pop(context);
+                    }
+                  },
+                  selectedColor: Theme.of(context).colorScheme.primaryContainer,
+                  checkmarkColor: Theme.of(context).colorScheme.primary,
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   void _addUserPostMarkers() {
     for (final post in userPosts) {
@@ -102,9 +153,7 @@ class _MapTabState extends State<MapTab> {
             _isSharingLocation = false; // Turn off slider if denied
           });
           if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location permission permanently denied. Please enable in settings.')),
-            );
+             ErrorHelper.showError(context, 'Location permission permanently denied. Please enable in settings.');
           }
           return;
       }
@@ -402,6 +451,20 @@ class _MapTabState extends State<MapTab> {
                       children: [
                         FloatingActionButton(
                           mini: true,
+                          heroTag: 'search',
+                          onPressed: () {
+                            showSearch(
+                              context: context,
+                              delegate: PostSearchDelegate(userPosts),
+                            );
+                          },
+                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          foregroundColor: Theme.of(context).colorScheme.primary,
+                          child: const Icon(Icons.search),
+                        ),
+                        const SizedBox(height: 8),
+                        FloatingActionButton(
+                          mini: true,
                           onPressed: () {
                             mapController.move(
                               mapController.camera.center,
@@ -451,5 +514,85 @@ class _MapTabState extends State<MapTab> {
   void dispose() {
     mapController.dispose();
     super.dispose();
+  }
+}
+
+class PostSearchDelegate extends SearchDelegate<MapPost?> {
+  final List<MapPost> posts;
+
+  PostSearchDelegate(this.posts);
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, null);
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    final results = posts.where((post) {
+      final title = post.title.toLowerCase();
+      final description = post.description.toLowerCase();
+      final searchLower = query.toLowerCase();
+      return title.contains(searchLower) || description.contains(searchLower);
+    }).toList();
+
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final post = results[index];
+        return ListTile(
+          title: Text(post.title),
+          subtitle: Text(post.description),
+          onTap: () {
+            close(context, post);
+            // Navigate to post location
+            // This requires a callback or access to map controller, 
+            // but for now we just close. 
+            // Ideally we'd return the post and handle it in MapTab.
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    final results = posts.where((post) {
+      final title = post.title.toLowerCase();
+      final description = post.description.toLowerCase();
+      final searchLower = query.toLowerCase();
+      return title.contains(searchLower) || description.contains(searchLower);
+    }).toList();
+
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final post = results[index];
+        return ListTile(
+          title: Text(post.title),
+          subtitle: Text(post.description),
+          onTap: () {
+            close(context, post);
+          },
+        );
+      },
+    );
   }
 }
