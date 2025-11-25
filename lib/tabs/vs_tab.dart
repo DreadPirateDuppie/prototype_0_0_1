@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 import '../models/battle.dart';
-import '../services/battle_service.dart';
+import '../providers/battle_provider.dart';
 import '../screens/battle_detail_screen.dart';
 import '../screens/create_battle_dialog.dart';
 import '../screens/community_verification_screen.dart';
@@ -17,8 +18,6 @@ class VsTab extends StatefulWidget {
 }
 
 class _VsTabState extends State<VsTab> {
-  List<Battle> _battles = [];
-  bool _isLoading = true;
   final _currentUser = Supabase.instance.client.auth.currentUser;
 
   // Matrix theme colors
@@ -34,24 +33,9 @@ class _VsTabState extends State<VsTab> {
   Future<void> _loadBattles() async {
     if (_currentUser == null) return;
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final battles = await BattleService.getActiveBattles(_currentUser.id);
-      setState(() {
-        _battles = battles;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ErrorHelper.showError(context, 'Error loading battles: $e');
-      }
-    }
+    // Use the BattleProvider to load battles
+    final provider = context.read<BattleProvider>();
+    await provider.loadBattles(_currentUser.id);
   }
 
   String _getGameModeDisplay(GameMode mode) {
@@ -562,109 +546,124 @@ class _VsTabState extends State<VsTab> {
     const matrixGreen = Color(0xFF00FF41);
     const matrixBlack = Color(0xFF000000);
     
-    return Scaffold(
-      backgroundColor: matrixBlack,
-      appBar: AppBar(
-        title: const Text(
-          'VS BATTLES',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
-            fontFamily: 'monospace',
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: matrixBlack,
-        foregroundColor: matrixGreen,
-        elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.transparent,
-                  matrixGreen.withOpacity(0.5),
-                  Colors.transparent,
-                ],
+    return Consumer<BattleProvider>(
+      builder: (context, battleProvider, child) {
+        final battles = battleProvider.activeBattles;
+        final isLoading = battleProvider.isLoading;
+        
+        // Show error if any
+        if (battleProvider.hasError) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ErrorHelper.showError(context, battleProvider.error ?? 'Unknown error');
+            battleProvider.clearError();
+          });
+        }
+        
+        return Scaffold(
+          backgroundColor: matrixBlack,
+          appBar: AppBar(
+            title: const Text(
+              'VS BATTLES',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+                fontFamily: 'monospace',
               ),
             ),
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.verified_user),
-            tooltip: 'Community Verification',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CommunityVerificationScreen(),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          const AdBanner(),
-          Expanded(
-            child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      color: matrixGreen,
-                      strokeWidth: 3,
-                    ),
-                  )
-                : RefreshIndicator(
-                    color: matrixGreen,
-                    backgroundColor: matrixBlack,
-                    onRefresh: _loadBattles,
-                    child: ListView.builder(
-                      itemCount: _battles.length + 1, // +1 for tutorial
-                      itemBuilder: (context, index) {
-                        // First item is the tutorial battle
-                        if (index == 0) {
-                          return _buildTutorialBattleCard();
-                        }
-                        // Remaining items are real battles
-                        return _buildBattleCard(_battles[index - 1]);
-                      },
-                    ),
+            centerTitle: true,
+            backgroundColor: matrixBlack,
+            foregroundColor: matrixGreen,
+            elevation: 0,
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      matrixGreen.withOpacity(0.5),
+                      Colors.transparent,
+                    ],
                   ),
-          ),
-        ],
-      ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: matrixGreen.withOpacity(0.4),
-              blurRadius: 20,
-              spreadRadius: 2,
+                ),
+              ),
             ),
-          ],
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: () async {
-            final result = await showDialog<bool>(
-              context: context,
-              builder: (context) => const CreateBattleDialog(),
-            );
-            if (result == true) {
-              _loadBattles();
-            }
-          },
-          backgroundColor: matrixBlack,
-          foregroundColor: matrixGreen,
-          elevation: 0,
-          label: const Text('New Battle'),
-          icon: const Icon(Icons.add),
-        ),
-      ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.verified_user),
+                tooltip: 'Community Verification',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CommunityVerificationScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          body: Column(
+            children: [
+              const AdBanner(),
+              Expanded(
+                child: isLoading
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          color: matrixGreen,
+                          strokeWidth: 3,
+                        ),
+                      )
+                    : RefreshIndicator(
+                        color: matrixGreen,
+                        backgroundColor: matrixBlack,
+                        onRefresh: _loadBattles,
+                        child: ListView.builder(
+                          itemCount: battles.length + 1, // +1 for tutorial
+                          itemBuilder: (context, index) {
+                            // First item is the tutorial battle
+                            if (index == 0) {
+                              return _buildTutorialBattleCard();
+                            }
+                            // Remaining items are real battles
+                            return _buildBattleCard(battles[index - 1]);
+                          },
+                        ),
+                      ),
+              ),
+            ],
+          ),
+          floatingActionButton: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: matrixGreen.withOpacity(0.4),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: FloatingActionButton.extended(
+              onPressed: () async {
+                final result = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => const CreateBattleDialog(),
+                );
+                if (result == true) {
+                  _loadBattles();
+                }
+              },
+              backgroundColor: matrixBlack,
+              foregroundColor: matrixGreen,
+              elevation: 0,
+              label: const Text('New Battle'),
+              icon: const Icon(Icons.add),
+            ),
+          ),
+        );
+      },
     );
   }
 

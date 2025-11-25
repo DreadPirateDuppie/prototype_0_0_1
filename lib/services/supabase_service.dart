@@ -4,6 +4,9 @@ import 'dart:developer' as developer;
 import 'dart:async' as async;
 import '../models/post.dart';
 import 'error_types.dart';
+import 'admin_service.dart';
+import 'user_service.dart';
+import 'points_service.dart';
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -18,125 +21,38 @@ class SupabaseService {
     return _client.auth.currentSession;
   }
 
-  // Get user display name
+  // Get user display name - delegates to UserService
   static Future<String?> getUserDisplayName(String userId) async {
-    try {
-      final response = await _client
-          .from('user_profiles')
-          .select('display_name')
-          .eq('id', userId)
-          .maybeSingle();
-      return response?['display_name'];
-    } catch (e) {
-      developer.log('Error getting display name: $e', name: 'SupabaseService');
-      // Silently fail - table may not exist yet
-      return null;
-    }
+    final userService = UserService();
+    return userService.getUserDisplayName(userId);
   }
 
-  // Get current user display name with fallback
+  // Get current user display name with fallback - delegates to UserService
   static Future<String?> getCurrentUserDisplayName() async {
-    final user = getCurrentUser();
-    if (user == null) return null;
-
-    // Try to get from user metadata first
-    var displayName = user.userMetadata?['display_name'] as String?;
-    if (displayName != null && displayName.isNotEmpty) {
-      return displayName;
-    }
-
-    // Try to get from user_profiles table
-    displayName = await getUserDisplayName(user.id);
-    if (displayName != null && displayName.isNotEmpty) {
-      return displayName;
-    }
-
-    // Fallback to email prefix
-    return user.email?.split('@').first ?? 'User';
+    final userService = UserService();
+    return userService.getCurrentUserDisplayName();
   }
 
-  // Get user username
+  // Get user username - delegates to UserService
   static Future<String?> getUserUsername(String userId) async {
-    try {
-      final response = await _client
-          .from('user_profiles')
-          .select('username')
-          .eq('id', userId)
-          .maybeSingle();
-      return response?['username'];
-    } catch (e) {
-      return null;
-    }
+    final userService = UserService();
+    return userService.getUserUsername(userId);
   }
 
-  // Get user avatar URL
+  // Get user avatar URL - delegates to UserService
   static Future<String?> getUserAvatarUrl(String userId) async {
-    try {
-      final response = await _client
-          .from('user_profiles')
-          .select('avatar_url')
-          .eq('id', userId)
-          .maybeSingle();
-      return response?['avatar_url'];
-    } catch (e) {
-      return null;
-    }
+    final userService = UserService();
+    return userService.getUserAvatarUrl(userId);
   }
 
   /// Checks if the current user has admin privileges.
+  /// Delegates to AdminService for consistent admin checking.
   /// Returns false if the user is not logged in, the user profile doesn't exist,
   /// or if there's any error during the check.
   static Future<bool> isCurrentUserAdmin() async {
-    try {
-      final user = getCurrentUser();
-      if (user == null) {
-        developer.log('User not logged in', name: 'AdminCheck');
-        return false;
-      }
-
-      // First, check if the user is the hardcoded admin (if needed)
-      if (user.email == 'admin@example.com' || user.email == '123@123.com') {
-        // Change this to your admin email
-        developer.log('User is hardcoded admin', name: 'AdminCheck');
-        return true;
-      }
-
-      // Check the user_profiles table for admin status
-      developer.log(
-        'Checking admin status for user: ${user.email} (${user.id})',
-        name: 'AdminCheck',
-      );
-
-      final response = await _client
-          .from('user_profiles')
-          .select('is_admin')
-          .eq('id', user.id)
-          .maybeSingle()
-          .timeout(const Duration(seconds: 5));
-
-      final isAdmin = response?['is_admin'] == true;
-      developer.log(
-        'Database admin status for ${user.email}: $isAdmin',
-        name: 'AdminCheck',
-      );
-      return isAdmin;
-    } on PostgrestException catch (e) {
-      developer.log(
-        'Database error checking admin status: ${e.message}',
-        name: 'AdminCheck',
-        error: e,
-        stackTrace: StackTrace.current,
-      );
-      return false;
-    } catch (e, stackTrace) {
-      developer.log(
-        'Error checking admin status',
-        name: 'AdminCheck',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return false;
-    }
+    // Delegate to AdminService to avoid duplicate logic
+    final adminService = AdminService();
+    return adminService.isCurrentUserAdmin();
   }
 
   // Check if username is available
@@ -315,34 +231,10 @@ class SupabaseService {
   }
 
   // Upload profile image
+  // Upload profile image - delegates to UserService
   static Future<String> uploadProfileImage(File imageFile, String userId) async {
-    try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final filename = 'profiles/avatar_${userId}_$timestamp.jpg';
-
-      final bytes = await imageFile.readAsBytes();
-      await _client.storage
-          .from('post_images')
-          .uploadBinary(
-            filename,
-            bytes,
-            fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
-          );
-
-      final publicUrl = _client.storage
-          .from('post_images')
-          .getPublicUrl(filename);
-
-      // Update user profile with new avatar URL
-      await _client.from('user_profiles').upsert({
-        'id': userId,
-        'avatar_url': publicUrl,
-      });
-
-      return publicUrl;
-    } catch (e) {
-      throw Exception('Failed to upload profile image: $e');
-    }
+    final userService = UserService();
+    return userService.uploadProfileImage(imageFile, userId);
   }
 
   // Create a map post
@@ -419,45 +311,10 @@ class SupabaseService {
   }
 
   // Recalculate user XP based on posts and votes
+  // Recalculate user XP - delegates to PointsService
   static Future<void> recalculateUserXP(String userId) async {
-    try {
-      // 1. Count user's posts
-      final postsResponse = await _client
-          .from('map_posts')
-          .select('id, likes')
-          .eq('user_id', userId);
-      
-      final posts = (postsResponse as List).cast<Map<String, dynamic>>();
-      final postCount = posts.length;
-      
-      // 2. Calculate XP from posts (100 XP per post)
-    double xpFromPosts = postCount * 100.0;
-      
-      // 3. Calculate XP from upvotes received (1 XP per upvote)
-      // Note: 'likes' column in map_posts is a simple counter, but for accuracy 
-      // we should ideally count positive votes in post_votes table.
-      // For now, we'll use the 'likes' counter as it's faster and simpler.
-      // If we want to be strict about "upvotes only", we'd query post_votes.
-      // Let's stick to the simple 'likes' count for now as it aligns with current logic.
-      double xpFromVotes = 0;
-      for (var post in posts) {
-        xpFromVotes += (post['likes'] as num? ?? 0).toDouble();
-      }
-      
-      // 4. Total Map Score
-      final totalMapScore = xpFromPosts + xpFromVotes;
-      
-      // 5. Update user_scores
-      await _client.from('user_scores').upsert({
-        'user_id': userId,
-        'map_score': totalMapScore,
-      });
-      
-      developer.log('Recalculated XP for $userId: $totalMapScore ($postCount posts, $xpFromVotes votes)', name: 'SupabaseService');
-    } catch (e) {
-      developer.log('Error recalculating XP: $e', name: 'SupabaseService');
-      throw Exception('Failed to recalculate XP: $e');
-    }
+    final pointsService = PointsService();
+    return pointsService.recalculateUserXP(userId);
   }
 
   // Get all map posts with optional filters

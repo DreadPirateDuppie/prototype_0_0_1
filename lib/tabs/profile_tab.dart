@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
-import '../services/battle_service.dart';
 import '../models/post.dart';
 import '../models/user_scores.dart';
 import '../screens/edit_post_dialog.dart';
 import '../screens/edit_username_dialog.dart';
 import '../widgets/star_rating_display.dart';
 import '../widgets/mini_map_snapshot.dart';
+import '../widgets/user_stats_card.dart';
+import '../providers/user_provider.dart';
 import 'settings_tab.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -23,9 +25,6 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateMixin {
   late Future<List<MapPost>> _userPostsFuture;
-  late Future<String?> _usernameFuture;
-  late Future<String?> _avatarUrlFuture;
-  late Future<UserScores> _userScoresFuture;
   late TabController _tabController;
   bool _isStatsExpanded = true;
   bool _isUploadingImage = false;
@@ -35,28 +34,23 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     
-    // Initialize futures immediately to prevent LateInitializationError
+    // Initialize posts future
     final user = SupabaseService.getCurrentUser();
     if (user != null) {
       _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
-      _usernameFuture = SupabaseService.getUserUsername(user.id);
-      _avatarUrlFuture = SupabaseService.getUserAvatarUrl(user.id);
-      _userScoresFuture = BattleService.getUserScores(user.id);
     } else {
-      // Fallback for no user (shouldn't happen in this tab usually)
       _userPostsFuture = Future.value([]);
-      _usernameFuture = Future.value('Guest');
-      _avatarUrlFuture = Future.value(null);
-      _userScoresFuture = Future.value(UserScores(
-        userId: '',
-        mapScore: 0,
-        playerScore: 0,
-        rankingScore: 500,
-      ));
     }
     
-    // Then trigger a refresh to ensure data is up to date (including XP recalculation)
-    _refreshAll();
+    // Initialize user provider after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      if (userProvider.currentUser == null) {
+        userProvider.initialize();
+      } else {
+        userProvider.loadUserProfile();
+      }
+    });
   }
 
   @override
@@ -68,15 +62,14 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
   Future<void> _refreshAll() async {
     final user = SupabaseService.getCurrentUser();
     if (user != null) {
-      // Recalculate XP to ensure stats are up to date
-      await SupabaseService.recalculateUserXP(user.id);
+      // Refresh user provider (handles XP recalculation)
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      await userProvider.refreshScores();
       
+      // Refresh posts
       if (mounted) {
         setState(() {
           _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
-          _usernameFuture = SupabaseService.getUserUsername(user.id);
-          _avatarUrlFuture = SupabaseService.getUserAvatarUrl(user.id);
-          _userScoresFuture = BattleService.getUserScores(user.id);
         });
       }
     }
@@ -94,8 +87,10 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
       try {
         final user = SupabaseService.getCurrentUser();
         if (user != null) {
-          await SupabaseService.uploadProfileImage(File(pickedFile.path), user.id);
-          await _refreshAll();
+          final newUrl = await SupabaseService.uploadProfileImage(File(pickedFile.path), user.id);
+          // Update provider with new avatar URL
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          userProvider.updateAvatarUrl(newUrl);
           widget.onProfileUpdated?.call(); // Notify parent to refresh nav bar
         }
       } catch (e) {
@@ -117,10 +112,9 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
       context: context,
       builder: (context) => EditUsernameDialog(
         currentUsername: currentUsername,
-        onUsernameSaved: (newUsername) {
-          setState(() {
-            _usernameFuture = SupabaseService.getUserUsername(SupabaseService.getCurrentUser()!.id);
-          });
+        onUsernameSaved: (newUsername) async {
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          await userProvider.updateUsername(newUsername);
           widget.onProfileUpdated?.call();
         },
       ),
@@ -243,283 +237,12 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildScoreCard(String label, double score, Color color, {String? subtitle, bool isXP = false, int? level, double? levelProgress, double? xpForNextLevel}) {
-    // For XP scores, use progressive leveling
-    // For traditional scores, show progress out of 1000
-    final double progress;
-    final String displayValue;
-    String? progressSubtitle;
-    
-    if (isXP && level != null && levelProgress != null && xpForNextLevel != null) {
-      // XP system: use progressive leveling
-      progress = levelProgress;
-      displayValue = 'Lvl $level • ${score.toStringAsFixed(0)} XP';
-      final xpNeeded = (xpForNextLevel - score).toStringAsFixed(0);
-      progressSubtitle = '$xpNeeded XP to Lvl ${level + 1}';
-    } else {
-      // Traditional scoring (0-1000)
-      progress = score / 1000.0;
-      displayValue = score.toStringAsFixed(0);
-    }
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                // color: Colors.black87,
-              ),
-            ),
-            Text(
-              displayValue,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: progress,
-            backgroundColor: Theme.of(context).dividerColor.withValues(alpha: 0.1),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 6,
-          ),
-        ),
-        if (progressSubtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            progressSubtitle,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: color.withValues(alpha: 0.8),
-            ),
-          ),
-        ],
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 11,
-              color: Theme.of(context).textTheme.bodySmall?.color,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
+  // Stats section now uses the extracted UserStatsCard widget
   Widget _buildStatsSection(UserScores scores) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Theme.of(context).brightness == Brightness.dark 
-                ? Colors.green.shade900.withValues(alpha: 0.2) 
-                : Colors.green.shade50,
-            Theme.of(context).brightness == Brightness.dark 
-                ? Colors.green.shade900.withValues(alpha: 0.1) 
-                : Colors.lightGreen.shade50,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.green.withValues(alpha: 0.2),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isStatsExpanded = !_isStatsExpanded;
-              });
-            },
-            child: Row(
-              children: [
-                Icon(
-                  Icons.analytics_outlined,
-                  color: Colors.green.shade700,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Your Stats',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green.shade700,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: Icon(
-                    Icons.info_outline,
-                    size: 18,
-                    color: Colors.green.shade600,
-                  ),
-                  onPressed: _showStatsInfo,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Learn about stats',
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade700,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'Private',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  _isStatsExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                  color: Colors.green.shade700,
-                ),
-              ],
-            ),
-          ),
-          AnimatedCrossFade(
-            firstChild: Container(),
-            secondChild: Column(
-              children: [
-                const SizedBox(height: 16),
-                _buildScoreCard(
-                  'Spotter Lvl',
-                  scores.mapScore,
-                  Colors.green.shade600,
-                  subtitle: 'XP from map contributions',
-                  isXP: true,
-                  level: scores.mapLevel,
-                  levelProgress: scores.mapLevelProgress,
-                  xpForNextLevel: scores.mapXPForNextLevel,
-                ),
-                const SizedBox(height: 12),
-                _buildScoreCard(
-                  'VS Lvl',
-                  scores.playerScore,
-                  Colors.blue.shade600,
-                  subtitle: 'XP from battle performance',
-                  isXP: true,
-                  level: scores.playerLevel,
-                  levelProgress: scores.playerLevelProgress,
-                  xpForNextLevel: scores.playerXPForNextLevel,
-                ),
-                const SizedBox(height: 12),
-                _buildScoreCard(
-                  'Ranking Score',
-                  scores.rankingScore,
-                  Colors.orange.shade600,
-                  subtitle: 'Voting accuracy (500-1000)',
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.green.withValues(alpha: 0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Final Score',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context).textTheme.bodySmall?.color,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            scores.finalScore.toStringAsFixed(1),
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        height: 40,
-                        width: 1,
-                        color: Theme.of(context).dividerColor,
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Vote Weight',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context).textTheme.bodySmall?.color,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${(scores.voteWeight * 100).toStringAsFixed(1)}%',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            crossFadeState: _isStatsExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 300),
-          ),
-        ],
-      ),
+    return UserStatsCard(
+      scores: scores,
+      initiallyExpanded: _isStatsExpanded,
+      onInfoPressed: _showStatsInfo,
     );
   }
 
@@ -678,33 +401,35 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final user = SupabaseService.getCurrentUser();
 
-    return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            SliverAppBar(
-              expandedHeight: 380.0,
-              floating: false,
-              pinned: true,
-              backgroundColor: Colors.green,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white),
-                  onPressed: _refreshAll,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings, color: Colors.white),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsTab(),
-                      ),
-                    );
-                  },
-                ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        return Scaffold(
+          body: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverAppBar(
+                  expandedHeight: 380.0,
+                  floating: false,
+                  pinned: true,
+                  backgroundColor: Colors.green,
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Colors.white),
+                      onPressed: _refreshAll,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.settings, color: Colors.white),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SettingsTab(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                  flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -739,9 +464,8 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                                   ),
                                 ],
                               ),
-                              child: FutureBuilder<String?>(
-                                future: _avatarUrlFuture,
-                                builder: (context, snapshot) {
+                              child: Builder(
+                                builder: (context) {
                                   if (_isUploadingImage) {
                                     return CircleAvatar(
                                       radius: 50,
@@ -750,10 +474,10 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                                     );
                                   }
                                   
-                                  if (snapshot.hasData && snapshot.data != null) {
+                                  if (userProvider.avatarUrl != null) {
                                     return CircleAvatar(
                                       radius: 50,
-                                      backgroundImage: NetworkImage(snapshot.data!),
+                                      backgroundImage: NetworkImage(userProvider.avatarUrl!),
                                       backgroundColor: Colors.green.shade200,
                                     );
                                   }
@@ -794,32 +518,26 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Username
-                      FutureBuilder<String?>(
-                        future: _usernameFuture,
-                        builder: (context, snapshot) {
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                snapshot.data ?? 'Loading...',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  // color: Colors.black87,
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.edit, size: 20, color: Colors.grey),
-                                onPressed: () {
-                                  _usernameFuture.then((username) {
-                                    _editUsername(username ?? '');
-                                  });
-                                },
-                              ),
-                            ],
-                          );
-                        },
+                      // Username - now from UserProvider
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            userProvider.isLoading 
+                                ? 'Loading...' 
+                                : userProvider.displayName,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 20, color: Colors.grey),
+                            onPressed: () {
+                              _editUsername(userProvider.username ?? '');
+                            },
+                          ),
+                        ],
                       ),
                       // Bio / Email
                       Text(
@@ -859,20 +577,19 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                 ],
               ),
             ),
-            // User Stats Section (Scrollable)
+            // User Stats Section (Scrollable) - now from UserProvider
             SliverToBoxAdapter(
-              child: FutureBuilder<UserScores>(
-                future: _userScoresFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+              child: Builder(
+                builder: (context) {
+                  if (userProvider.isLoading) {
                     return Container(
                       margin: const EdgeInsets.all(16),
                       padding: const EdgeInsets.all(24),
                       child: const Center(child: CircularProgressIndicator()),
                     );
                   }
-                  if (snapshot.hasData) {
-                    return _buildStatsSection(snapshot.data!);
+                  if (userProvider.userScores != null) {
+                    return _buildStatsSection(userProvider.userScores!);
                   }
                   return const SizedBox.shrink();
                 },
@@ -983,6 +700,8 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
           ],
         ),
       ),
+    );
+      },
     );
   }
 
