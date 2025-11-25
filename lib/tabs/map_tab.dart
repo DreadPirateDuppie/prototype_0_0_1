@@ -8,7 +8,6 @@ import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
 import '../widgets/ad_banner.dart';
 import '../utils/error_helper.dart';
-import 'feed_tab.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -27,7 +26,7 @@ class _MapTabState extends State<MapTab> {
   bool _isPinMode = false;
   bool _isSharingLocation = false; // Slider state
 
-  String _selectedCategory = 'All';
+  final String _selectedCategory = 'All';
   final List<String> _categories = ['All', 'Street', 'Park', 'DIY', 'Shop', 'Other'];
 
   @override
@@ -71,49 +70,7 @@ class _MapTabState extends State<MapTab> {
     }
   }
 
-  void _showFilterDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter Map'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Category'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: _categories.map((category) {
-                final isSelected = _selectedCategory == category;
-                return FilterChip(
-                  label: Text(category),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() {
-                        _selectedCategory = category;
-                      });
-                      _loadUserPosts();
-                      Navigator.pop(context);
-                    }
-                  },
-                  selectedColor: Theme.of(context).colorScheme.primaryContainer,
-                  checkmarkColor: Theme.of(context).colorScheme.primary,
-                );
-              }).toList(),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
+
 
 
   void _addUserPostMarkers() {

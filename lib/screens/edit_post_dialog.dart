@@ -38,8 +38,8 @@ class _EditPostDialogState extends State<EditPostDialog> {
     super.initState();
     _titleController = TextEditingController(text: widget.post.title);
     _descriptionController = TextEditingController(text: widget.post.description);
-    _tagsController = TextEditingController(text: widget.post.tags?.join(', ') ?? '');
-    _selectedCategory = widget.post.category ?? 'Street';
+    _tagsController = TextEditingController(text: widget.post.tags.join(', '));
+    _selectedCategory = widget.post.category;
     if (!_categories.contains(_selectedCategory)) {
       _selectedCategory = 'Other';
     }
@@ -164,17 +164,17 @@ class _EditPostDialogState extends State<EditPostDialog> {
                 style: const TextStyle(color: matrixGreen),
                 decoration: InputDecoration(
                   labelText: 'Title',
-                  labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
+                  labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
                   hintText: 'Enter post title',
-                  hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                  hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                    borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: matrixGreen, width: 2),
                   ),
                   border: OutlineInputBorder(
-                    borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                    borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                   ),
                 ),
                 maxLines: 1,
@@ -329,7 +329,7 @@ class _EditPostDialogState extends State<EditPostDialog> {
                     child: Text(
                       'CANCEL',
                       style: TextStyle(
-                        color: matrixGreen.withOpacity(0.7),
+                        color: matrixGreen.withValues(alpha: 0.7),
                         fontFamily: 'monospace',
                       ),
                     ),
@@ -340,7 +340,7 @@ class _EditPostDialogState extends State<EditPostDialog> {
                       border: Border.all(color: matrixGreen, width: 2),
                       boxShadow: [
                         BoxShadow(
-                          color: matrixGreen.withOpacity(0.3),
+                          color: matrixGreen.withValues(alpha: 0.3),
                           blurRadius: 8,
                         ),
                       ],

@@ -1,7 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'dart:developer' as developer;
+import 'dart:async' as async;
 import '../models/post.dart';
+import 'error_types.dart';
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -169,11 +171,20 @@ class SupabaseService {
   // Save user username (with uniqueness constraint)
   static Future<void> saveUserUsername(String userId, String username) async {
     try {
+      // Update user profile
       await _client.from('user_profiles').upsert({
         'id': userId,
         'username': username.toLowerCase().trim(),
         'display_name': username.trim(), // Also update display name for consistency
       });
+      
+      // Update all posts by this user to reflect the new username
+      await _client
+          .from('map_posts')
+          .update({'user_name': username.trim()})
+          .eq('user_id', userId);
+          
+      developer.log('Updated username for user $userId and all their posts', name: 'SupabaseService');
     } catch (e) {
       throw Exception('Failed to save username: $e');
     }
@@ -205,8 +216,28 @@ class SupabaseService {
         password: password,
       );
       return response;
+    } on AuthException catch (e) {
+      throw AppAuthException(
+        'Authentication failed: ${e.message}',
+        userMessage: 'Invalid email or password. Please try again.',
+        originalError: e,
+      );
+    } on SocketException catch (e) {
+      throw AppNetworkException(
+        'Network error during sign in',
+        originalError: e,
+      );
+    } on async.TimeoutException catch (e) {
+      throw AppTimeoutException(
+        'Sign in request timed out',
+        originalError: e,
+      );
     } catch (e) {
-      rethrow;
+      throw AppAuthException(
+        'Sign in failed: $e',
+        userMessage: 'Unable to sign in. Please check your credentials and try again.',
+        originalError: e,
+      );
     }
   }
 
@@ -214,8 +245,17 @@ class SupabaseService {
   static Future<bool> signInWithGoogle() async {
     try {
       return await _client.auth.signInWithOAuth(OAuthProvider.google);
+    } on SocketException catch (e) {
+      throw AppNetworkException(
+        'Network error during Google sign in',
+        originalError: e,
+      );
     } catch (e) {
-      throw Exception('Google Sign-In failed: $e');
+      throw AppAuthException(
+        'Google Sign-In failed: $e',
+        userMessage: 'Unable to sign in with Google. Please try again.',
+        originalError: e,
+      );
     }
   }
 
@@ -248,8 +288,29 @@ class SupabaseService {
           .from('post_images')
           .getPublicUrl(filename);
       return publicUrl;
+    } on SocketException catch (e) {
+      throw AppNetworkException(
+        'Network error during image upload',
+        originalError: e,
+      );
+    } on async.TimeoutException catch (e) {
+      throw AppTimeoutException(
+        'Image upload timed out',
+        userMessage: 'Upload is taking too long. Please check your connection and try again.',
+        originalError: e,
+      );
+    } on FileSystemException catch (e) {
+      throw AppStorageException(
+        'File system error: $e',
+        userMessage: 'Unable to read the image file. Please try selecting it again.',
+        originalError: e,
+      );
     } catch (e) {
-      throw Exception('Failed to upload image: $e');
+      throw AppStorageException(
+        'Failed to upload image: $e',
+        userMessage: 'Image upload failed. Please try again.',
+        originalError: e,
+      );
     }
   }
 
@@ -292,18 +353,22 @@ class SupabaseService {
     required String title,
     required String description,
     String? photoUrl,
-    String? userName,
-    String? userEmail,
+    String? userName,  // Deprecated - will fetch from user_profiles
+    String? userEmail,  // Deprecated - will fetch from user
     String category = 'Other',
     List<String> tags = const [],
   }) async {
     try {
+      // Fetch current username from user_profiles
+      final currentUsername = await getUserDisplayName(userId);
+      final user = getCurrentUser();
+      
       final response = await _client
           .from('map_posts')
           .insert({
             'user_id': userId,
-            'user_name': userName,
-            'user_email': userEmail,
+            'user_name': currentUsername ?? user?.email?.split('@')[0],
+            'user_email': user?.email,
             'latitude': latitude,
             'longitude': longitude,
             'title': title,
@@ -326,8 +391,30 @@ class SupabaseService {
     await awardPoints(userId, 4.20, 'post_reward', referenceId: post.id, description: 'Created a new spot');
     
     return post;
+    } on SocketException catch (e) {
+      throw AppNetworkException(
+        'Network error while creating post',
+        originalError: e,
+      );
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') {
+        throw AppConflictException(
+          'Duplicate post detected',
+          userMessage: 'A similar post already exists at this location.',
+          originalError: e,
+        );
+      }
+      throw AppServerException(
+        'Database error: ${e.message}',
+        userMessage: 'Unable to create post. Please try again.',
+        originalError: e,
+      );
     } catch (e) {
-      throw Exception('Failed to create post: $e');
+      throw AppServerException(
+        'Failed to create post: $e',
+        userMessage: 'Unable to create post. Please try again later.',
+        originalError: e,
+      );
     }
   }
 
@@ -420,7 +507,7 @@ class SupabaseService {
     }
   }
 
-  // Get user's map posts
+  // Get all map posts for a specific user
   static Future<List<MapPost>> getUserMapPosts(String userId) async {
     try {
       final response = await _client
@@ -429,7 +516,25 @@ class SupabaseService {
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      return (response as List).map((post) => MapPost.fromMap(post)).toList();
+      final posts = (response as List).cast<Map<String, dynamic>>();
+      
+      // Fetch current username to ensure consistency
+      String? currentUsername;
+      try {
+        currentUsername = await getUserDisplayName(userId);
+      } catch (e) {
+        // Ignore error, will fallback
+      }
+
+      return posts.map((post) {
+        if (currentUsername != null) {
+          post['user_name'] = currentUsername;
+        } else {
+          // Clear email if no username set
+          post['user_name'] = null;
+        }
+        return MapPost.fromMap(post);
+      }).toList();
     } catch (e) {
       // Table may not exist yet
       return [];
@@ -542,16 +647,32 @@ class SupabaseService {
   }) async {
     try {
       final user = getCurrentUser();
+      if (user == null) {
+        throw AppAuthException(
+          'User not authenticated',
+          userMessage: 'Please sign in to report posts.',
+        );
+      }
+      
       await _client.from('post_reports').insert({
         'post_id': postId,
-        'reporter_user_id': user?.id,
+        'reporter_user_id': user.id,
         'reason': reason,
         'details': details,
         'status': 'pending',
         'created_at': DateTime.now().toIso8601String(),
       });
+    } on SocketException catch (e) {
+      throw AppNetworkException(
+        'Network error while reporting post',
+        originalError: e,
+      );
     } catch (e) {
-      throw Exception('Failed to report post: $e');
+      throw AppServerException(
+        'Failed to report post: $e',
+        userMessage: 'Unable to submit report. Please try again.',
+        originalError: e,
+      );
     }
   }
 
@@ -771,9 +892,13 @@ class SupabaseService {
         
         post['user_vote'] = voteMap[postId];
         
-        // Use fetched profile name if available, otherwise fallback to post's stored name
+        // Use fetched profile name if available
         if (userNames.containsKey(userId)) {
           post['user_name'] = userNames[userId];
+        } else {
+          // Clear email from user_name if no username is set
+          // This ensures UI shows 'User' instead of email
+          post['user_name'] = null;
         }
         
         return MapPost.fromMap(post);

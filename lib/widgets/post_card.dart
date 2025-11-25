@@ -126,7 +126,7 @@ class _PostCardState extends State<PostCard> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 0,
-      color: matrixBlack,
+      color: const Color(0xFF000000), // Pure black background
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: matrixGreen.withOpacity(0.3), width: 1),
@@ -163,13 +163,11 @@ class _PostCardState extends State<PostCard> {
                     ),
                     child: CircleAvatar(
                       radius: 18,
-                      backgroundColor: matrixBlack,
+                      backgroundColor: const Color(0xFF000000), // Pure black
                       child: Text(
-                        (currentPost.userName?.isNotEmpty ?? false)
+                        (currentPost.userName?.isNotEmpty == true)
                             ? currentPost.userName![0].toUpperCase()
-                            : (currentPost.userEmail?.isNotEmpty ?? false)
-                            ? currentPost.userEmail![0].toUpperCase()
-                            : '?',
+                            : 'U',
                         style: const TextStyle(
                           color: matrixGreen,
                           fontSize: 14,
@@ -184,10 +182,9 @@ class _PostCardState extends State<PostCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        currentPost.userName ?? 
-                            (currentPost.userEmail != null 
-                                ? currentPost.userEmail!.split('@')[0] 
-                                : 'Unknown User'),
+                        currentPost.userName?.isNotEmpty == true
+                            ? currentPost.userName!
+                            : 'User',
                         style: TextStyle(
                           fontSize: 13,
                           color: Theme.of(context).textTheme.bodySmall?.color,

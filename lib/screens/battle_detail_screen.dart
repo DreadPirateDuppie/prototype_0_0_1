@@ -577,9 +577,9 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: matrixGreen.withOpacity(0.1),
+                              color: matrixGreen.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: matrixGreen.withOpacity(0.3)),
+                              border: Border.all(color: matrixGreen.withValues(alpha: 0.3)),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -634,7 +634,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                             Text(
                               'Time left: ${_formatDuration(_battle.getRemainingTime())}',
                               style: TextStyle(
-                                color: matrixGreen.withOpacity(0.8),
+                                color: matrixGreen.withValues(alpha: 0.8),
                                 fontFamily: 'monospace',
                               ),
                             ),

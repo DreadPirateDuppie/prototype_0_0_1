@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "681288495288",
+    "project_id": "pushinn-10e98",
+    "storage_bucket": "pushinn-10e98.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:681288495288:android:72e73551dbbf9f59ae444d",
+        "android_client_info": {
+          "package_name": "com.example.prototype_0_0_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3AbZQqqReTV7IKV8oDNn4emQoOJEAp6A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

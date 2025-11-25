@@ -580,11 +580,9 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                   radius: 16,
                   backgroundColor: Colors.green,
                   child: Text(
-                    (post.userName?.isNotEmpty ?? false)
+                    (post.userName?.isNotEmpty == true)
                         ? post.userName![0].toUpperCase()
-                        : (post.userEmail?.isNotEmpty ?? false)
-                        ? post.userEmail![0].toUpperCase()
-                        : '?',
+                        : 'U',
                     style: const TextStyle(color: Colors.white, fontSize: 12),
                   ),
                 ),
@@ -594,10 +592,9 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        post.userName ?? 
-                            (post.userEmail != null 
-                                ? post.userEmail!.split('@')[0] 
-                                : 'Unknown User'),
+                        post.userName?.isNotEmpty == true
+                            ? post.userName!
+                            : 'User',
                         style: TextStyle(
                           fontSize: 12,
                           color: Theme.of(context).textTheme.bodySmall?.color,

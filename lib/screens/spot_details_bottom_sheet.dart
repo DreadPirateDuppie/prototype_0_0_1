@@ -194,11 +194,9 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                     radius: 24,
                     backgroundColor: Colors.green,
                     child: Text(
-                      (currentPost.userName?.isNotEmpty ?? false)
+                      (currentPost.userName?.isNotEmpty == true)
                           ? currentPost.userName![0].toUpperCase()
-                          : (currentPost.userEmail?.isNotEmpty ?? false)
-                          ? currentPost.userEmail![0].toUpperCase()
-                          : '?',
+                          : 'U',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -209,10 +207,9 @@ class _SpotDetailsBottomSheetState extends State<SpotDetailsBottomSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      currentPost.userName ?? 
-                          (currentPost.userEmail != null 
-                              ? currentPost.userEmail!.split('@')[0] 
-                              : 'Unknown User'),
+                      currentPost.userName?.isNotEmpty == true
+                          ? currentPost.userName!
+                          : 'User',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

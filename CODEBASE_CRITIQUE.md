@@ -14,7 +14,7 @@
 │ PROJECT HEALTH ASSESSMENT                   │
 ├─────────────────────────────────────────────┤
 │ Code Quality          ██░░░░░░░ 2/5        │
-│ Test Coverage         ░░░░░░░░░░ 0/5       │
+│ Test Coverage         ░░░░░░░░░░ 0/5       │x
 │ Architecture          ███░░░░░░░ 3/5       │
 │ Documentation         ████░░░░░░ 4/5       │
 │ Performance           ███░░░░░░░ 3/5       │
@@ -291,7 +291,6 @@ final supabaseUrl = dotenv.env['SUPABASE_URL'] ??
 **Issues**:
 - Credentials in source (even with fallback)
 - Hard-coded duration values scattered throughout
-- Magic numbers (e.g., 4 minutes 20 seconds for quickfire)
 - Theme colors defined inline in widgets
 
 #### Better Pattern:
@@ -433,7 +432,6 @@ context.go('/path');  // Also using GoRouter?
 
 **Recommendation**: Pick one and standardize:
 - **GoRouter** (recommended for large apps) - already partially used
-- **Named routes** - simpler but less flexible
 
 ---
 
@@ -539,7 +537,7 @@ Widget build(BuildContext context) {
 - [ ] Remove non-functional stub buttons (comments, share, etc.)
 - [ ] Add null-safety fixes
 - [ ] Create 5-10 basic unit tests for models
-- [ ] Document the rating system issue
+- [ ] fix the rating system issue
 
 ### Phase 2: Improve Architecture (2-3 weeks)
 - [ ] Extract constants to config file

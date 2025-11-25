@@ -50,7 +50,7 @@ class _FeedTabState extends State<FeedTab> {
         posts = posts.where((post) {
           return post.title.toLowerCase().contains(query) ||
                  post.description.toLowerCase().contains(query) ||
-                 (post.tags?.any((tag) => tag.toLowerCase().contains(query)) ?? false);
+                 post.tags.any((tag) => tag.toLowerCase().contains(query));
         }).toList();
       }
 

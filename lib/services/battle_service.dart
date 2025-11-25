@@ -3,6 +3,7 @@ import 'dart:io';
 import '../models/battle.dart';
 import '../models/user_scores.dart';
 import 'supabase_service.dart';
+import 'error_types.dart';
 
 class BattleService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -61,8 +62,30 @@ class BattleService {
           .single();
 
       return Battle.fromMap(response);
+    } on SocketException catch (e) {
+      throw AppNetworkException(
+        'Network error while creating battle',
+        originalError: e,
+      );
+    } on PostgrestException catch (e) {
+      throw AppServerException(
+        'Database error: ${e.message}',
+        userMessage: 'Unable to create battle. Please try again.',
+        originalError: e,
+      );
     } catch (e) {
-      throw Exception('Failed to create battle: $e');
+      if (e.toString().contains('Insufficient points')) {
+        throw AppValidationException(
+          'Insufficient points for bet',
+          userMessage: 'You don\'t have enough points for this bet.',
+          originalError: e,
+        );
+      }
+      throw AppServerException(
+        'Failed to create battle: $e',
+        userMessage: 'Unable to create battle. Please try again later.',
+        originalError: e,
+      );
     }
   }
   // Opponent accepts bet
@@ -142,8 +165,30 @@ class BattleService {
           .single();
 
       return Battle.fromMap(response);
+    } on SocketException catch (e) {
+      throw AppNetworkException(
+        'Network error while fetching battle',
+        originalError: e,
+      );
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST116') {
+        throw AppNotFoundException(
+          'Battle not found',
+          userMessage: 'This battle no longer exists.',
+          originalError: e,
+        );
+      }
+      throw AppServerException(
+        'Database error: ${e.message}',
+        userMessage: 'Unable to load battle details.',
+        originalError: e,
+      );
     } catch (e) {
-      return null;
+      throw AppServerException(
+        'Failed to fetch battle: $e',
+        userMessage: 'Unable to load battle. Please try again.',
+        originalError: e,
+      );
     }
   }
 
