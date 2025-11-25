@@ -10,10 +10,16 @@ on:
         required: true
         type: string
 
+# Limit permissions for security
+permissions:
+  contents: write  # Needed for release uploads
+
 jobs:
   build-android-release:
     name: Build Android Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -68,6 +74,8 @@ jobs:
   build-ios-release:
     name: Build iOS Release
     runs-on: macos-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -104,6 +112,8 @@ jobs:
   build-web-release:
     name: Build Web Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
