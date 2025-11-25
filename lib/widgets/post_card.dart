@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/post.dart';
 import '../services/supabase_service.dart';
 import '../screens/edit_post_dialog.dart';
@@ -86,6 +87,25 @@ class _PostCardState extends State<PostCard> {
           _isSaving = false;
         });
         ErrorHelper.showError(context, 'Error saving post: $e');
+      }
+    }
+  }
+
+  Future<void> _sharePost() async {
+    try {
+      final rating = currentPost.popularityRating > 0 
+          ? '${currentPost.popularityRating.toStringAsFixed(1)}/5 ⭐' 
+          : 'Not rated yet';
+      await Share.share(
+        'Check out "${currentPost.title}" 🛹\n'
+        'Rating: $rating\n'
+        '${currentPost.description}\n\n'
+        'Get the app: https://pushinn.app',
+        subject: 'Amazing spot on Pushinn!',
+      );
+    } catch (e) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Share failed: $e');
       }
     }
   }
@@ -341,11 +361,17 @@ class _PostCardState extends State<PostCard> {
                       ),
                     ),
                     IconButton(
+                      icon: const Icon(Icons.share, color: Color(0xFF00FF41)),
+                      onPressed: _sharePost,
+                      tooltip: 'Share',
+                    ),
+                    IconButton(
                       icon: Icon(
                         _isSaved ? Icons.bookmark : Icons.bookmark_border,
                         color: _isSaved ? const Color(0xFF00FF41) : null,
                       ),
                       onPressed: _isSaving ? null : _toggleSave,
+                      tooltip: _isSaved ? 'Remove from saved' : 'Save',
                     ),
                   ],
                 ),
