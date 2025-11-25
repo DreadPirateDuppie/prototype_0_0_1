@@ -134,7 +134,7 @@ void main() {
       expect(battle.isTimerExpired(), true);
     });
 
-    test('getTimerDuration() returns 4:20 for quickfire', () {
+    test('getTimerDuration() returns 4 minutes 20 seconds for quickfire', () {
       final battle = Battle(
         player1Id: 'user-1',
         player2Id: 'user-2',
