@@ -83,24 +83,29 @@ The Pushinn app has made significant architectural improvements during Phases 3-
 
 ---
 
-### Issue #3: Large Screen/Tab Files
+### ~~Issue #3: Large Screen/Tab Files~~ 🔄 PARTIALLY FIXED
 
 **Severity**: 🟡 LOW-MEDIUM  
 **Files**: Multiple
 
-| File | Lines | Concern |
-|------|-------|---------|
-| `profile_tab.dart` | 989 | Should use `UserStatsCard`, `ProfileHeader` widgets |
-| `rewards_tab.dart` | 851 | Complex UI, needs component extraction |
-| `admin_dashboard.dart` | 738 | Admin-specific, but could be modularized |
-| `battle_detail_screen.dart` | 720 | Should use `BattleHeader` widget |
-| `vs_tab.dart` | 692 | Battle list could be extracted |
+| File | Lines | Status |
+|------|-------|--------|
+| `profile_tab.dart` | 721 | ✅ IMPROVED (was 989, now uses `UserStatsCard`) |
+| `rewards_tab.dart` | 851 | ⏳ Complex UI, needs component extraction |
+| `admin_dashboard.dart` | 738 | ⏳ Admin-specific, but could be modularized |
+| `battle_detail_screen.dart` | 720 | ⏳ Should use `BattleHeader` widget |
+| `vs_tab.dart` | 692 | ⏳ Battle list could be extracted |
+
+**What was done**:
+- `profile_tab.dart` reduced from 989 to 721 lines (268 lines removed)
+- Now uses the extracted `UserStatsCard` widget
+- Removed duplicate `_buildScoreCard` method
 
 **Recommendation**: 
-- Use already-extracted `ProfileHeader`, `UserStatsCard`, `BattleHeader` in existing screens
+- Use already-extracted `BattleHeader` in `battle_detail_screen.dart`
 - Extract `RewardsCard`, `StreakDisplay`, `AchievementBadge` from `rewards_tab.dart`
 
-**Estimated Time**: 4-6 hours total
+**Estimated Time**: 3-4 hours for remaining files
 
 ---
 
@@ -234,23 +239,26 @@ catch (e) {
 | Test Files | 18 | 25+ | 🟡 Good |
 | Test Coverage | ~40% (est.) | 70%+ | 🟠 Needs Work |
 | Largest File | 1,249 lines | <500 lines | 🟠 Improved (was 1,392) |
+| profile_tab.dart | 721 lines | <500 lines | ✅ Improved (was 989) |
 | Static Methods in Services | 100 | <20 | 🟠 Needs Work |
 | setState Usage | 114 | <50 | 🟠 Needs Work |
 | CI/CD Workflows | 2 | 2 | ✅ Complete |
 | Provider Classes | 4 | 4 | ✅ Complete |
 | Security Issues | 0 | 0 | ✅ Fixed |
+| Widget Reuse | 1 screen | All screens | 🟠 In Progress |
 
 ---
 
 ## 📋 RECOMMENDED SPRINT PLAN (1 Week)
 
-### Day 1-2: Screen Updates
-1. Update screens to use extracted widgets (`ProfileHeader`, `BattleHeader`, etc.)
-2. Replace direct service calls with provider patterns
+### ~~Day 1-2: Screen Updates~~ 🔄 PARTIALLY DONE
+1. ✅ Updated `profile_tab.dart` to use extracted `UserStatsCard` widget
+2. ⏳ Update `battle_detail_screen.dart` to use `BattleHeader`
+3. ⏳ Replace direct service calls with provider patterns
 
 ### Day 3-4: State Management Migration
-1. Migrate `profile_tab.dart` to use `UserProvider`
-2. Migrate `vs_tab.dart` to use `BattleProvider`
+1. ⏳ Migrate `profile_tab.dart` to use `UserProvider`
+2. ⏳ Migrate `vs_tab.dart` to use `BattleProvider`
 
 ### Day 5: Testing
 1. Add integration tests
@@ -267,14 +275,15 @@ The Pushinn app has made excellent progress in Phases 3-5 and follow-up fixes. T
 - ✅ CI/CD pipelines
 - ✅ Security audit documentation
 - ✅ No hardcoded security credentials in source code
+- ✅ `profile_tab.dart` now uses extracted `UserStatsCard` widget (268 lines reduced)
 
 **Remaining items for next sprint**:
-1. Migrate screens to use providers instead of local `setState`
-2. Use extracted widgets in existing screens
-3. Increase test coverage to 70%+
+1. ⏳ Migrate screens to use providers instead of local `setState`
+2. ⏳ Use `BattleHeader` widget in `battle_detail_screen.dart`
+3. ⏳ Increase test coverage to 70%+
 
-**Estimated Total Time for Remaining Recommendations**: 8-12 hours
+**Estimated Total Time for Remaining Recommendations**: 6-10 hours
 
 ---
 
-*This critique was updated after applying fixes on November 25, 2025.*
+*This critique was last updated on November 25, 2025.*
