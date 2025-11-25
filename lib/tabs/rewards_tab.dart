@@ -636,7 +636,14 @@ class _RewardsTabState extends State<RewardsTab> {
               ),
             ),
             TextButton(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Full transaction history coming soon!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
               child: const Text('View All'),
             ),
           ],
