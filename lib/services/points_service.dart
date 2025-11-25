@@ -9,9 +9,17 @@ class PointsService {
   /// Creates a PointsService with optional dependency injection
   PointsService({SupabaseClient? client}) : _injectedClient = client;
 
-  /// Gets the Supabase client, using injected client or falling back to getIt
-  SupabaseClient get _client =>
-      _injectedClient ?? getIt<SupabaseClient>();
+  /// Gets the Supabase client, using injected client or falling back to getIt or Supabase.instance
+  SupabaseClient get _client {
+    if (_injectedClient != null) {
+      return _injectedClient!;
+    }
+    // Try getIt first, but fallback to Supabase.instance if not registered
+    if (getIt.isRegistered<SupabaseClient>()) {
+      return getIt<SupabaseClient>();
+    }
+    return Supabase.instance.client;
+  }
 
   /// Get user wallet balance
   Future<double> getUserPoints(String userId) async {

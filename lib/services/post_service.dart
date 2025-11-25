@@ -12,9 +12,17 @@ class PostService {
   /// Creates a PostService with optional dependency injection
   PostService({SupabaseClient? client}) : _injectedClient = client;
 
-  /// Gets the Supabase client, using injected client or falling back to getIt
-  SupabaseClient get _client =>
-      _injectedClient ?? getIt<SupabaseClient>();
+  /// Gets the Supabase client, using injected client or falling back to getIt or Supabase.instance
+  SupabaseClient get _client {
+    if (_injectedClient != null) {
+      return _injectedClient!;
+    }
+    // Try getIt first, but fallback to Supabase.instance if not registered
+    if (getIt.isRegistered<SupabaseClient>()) {
+      return getIt<SupabaseClient>();
+    }
+    return Supabase.instance.client;
+  }
 
   /// Create a map post
   Future<MapPost?> createMapPost({
