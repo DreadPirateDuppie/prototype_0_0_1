@@ -341,8 +341,38 @@ class SupabaseService {
       }
 
       final response = await query.order('created_at', ascending: false);
+      final posts = (response as List).cast<Map<String, dynamic>>();
 
-      return (response as List).map((post) => MapPost.fromMap(post)).toList();
+      // Fetch user profiles for these posts to get up-to-date display names
+      final userIds = posts.map((p) => p['user_id'] as String).toSet().toList();
+      Map<String, String> userNames = {};
+      
+      if (userIds.isNotEmpty) {
+        try {
+          final profilesResponse = await _client
+              .from('user_profiles')
+              .select('id, display_name, username')
+              .filter('id', 'in', userIds);
+              
+          for (final profile in (profilesResponse as List)) {
+            final id = profile['id'] as String;
+            final name = profile['display_name'] as String? ?? profile['username'] as String?;
+            if (name != null) {
+              userNames[id] = name;
+            }
+          }
+        } catch (e) {
+          developer.log('Error fetching profiles: $e', name: 'SupabaseService');
+        }
+      }
+
+      return posts.map((post) {
+        final userId = post['user_id'] as String;
+        if (userNames.containsKey(userId)) {
+          post['user_name'] = userNames[userId];
+        }
+        return MapPost.fromMap(post);
+      }).toList();
     } catch (e) {
       // Table may not exist yet
       return [];
@@ -813,10 +843,11 @@ class SupabaseService {
   }
 
   // Check and update daily streak
-  static Future<void> checkDailyStreak() async {
+  // Returns the amount of points awarded, or 0.0 if already claimed today
+  static Future<double> checkDailyStreak() async {
     try {
       final user = getCurrentUser();
-      if (user == null) return;
+      if (user == null) return 0.0;
 
       // Get current streak data
       final streakData = await getUserStreak(user.id);
@@ -830,8 +861,9 @@ class SupabaseService {
       // If never logged in before
       if (lastLoginStr == null) {
         await _updateStreak(user.id, 1, 1, today);
-        await awardPoints(user.id, 10, 'daily_login', description: 'First login bonus');
-        return;
+        const points = 10.0;
+        await awardPoints(user.id, points, 'daily_login', description: 'First login bonus');
+        return points;
       }
 
       final lastLogin = DateTime.parse(lastLoginStr);
@@ -841,7 +873,7 @@ class SupabaseService {
 
       if (difference == 0) {
         // Already logged in today, do nothing
-        return;
+        return 0.0;
       } else if (difference == 1) {
         // Logged in yesterday, increment streak
         final newStreak = currentStreak + 1;
@@ -851,13 +883,17 @@ class SupabaseService {
         // Calculate bonus: Base 3.5 + (Streak * 0.5)
         final bonus = 3.5 + (newStreak * 0.5);
         await awardPoints(user.id, bonus, 'daily_login', description: 'Daily streak: $newStreak days');
+        return bonus;
       } else {
         // Missed a day (or more), reset streak
         await _updateStreak(user.id, 1, longestStreak, today);
-        await awardPoints(user.id, 3.5, 'daily_login', description: 'Daily login (streak reset)');
+        const points = 3.5;
+        await awardPoints(user.id, points, 'daily_login', description: 'Daily login (streak reset)');
+        return points;
       }
     } catch (e) {
       developer.log('Error checking daily streak: $e', name: 'SupabaseService');
+      return 0.0;
     }
   }
 
@@ -871,7 +907,6 @@ class SupabaseService {
     });
   }
 
-  // Award points (or deduct if negative)
   static Future<void> awardPoints(
     String userId, 
     double amount, 
@@ -879,31 +914,37 @@ class SupabaseService {
     {String? referenceId, String? description}
   ) async {
     try {
+      developer.log('Attempting to award $amount points to $userId for $type', name: 'SupabaseService');
+      
       // 1. Update wallet balance
       // First ensure wallet exists
       final currentPoints = await getUserPoints(userId);
+      developer.log('Current points: $currentPoints', name: 'SupabaseService');
       final newBalance = currentPoints + amount;
       
-      await _client.from('user_wallets').upsert({
+      final walletResult = await _client.from('user_wallets').upsert({
         'user_id': userId,
         'balance': newBalance,
         'updated_at': DateTime.now().toIso8601String(),
-      });
+      }).select();
+      developer.log('Wallet upsert result: $walletResult', name: 'SupabaseService');
 
       // 2. Log transaction
-      await _client.from('point_transactions').insert({
+      final transactionResult = await _client.from('point_transactions').insert({
         'user_id': userId,
         'amount': amount,
         'transaction_type': type,
         'reference_id': referenceId,
         'description': description,
         'created_at': DateTime.now().toIso8601String(),
-      });
+      }).select();
+      developer.log('Transaction insert result: $transactionResult', name: 'SupabaseService');
       
-      developer.log('Awarded $amount points to $userId for $type', name: 'SupabaseService');
-    } catch (e) {
-      developer.log('Error awarding points: $e', name: 'SupabaseService');
-      // Don't throw, just log error to prevent blocking user actions
+      developer.log('Successfully awarded $amount points to $userId for $type. New balance: $newBalance', name: 'SupabaseService');
+    } catch (e, stackTrace) {
+      developer.log('Error awarding points: $e\nStack trace: $stackTrace', name: 'SupabaseService', error: e);
+      // Rethrow to surface the error during debugging
+      rethrow;
     }
   }
 

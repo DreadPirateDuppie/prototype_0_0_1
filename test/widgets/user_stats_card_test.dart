@@ -119,7 +119,6 @@ void main() {
 
     test('Level progress display shows correct format', () {
       const level = 3;
-      const levelProgress = 0.6;
       const xpForNextLevel = 300.0;
       const currentXP = 180.0;
       

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/spot_video.dart';
 import '../models/post.dart';
-import '../services/supabase_service.dart';
 import 'trick_submission_dialog.dart';
 import '../utils/error_helper.dart';
 
@@ -35,10 +34,6 @@ class _TrickHistoryScreenState extends State<TrickHistoryScreen> {
       // Assuming SupabaseService has getSpotVideos(spotId, sortBy)
       // If not, we'll query directly here for now as a fallback
       
-      final client = SupabaseService.getCurrentSession() != null 
-          ? SupabaseService.getCurrentUser() 
-          : null; // Just to check auth, but we need client access
-          
       // Since we don't have direct client access here easily without import, 
       // let's assume we added getSpotVideos to SupabaseService or implement query here
       // But SupabaseService is imported.
@@ -86,12 +81,12 @@ class _TrickHistoryScreenState extends State<TrickHistoryScreen> {
   }
 
   Future<void> _launchVideo(SpotVideo trick) async {
-    if (trick.url == null || trick.url!.isEmpty) {
+    if (trick.url.isEmpty) {
       ErrorHelper.showError(context, 'No video link for this trick yet');
       return;
     }
     
-    final uri = Uri.parse(trick.url!);
+    final uri = Uri.parse(trick.url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
@@ -288,16 +283,16 @@ class _TrickHistoryScreenState extends State<TrickHistoryScreen> {
         children: [
           // Placeholder - would show actual thumbnail in production
           Center(
-            child: trick.url != null && trick.url!.isNotEmpty
+            child: trick.url.isNotEmpty
                 ? const Icon(Icons.play_circle_filled, size: 32, color: Colors.white)
                 : Icon(Icons.skateboarding, size: 32, color: Colors.grey[600]),
           ),
           // Platform badge
-          if (trick.platform != null && trick.url != null && trick.url!.isNotEmpty)
+          if (trick.url.isNotEmpty)
             Positioned(
               top: 4,
               right: 4,
-              child: _buildPlatformBadge(trick.platform!),
+              child: _buildPlatformBadge(trick.platform),
             ),
         ],
       ),

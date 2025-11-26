@@ -218,8 +218,10 @@ void main() {
           createdAt: DateTime.now(),
         );
 
-        const isPlayer1 = true;
+        var isPlayer1 = true;
+        // ignore: dead_code
         final myLetters = isPlayer1 ? battle.player1Letters : battle.player2Letters;
+        // ignore: dead_code
         final opponentLetters = isPlayer1 ? battle.player2Letters : battle.player1Letters;
 
         expect(myLetters, 'SK');

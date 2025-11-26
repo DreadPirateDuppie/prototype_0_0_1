@@ -233,7 +233,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${scores.voteWeight.toStringAsFixed(0)}%',
+                '${(scores.voteWeight * 100).toStringAsFixed(0)}%',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,

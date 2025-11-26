@@ -4,6 +4,7 @@ import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
 import '../screens/admin_dashboard.dart';
 import '../utils/error_helper.dart';
+import '../screens/premium_screen.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -150,7 +151,12 @@ class _SettingsTabState extends State<SettingsTab> {
                             setState(() {
                               isSubmitting = false;
                             });
-                            ErrorHelper.showError(context, 'Error: $e');
+                            scaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
                           }
                         }
                       },
@@ -232,10 +238,10 @@ class _SettingsTabState extends State<SettingsTab> {
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Premium coming soon!'),
-                        duration: Duration(seconds: 2),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PremiumScreen(),
                       ),
                     );
                   },

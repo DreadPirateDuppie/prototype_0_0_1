@@ -23,7 +23,7 @@ void main() {
 
       test('formats minutes and seconds correctly', () {
         expect(DurationUtils.formatShort(const Duration(minutes: 5, seconds: 30)), '5m 30s');
-        expect(DurationUtils.formatShort(const Duration(minutes: 1, seconds: 0)), '1m 0s');
+        expect(DurationUtils.formatShort(const Duration(minutes: 1, seconds: 0)), '1m');
       });
 
       test('formats seconds only correctly', () {

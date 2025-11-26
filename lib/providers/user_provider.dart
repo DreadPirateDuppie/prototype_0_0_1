@@ -73,7 +73,7 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await SupabaseService.updateUsername(_currentUser!.id, newUsername);
+      await SupabaseService.saveUserUsername(_currentUser!.id, newUsername);
       _username = newUsername;
       _error = null;
       _isLoading = false;

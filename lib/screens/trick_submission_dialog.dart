@@ -177,7 +177,7 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
                       child: Text(
                         'CANCEL',
                         style: TextStyle(
-                          color: matrixGreen.withOpacity(0.7),
+                          color: matrixGreen.withValues(alpha: 0.7),
                           fontFamily: 'monospace',
                         ),
                       ),
@@ -189,7 +189,7 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
                         border: Border.all(color: matrixGreen, width: 2),
                         boxShadow: [
                           BoxShadow(
-                            color: matrixGreen.withOpacity(0.3),
+                            color: matrixGreen.withValues(alpha: 0.3),
                             blurRadius: 8,
                           ),
                         ],

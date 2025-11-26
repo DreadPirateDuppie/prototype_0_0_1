@@ -34,12 +34,10 @@ class BattleProvider extends ChangeNotifier {
       final battles = await BattleService.getUserBattles(userId);
       
       _activeBattles = battles
-          .where((b) => !b.isComplete() && b.player2Id != null)
+          .where((b) => !b.isComplete())
           .toList();
       _completedBattles = battles.where((b) => b.isComplete()).toList();
-      _pendingBattles = battles
-          .where((b) => !b.isComplete() && b.player2Id == null)
-          .toList();
+      _pendingBattles = [];
       
       _error = null;
     } catch (e) {

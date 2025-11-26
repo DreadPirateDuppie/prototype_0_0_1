@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import '../models/battle.dart';
@@ -546,7 +547,7 @@ class BattleService {
       }
     } catch (e) {
       // Silently fail to avoid blocking UI
-      print('Error checking expired turns: $e');
+      debugPrint('Error checking expired turns: $e');
     }
   }
 }

@@ -22,7 +22,6 @@ class _VsTabState extends State<VsTab> {
 
   // Matrix theme colors
   static const Color matrixGreen = Color(0xFF00FF41);
-  static const Color matrixBlack = Color(0xFF0D0D0D);
 
   @override
   void initState() {
@@ -67,13 +66,13 @@ class _VsTabState extends State<VsTab> {
         color: matrixSurface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isMyTurn ? matrixGreen : matrixGreen.withOpacity(0.3),
+          color: isMyTurn ? matrixGreen : matrixGreen.withValues(alpha: 0.3),
           width: isMyTurn ? 2 : 1,
         ),
         boxShadow: [
           if (isMyTurn)
             BoxShadow(
-              color: matrixGreen.withOpacity(0.3),
+              color: matrixGreen.withValues(alpha: 0.3),
               blurRadius: 12,
               spreadRadius: 0,
             ),
@@ -104,20 +103,20 @@ class _VsTabState extends State<VsTab> {
                     shape: BoxShape.circle,
                     color: matrixBlack,
                     border: Border.all(
-                      color: isMyTurn ? matrixGreen : matrixGreen.withOpacity(0.5),
+                      color: isMyTurn ? matrixGreen : matrixGreen.withValues(alpha: 0.5),
                       width: 2,
                     ),
                     boxShadow: [
                       if (isMyTurn)
                         BoxShadow(
-                          color: matrixGreen.withOpacity(0.5),
+                          color: matrixGreen.withValues(alpha: 0.5),
                           blurRadius: 8,
                         ),
                     ],
                   ),
                   child: Icon(
                     isMyTurn ? Icons.play_arrow : Icons.pause,
-                    color: isMyTurn ? matrixGreen : matrixGreen.withOpacity(0.5),
+                    color: isMyTurn ? matrixGreen : matrixGreen.withValues(alpha: 0.5),
                     size: 32,
                   ),
                 ),
@@ -131,10 +130,10 @@ class _VsTabState extends State<VsTab> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: matrixGreen.withOpacity(0.1),
+                          color: matrixGreen.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: matrixGreen.withOpacity(0.3),
+                            color: matrixGreen.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Text(
@@ -169,9 +168,9 @@ class _VsTabState extends State<VsTab> {
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [
-                                  matrixGreen.withOpacity(0.1),
-                                  matrixGreen.withOpacity(0.5),
-                                  matrixGreen.withOpacity(0.1),
+                                  matrixGreen.withValues(alpha: 0.1),
+                                  matrixGreen.withValues(alpha: 0.5),
+                                  matrixGreen.withValues(alpha: 0.1),
                                 ],
                               ),
                             ),
@@ -192,8 +191,8 @@ class _VsTabState extends State<VsTab> {
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: isMyTurn 
-                              ? matrixGreen.withOpacity(0.2)
-                              : Colors.orange.withOpacity(0.2),
+                              ? matrixGreen.withValues(alpha: 0.2)
+                              : Colors.orange.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
@@ -207,7 +206,7 @@ class _VsTabState extends State<VsTab> {
                                 color: isMyTurn ? matrixGreen : Colors.orange,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: (isMyTurn ? matrixGreen : Colors.orange).withOpacity(0.5),
+                                    color: (isMyTurn ? matrixGreen : Colors.orange).withValues(alpha: 0.5),
                                     blurRadius: 4,
                                   ),
                                 ],
@@ -236,7 +235,7 @@ class _VsTabState extends State<VsTab> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFD700).withOpacity(0.2),
+                                color: const Color(0xFFFFD700).withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                                 border: Border.all(
                                   color: const Color(0xFFFFD700),
@@ -271,7 +270,7 @@ class _VsTabState extends State<VsTab> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(
-                                color: _getTimerColor(battle).withOpacity(0.2),
+                                color: _getTimerColor(battle).withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                                 border: Border.all(
                                   color: _getTimerColor(battle),
@@ -308,7 +307,7 @@ class _VsTabState extends State<VsTab> {
                 // Arrow
                 Icon(
                   Icons.arrow_forward_ios,
-                  color: matrixGreen.withOpacity(0.5),
+                  color: matrixGreen.withValues(alpha: 0.5),
                   size: 20,
                 ),
               ],
@@ -331,12 +330,12 @@ class _VsTabState extends State<VsTab> {
         color: matrixSurface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: tutorialYellow.withOpacity(0.6),
+          color: tutorialYellow.withValues(alpha: 0.6),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: tutorialYellow.withOpacity(0.3),
+            color: tutorialYellow.withValues(alpha: 0.3),
             blurRadius: 12,
             spreadRadius: 0,
           ),
@@ -366,7 +365,7 @@ class _VsTabState extends State<VsTab> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: tutorialYellow.withOpacity(0.5),
+                        color: tutorialYellow.withValues(alpha: 0.5),
                         blurRadius: 8,
                       ),
                     ],
@@ -387,7 +386,7 @@ class _VsTabState extends State<VsTab> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: tutorialYellow.withOpacity(0.2),
+                          color: tutorialYellow.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: tutorialYellow,
@@ -425,9 +424,9 @@ class _VsTabState extends State<VsTab> {
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [
-                                  matrixGreen.withOpacity(0.1),
-                                  matrixGreen.withOpacity(0.5),
-                                  matrixGreen.withOpacity(0.1),
+                                  matrixGreen.withValues(alpha: 0.1),
+                                  matrixGreen.withValues(alpha: 0.5),
+                                  matrixGreen.withValues(alpha: 0.1),
                                 ],
                               ),
                             ),
@@ -454,7 +453,7 @@ class _VsTabState extends State<VsTab> {
                               color: tutorialYellow,
                               boxShadow: [
                                 BoxShadow(
-                                  color: tutorialYellow.withOpacity(0.6),
+                                  color: tutorialYellow.withValues(alpha: 0.6),
                                   blurRadius: 4,
                                   spreadRadius: 1,
                                 ),
@@ -480,7 +479,7 @@ class _VsTabState extends State<VsTab> {
                 // Arrow
                 Icon(
                   Icons.arrow_forward_ios,
-                  color: tutorialYellow.withOpacity(0.6),
+                  color: tutorialYellow.withValues(alpha: 0.6),
                   size: 20,
                 ),
               ],
@@ -500,7 +499,7 @@ class _VsTabState extends State<VsTab> {
         Text(
           label,
           style: TextStyle(
-            color: matrixGreen.withOpacity(0.6),
+            color: matrixGreen.withValues(alpha: 0.6),
             fontSize: 10,
             fontWeight: FontWeight.bold,
             fontFamily: 'monospace',
@@ -518,26 +517,6 @@ class _VsTabState extends State<VsTab> {
           ),
         ),
       ],
-    );
-  }
-
-  Battle _buildTutorialBattle() {
-    final now = DateTime.now();
-    return Battle(
-      id: 'tutorial_battle',
-      player1Id: 'tutorial_player_1',
-      player2Id: 'tutorial_player_2',
-      gameMode: GameMode.skate,
-      customLetters: '',
-      player1Letters: 'SK',
-      player2Letters: 'S',
-      setTrickVideoUrl: 'https://example.com/tutorial_set.mp4',
-      attemptVideoUrl: null,
-      verificationStatus: VerificationStatus.pending,
-      createdAt: now,
-      completedAt: null,
-      winnerId: null,
-      currentTurnPlayerId: 'tutorial_player_1',
     );
   }
 
@@ -582,7 +561,7 @@ class _VsTabState extends State<VsTab> {
                   gradient: LinearGradient(
                     colors: [
                       Colors.transparent,
-                      matrixGreen.withOpacity(0.5),
+                      matrixGreen.withValues(alpha: 0.5),
                       Colors.transparent,
                     ],
                   ),
@@ -639,7 +618,7 @@ class _VsTabState extends State<VsTab> {
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: matrixGreen.withOpacity(0.4),
+                  color: matrixGreen.withValues(alpha: 0.4),
                   blurRadius: 20,
                   spreadRadius: 2,
                 ),

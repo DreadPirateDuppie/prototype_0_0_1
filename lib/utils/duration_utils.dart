@@ -9,8 +9,12 @@ class DurationUtils {
     final minutes = duration.inMinutes % 60;
     final seconds = duration.inSeconds % 60;
 
-    if (hours > 0) return '${hours}h ${minutes}m';
-    if (minutes > 0) return '${minutes}m ${seconds}s';
+    if (hours > 0) {
+      return minutes > 0 ? '${hours}h ${minutes}m' : '${hours}h';
+    }
+    if (minutes > 0) {
+      return seconds > 0 ? '${minutes}m ${seconds}s' : '${minutes}m';
+    }
     return '${seconds}s';
   }
 

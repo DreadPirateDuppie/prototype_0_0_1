@@ -3,10 +3,8 @@ import 'package:prototype_0_0_1/services/points_service.dart';
 
 void main() {
   group('PointsService', () {
-    late PointsService pointsService;
-
     setUp(() {
-      pointsService = PointsService();
+      // No setup needed
     });
 
     group('PointsService instantiation', () {

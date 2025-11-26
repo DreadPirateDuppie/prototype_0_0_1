@@ -181,7 +181,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
             Text(
               'Location: ${widget.location.latitude.toStringAsFixed(4)}, ${widget.location.longitude.toStringAsFixed(4)}',
               style: TextStyle(
-                color: matrixGreen.withOpacity(0.6),
+                color: matrixGreen.withValues(alpha: 0.6),
                 fontSize: 12,
                 fontFamily: 'monospace',
               ),
@@ -192,14 +192,14 @@ class _AddPostDialogState extends State<AddPostDialog> {
               style: const TextStyle(color: matrixGreen),
               decoration: InputDecoration(
                 labelText: 'Title',
-                labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
+                labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
                 hintText: 'Enter post title',
-                hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
                 border: OutlineInputBorder(
-                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen, width: 2),
@@ -210,17 +210,17 @@ class _AddPostDialogState extends State<AddPostDialog> {
             const SizedBox(height: 12),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _selectedCategory,
+              initialValue: _selectedCategory,
               dropdownColor: matrixBlack,
               style: const TextStyle(color: matrixGreen),
               decoration: InputDecoration(
                 labelText: 'Category',
-                labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
+                labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
                 border: OutlineInputBorder(
-                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen, width: 2),
@@ -244,14 +244,14 @@ class _AddPostDialogState extends State<AddPostDialog> {
               style: const TextStyle(color: matrixGreen),
               decoration: InputDecoration(
                 labelText: 'Tags',
-                labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
+                labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
                 hintText: 'stairs, ledge, covered (comma separated)',
-                hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
                 border: OutlineInputBorder(
-                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen, width: 2),
@@ -265,14 +265,14 @@ class _AddPostDialogState extends State<AddPostDialog> {
               style: const TextStyle(color: matrixGreen),
               decoration: InputDecoration(
                 labelText: 'Description',
-                labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
+                labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
                 hintText: 'Enter post description',
-                hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
                 border: OutlineInputBorder(
-                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen, width: 2),
@@ -287,7 +287,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   decoration: BoxDecoration(
-                    border: Border.all(color: matrixGreen.withOpacity(0.5)),
+                    border: Border.all(color: matrixGreen.withValues(alpha: 0.5)),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Image.file(
@@ -302,7 +302,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
             ],
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: matrixGreen.withOpacity(0.5)),
+                border: Border.all(color: matrixGreen.withValues(alpha: 0.5)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ElevatedButton.icon(
@@ -326,7 +326,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
           child: Text(
             'CANCEL',
             style: TextStyle(
-              color: matrixGreen.withOpacity(0.7),
+              color: matrixGreen.withValues(alpha: 0.7),
               fontFamily: 'monospace',
             ),
           ),
@@ -337,7 +337,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
             border: Border.all(color: matrixGreen, width: 2),
             boxShadow: [
               BoxShadow(
-                color: matrixGreen.withOpacity(0.3),
+                color: matrixGreen.withValues(alpha: 0.3),
                 blurRadius: 8,
               ),
             ],

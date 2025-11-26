@@ -5,7 +5,6 @@ import '../models/post.dart';
 import '../models/user_scores.dart';
 import '../screens/edit_post_dialog.dart';
 import '../screens/edit_username_dialog.dart';
-import '../widgets/star_rating_display.dart';
 import '../widgets/mini_map_snapshot.dart';
 import '../widgets/user_stats_card.dart';
 import '../providers/user_provider.dart';
@@ -26,7 +25,7 @@ class ProfileTab extends StatefulWidget {
 class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateMixin {
   late Future<List<MapPost>> _userPostsFuture;
   late TabController _tabController;
-  bool _isStatsExpanded = true;
+  final bool _isStatsExpanded = true;
   bool _isUploadingImage = false;
 
   @override
@@ -89,9 +88,11 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
         if (user != null) {
           final newUrl = await SupabaseService.uploadProfileImage(File(pickedFile.path), user.id);
           // Update provider with new avatar URL
-          final userProvider = Provider.of<UserProvider>(context, listen: false);
-          userProvider.updateAvatarUrl(newUrl);
-          widget.onProfileUpdated?.call(); // Notify parent to refresh nav bar
+          if (mounted) {
+            final userProvider = Provider.of<UserProvider>(context, listen: false);
+            userProvider.updateAvatarUrl(newUrl);
+            widget.onProfileUpdated?.call(); // Notify parent to refresh nav bar
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -246,24 +247,6 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
     );
   }
 
-  String _formatDate(DateTime date) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
-
   Widget _buildGridPost(MapPost post) {
     return GestureDetector(
       onTap: () => _editPost(post), // Or show details
@@ -287,116 +270,6 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildListPost(MapPost post) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Colors.green,
-                  child: Text(
-                    (post.userName?.isNotEmpty == true)
-                        ? post.userName![0].toUpperCase()
-                        : 'U',
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        post.userName?.isNotEmpty == true
-                            ? post.userName!
-                            : 'User',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                        ),
-                      ),
-                      Text(
-                        post.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      Text(
-                        _formatDate(post.createdAt),
-                        style: TextStyle(
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.more_vert),
-                  onPressed: () => _editPost(post),
-                ),
-              ],
-            ),
-            if (post.photoUrl != null) ...[
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  post.photoUrl!,
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ] else ...[
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  height: 150,
-                  width: double.infinity,
-                  child: MiniMapSnapshot(
-                    latitude: post.latitude,
-                    longitude: post.longitude,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Text(post.description),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                StarRatingDisplay(
-                  popularityRating: post.popularityRating,
-                  securityRating: post.securityRating,
-                  qualityRating: post.qualityRating,
-                ),
-                Row(
-                  children: [
-                    const Icon(Icons.favorite, color: Colors.red, size: 16),
-                    const SizedBox(width: 4),
-                    Text('${post.likes}'),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = SupabaseService.getCurrentUser();
@@ -408,7 +281,7 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
                 SliverAppBar(
-                  expandedHeight: 380.0,
+                  expandedHeight: 300.0,
                   floating: false,
                   pinned: true,
                   backgroundColor: Colors.green,

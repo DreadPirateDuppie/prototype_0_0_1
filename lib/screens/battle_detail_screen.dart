@@ -611,10 +611,9 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                                           });
                                         }
                                       } catch (e) {
-                                        if (mounted) {
-                                          ErrorHelper.showError(context, 'Failed to accept bet: $e');
-                                          setState(() => _isLoading = false);
-                                        }
+                                        if (!context.mounted) return;
+                                        ErrorHelper.showError(context, 'Failed to accept bet: $e');
+                                        setState(() => _isLoading = false);
                                       }
                                     },
                                     icon: const Icon(Icons.check_circle),

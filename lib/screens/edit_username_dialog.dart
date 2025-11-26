@@ -149,15 +149,15 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
               style: const TextStyle(color: matrixGreen),
               decoration: InputDecoration(
                 hintText: 'Enter your username',
-                hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
                 helperText: '3-20 characters, letters, numbers, dashes, underscores',
-                helperStyle: TextStyle(color: matrixGreen.withOpacity(0.5), fontSize: 11),
+                helperStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.5), fontSize: 11),
                 helperMaxLines: 2,
                 border: OutlineInputBorder(
-                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen, width: 2),
@@ -200,7 +200,7 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
           child: Text(
             'CANCEL',
             style: TextStyle(
-              color: matrixGreen.withOpacity(0.7),
+              color: matrixGreen.withValues(alpha: 0.7),
               fontFamily: 'monospace',
             ),
           ),
@@ -211,7 +211,7 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
             border: Border.all(color: matrixGreen, width: 2),
             boxShadow: [
               BoxShadow(
-                color: matrixGreen.withOpacity(0.3),
+                color: matrixGreen.withValues(alpha: 0.3),
                 blurRadius: 8,
               ),
             ],

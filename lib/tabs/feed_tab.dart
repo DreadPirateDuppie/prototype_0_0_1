@@ -107,50 +107,53 @@ class _FeedTabState extends State<FeedTab> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: matrixGreen, width: 1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: matrixGreen.withOpacity(0.2),
-                          blurRadius: 4,
-                        ),
-                      ],
+                Container(
+                  width: 250,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: matrixGreen.withValues(alpha: 0.2),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(
+                      color: matrixGreen,
+                      fontFamily: 'monospace',
+                      fontSize: 13,
                     ),
-                    child: TextField(
-                      controller: _searchController,
-                      style: const TextStyle(
-                        color: matrixGreen,
+                    cursorColor: matrixGreen,
+                    decoration: InputDecoration(
+                      hintText: 'Search posts...',
+                      hintStyle: TextStyle(
+                        color: matrixGreen.withValues(alpha: 0.5),
                         fontFamily: 'monospace',
+                        fontSize: 13,
                       ),
-                      cursorColor: matrixGreen,
-                      decoration: InputDecoration(
-                        hintText: 'Search posts...',
-                        hintStyle: TextStyle(
-                          color: matrixGreen.withOpacity(0.5),
-                          fontFamily: 'monospace',
-                        ),
-                        prefixIcon: const Icon(Icons.search, color: matrixGreen),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                      onChanged: _onSearchChanged,
+                      prefixIcon: const Icon(Icons.search, color: matrixGreen, size: 18),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      isDense: true,
                     ),
+                    onChanged: _onSearchChanged,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                   decoration: BoxDecoration(
                     color: Colors.black,
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: matrixGreen, width: 1),
                     boxShadow: [
                       BoxShadow(
-                        color: matrixGreen.withOpacity(0.2),
+                        color: matrixGreen.withValues(alpha: 0.2),
                         blurRadius: 4,
                       ),
                     ],
@@ -158,11 +161,13 @@ class _FeedTabState extends State<FeedTab> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _selectedCategory,
-                      icon: const Icon(Icons.filter_list, color: matrixGreen),
+                      icon: const Icon(Icons.filter_list, color: matrixGreen, size: 18),
                       dropdownColor: Colors.black,
+                      isDense: true,
                       style: const TextStyle(
                         color: matrixGreen,
                         fontFamily: 'monospace',
+                        fontSize: 13,
                       ),
                       items: _categories.map((String category) {
                         return DropdownMenuItem<String>(
@@ -193,7 +198,7 @@ class _FeedTabState extends State<FeedTab> {
                             Icon(
                               Icons.search_off,
                               size: 64,
-                              color: const Color(0xFF00FF41).withOpacity(0.5),
+                              color: const Color(0xFF00FF41).withValues(alpha: 0.5),
                             ),
                             const SizedBox(height: 16),
                             Text(

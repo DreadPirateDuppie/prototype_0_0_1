@@ -94,7 +94,7 @@ class PostProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _savedPosts = await SupabaseService.getSavedPosts(userId);
+      _savedPosts = await SupabaseService.getSavedPosts();
       _error = null;
     } catch (e) {
       _error = 'Failed to load saved posts: $e';
