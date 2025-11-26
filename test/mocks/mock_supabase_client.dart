@@ -1,5 +1,16 @@
+import 'dart:async';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+class FakePostgrestTransformBuilder<T> extends Fake implements PostgrestTransformBuilder<T> {
+  final T _result;
+  FakePostgrestTransformBuilder(this._result);
+
+  @override
+  Future<R> then<R>(FutureOr<R> Function(T value) onValue, {Function? onError}) async {
+    return onValue(_result);
+  }
+}
 
 /// Mock classes for Supabase client components
 class MockSupabaseClient extends Mock implements SupabaseClient {}
@@ -88,7 +99,7 @@ class MockSupabaseBuilder {
     when(() => mockQueryBuilder.select(any())).thenReturn(mockFilterBuilder);
     when(() => mockFilterBuilder.eq(any(), any())).thenReturn(mockFilterBuilder);
     when(() => mockFilterBuilder.order(any(), ascending: any(named: 'ascending')))
-        .thenAnswer((_) async => results);
+        .thenReturn(FakePostgrestTransformBuilder(results));
   }
 
   /// Helper to setup a select query that returns a single result
@@ -98,12 +109,12 @@ class MockSupabaseBuilder {
     Map<String, dynamic>? result,
   ) {
     final mockQueryBuilder = MockSupabaseQueryBuilder();
-    final mockFilterBuilder = MockPostgrestFilterBuilder<Map<String, dynamic>?>();
+    final mockFilterBuilder = MockPostgrestFilterBuilder<PostgrestList>();
 
     when(() => client.from(tableName)).thenReturn(mockQueryBuilder);
     when(() => mockQueryBuilder.select(any())).thenReturn(mockFilterBuilder);
     when(() => mockFilterBuilder.eq(any(), any())).thenReturn(mockFilterBuilder);
-    when(() => mockFilterBuilder.maybeSingle()).thenAnswer((_) async => result);
+    when(() => mockFilterBuilder.maybeSingle()).thenReturn(FakePostgrestTransformBuilder(result));
   }
 
   /// Helper to setup an insert query
@@ -113,12 +124,12 @@ class MockSupabaseBuilder {
     Map<String, dynamic> returnedData,
   ) {
     final mockQueryBuilder = MockSupabaseQueryBuilder();
-    final mockFilterBuilder = MockPostgrestFilterBuilder<Map<String, dynamic>>();
+    final mockListFilterBuilder = MockPostgrestFilterBuilder<List<Map<String, dynamic>>>();
 
     when(() => client.from(tableName)).thenReturn(mockQueryBuilder);
-    when(() => mockQueryBuilder.insert(any())).thenReturn(mockFilterBuilder);
-    when(() => mockFilterBuilder.select()).thenReturn(mockFilterBuilder);
-    when(() => mockFilterBuilder.single()).thenAnswer((_) async => returnedData);
+    when(() => mockQueryBuilder.insert(any())).thenReturn(mockListFilterBuilder);
+    when(() => mockListFilterBuilder.select()).thenReturn(mockListFilterBuilder);
+    when(() => mockListFilterBuilder.single()).thenReturn(FakePostgrestTransformBuilder(returnedData));
   }
 
   /// Helper to setup an update query
@@ -128,14 +139,14 @@ class MockSupabaseBuilder {
     Map<String, dynamic>? returnedData,
   ) {
     final mockQueryBuilder = MockSupabaseQueryBuilder();
-    final mockFilterBuilder = MockPostgrestFilterBuilder<Map<String, dynamic>?>();
+    final mockListFilterBuilder = MockPostgrestFilterBuilder<List<Map<String, dynamic>>>();
 
     when(() => client.from(tableName)).thenReturn(mockQueryBuilder);
-    when(() => mockQueryBuilder.update(any())).thenReturn(mockFilterBuilder);
-    when(() => mockFilterBuilder.eq(any(), any())).thenReturn(mockFilterBuilder);
+    when(() => mockQueryBuilder.update(any())).thenReturn(mockListFilterBuilder);
+    when(() => mockListFilterBuilder.eq(any(), any())).thenReturn(mockListFilterBuilder);
     if (returnedData != null) {
-      when(() => mockFilterBuilder.select()).thenReturn(mockFilterBuilder);
-      when(() => mockFilterBuilder.single()).thenAnswer((_) async => returnedData);
+      when(() => mockListFilterBuilder.select()).thenReturn(mockListFilterBuilder);
+      when(() => mockListFilterBuilder.single()).thenReturn(FakePostgrestTransformBuilder(returnedData));
     }
   }
 
@@ -145,11 +156,11 @@ class MockSupabaseBuilder {
     String tableName,
   ) {
     final mockQueryBuilder = MockSupabaseQueryBuilder();
-    final mockFilterBuilder = MockPostgrestFilterBuilder<void>();
+    final mockListFilterBuilder = MockPostgrestFilterBuilder<List<Map<String, dynamic>>>();
 
     when(() => client.from(tableName)).thenReturn(mockQueryBuilder);
-    when(() => mockQueryBuilder.delete()).thenReturn(mockFilterBuilder);
-    when(() => mockFilterBuilder.eq(any(), any())).thenReturn(mockFilterBuilder);
+    when(() => mockQueryBuilder.delete()).thenReturn(mockListFilterBuilder);
+    when(() => mockListFilterBuilder.eq(any(), any())).thenReturn(mockListFilterBuilder);
   }
 
   /// Helper to setup an upsert query

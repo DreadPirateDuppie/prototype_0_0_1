@@ -34,7 +34,8 @@ void main() {
             gameMode: GameMode.skate,
             currentTurnPlayerId: 'user-1',
             createdAt: DateTime.now(),
-            status: 'active',
+            verificationStatus: VerificationStatus.pending,
+            betAccepted: true,
           ),
           Battle(
             id: '2',
@@ -43,8 +44,9 @@ void main() {
             gameMode: GameMode.sk8,
             currentTurnPlayerId: 'user-3',
             createdAt: DateTime.now(),
-            status: 'completed',
+            completedAt: DateTime.now(),
             winnerId: 'user-1',
+            verificationStatus: VerificationStatus.resolved,
           ),
           Battle(
             id: '3',
@@ -53,32 +55,32 @@ void main() {
             gameMode: GameMode.skate,
             currentTurnPlayerId: 'user-2',
             createdAt: DateTime.now(),
-            status: 'pending',
+            verificationStatus: VerificationStatus.pending,
           ),
         ];
       });
 
       test('Filter active battles', () {
-        final activeBattles = battles.where((b) => b.status == 'active').toList();
+        final activeBattles = battles.where((b) => b.completedAt == null && b.betAccepted).toList();
         expect(activeBattles.length, 1);
         expect(activeBattles.first.id, '1');
       });
 
       test('Filter completed battles', () {
-        final completedBattles = battles.where((b) => b.status == 'completed').toList();
+        final completedBattles = battles.where((b) => b.completedAt != null).toList();
         expect(completedBattles.length, 1);
         expect(completedBattles.first.winnerId, 'user-1');
       });
 
       test('Filter pending battles', () {
-        final pendingBattles = battles.where((b) => b.status == 'pending').toList();
+        final pendingBattles = battles.where((b) => !b.betAccepted && b.completedAt == null).toList();
         expect(pendingBattles.length, 1);
       });
 
       test('Filter my turn battles', () {
         const currentUserId = 'user-1';
         final myTurnBattles = battles.where(
-          (b) => b.currentTurnPlayerId == currentUserId && b.status == 'active',
+          (b) => b.currentTurnPlayerId == currentUserId && b.completedAt == null && b.betAccepted,
         ).toList();
         expect(myTurnBattles.length, 1);
       });
@@ -110,8 +112,10 @@ void main() {
           createdAt: DateTime.now(),
         );
 
-        const isPlayer1 = true;
+        var isPlayer1 = true;
+        // ignore: dead_code
         final myLetters = isPlayer1 ? battle.player1Letters : battle.player2Letters;
+        // ignore: dead_code
         final opponentLetters = isPlayer1 ? battle.player2Letters : battle.player1Letters;
 
         expect(myLetters, 'SK');
@@ -129,8 +133,10 @@ void main() {
           createdAt: DateTime.now(),
         );
 
-        const isPlayer1 = false; // currentUserId = 'user-2'
+        var isPlayer1 = false; // currentUserId = 'user-2'
+        // ignore: dead_code
         final myLetters = isPlayer1 ? battle.player1Letters : battle.player2Letters;
+        // ignore: dead_code
         final opponentLetters = isPlayer1 ? battle.player2Letters : battle.player1Letters;
 
         expect(myLetters, 'S');
@@ -158,22 +164,28 @@ void main() {
 
     group('Battle Status Display', () {
       test('Active battle status', () {
-        String getStatusLabel(String status) {
-          switch (status) {
-            case 'active':
-              return 'In Progress';
-            case 'pending':
-              return 'Waiting';
-            case 'completed':
-              return 'Finished';
-            default:
-              return 'Unknown';
-          }
+        String getStatusLabel(Battle battle) {
+          if (battle.completedAt != null) return 'Finished';
+          if (!battle.betAccepted) return 'Waiting';
+          return 'In Progress';
         }
 
-        expect(getStatusLabel('active'), 'In Progress');
-        expect(getStatusLabel('pending'), 'Waiting');
-        expect(getStatusLabel('completed'), 'Finished');
+        final activeBattle = Battle(
+          player1Id: '1', player2Id: '2', gameMode: GameMode.skate, currentTurnPlayerId: '1', createdAt: DateTime.now(),
+          betAccepted: true,
+        );
+        final pendingBattle = Battle(
+          player1Id: '1', player2Id: '2', gameMode: GameMode.skate, currentTurnPlayerId: '1', createdAt: DateTime.now(),
+          betAccepted: false,
+        );
+        final completedBattle = Battle(
+          player1Id: '1', player2Id: '2', gameMode: GameMode.skate, currentTurnPlayerId: '1', createdAt: DateTime.now(),
+          completedAt: DateTime.now(),
+        );
+
+        expect(getStatusLabel(activeBattle), 'In Progress');
+        expect(getStatusLabel(pendingBattle), 'Waiting');
+        expect(getStatusLabel(completedBattle), 'Finished');
       });
 
       test('Turn indicator text', () {
@@ -258,7 +270,7 @@ void main() {
             player2Id: 'user-2',
             gameMode: GameMode.skate,
             currentTurnPlayerId: 'user-1',
-            status: 'active',
+            betAccepted: true,
             createdAt: DateTime.now(),
           ),
           Battle(
@@ -267,7 +279,7 @@ void main() {
             player2Id: 'user-3',
             gameMode: GameMode.skate,
             currentTurnPlayerId: 'user-3',
-            status: 'active',
+            betAccepted: true,
             createdAt: DateTime.now(),
           ),
           Battle(
@@ -276,14 +288,14 @@ void main() {
             player2Id: 'user-1',
             gameMode: GameMode.skate,
             currentTurnPlayerId: 'user-1',
-            status: 'active',
+            betAccepted: true,
             createdAt: DateTime.now(),
           ),
         ];
 
         const currentUserId = 'user-1';
         final actionsRequired = battles.where(
-          (b) => b.currentTurnPlayerId == currentUserId && b.status == 'active',
+          (b) => b.currentTurnPlayerId == currentUserId && b.completedAt == null && b.betAccepted,
         ).length;
 
         expect(actionsRequired, 2);

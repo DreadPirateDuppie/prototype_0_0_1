@@ -27,7 +27,6 @@ class _MapTabState extends State<MapTab> {
   bool _isSharingLocation = false; // Slider state
 
   final String _selectedCategory = 'All';
-  final List<String> _categories = ['All', 'Street', 'Park', 'DIY', 'Shop', 'Other'];
 
   @override
   void initState() {
@@ -226,17 +225,57 @@ class _MapTabState extends State<MapTab> {
                 );
               }
             },
-            child: Container(
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: const Icon(
-                Icons.location_on,
-                color: Colors.white,
-                size: 20,
-              ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Outer glow effect
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
+                // Pin background
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: post != null ? const Color(0xFF00FF41) : color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: post != null
+                            ? const Color(0xFF00FF41).withValues(alpha: 0.5)
+                            : color.withValues(alpha: 0.4),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    post != null ? Icons.location_on_rounded : Icons.location_on,
+                    color: Colors.black,
+                    size: 20,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -329,64 +368,45 @@ class _MapTabState extends State<MapTab> {
                       child: Padding(
                         padding: const EdgeInsets.only(top: 16.0),
                         child: Center(
-                      child: Material(
-                        elevation: 4,
-                        shadowColor: Colors.black26,
-                        borderRadius: BorderRadius.circular(30),
-                        color: Colors.white,
-                        child: InkWell(
-                          onTap: () => _toggleLocationSharing(!_isSharingLocation),
-                          borderRadius: BorderRadius.circular(30),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 6, // Slimmer vertical padding
-                            ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(30),
                               border: Border.all(
-                                color: _isSharingLocation
-                                    ? Colors.green
-                                    : Colors.grey.shade300,
-                                width: 1.5,
+                                color: const Color(0xFF00FF41).withValues(alpha: 0.3),
+                                width: 1,
                               ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  _isSharingLocation
-                                      ? Icons.my_location
-                                      : Icons.location_disabled,
+                                  _isSharingLocation ? Icons.my_location : Icons.location_disabled,
                                   size: 18,
-                                  color: _isSharingLocation
-                                      ? Colors.green
-                                      : Colors.grey,
+                                  color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  _isSharingLocation
-                                      ? 'Sharing Location'
-                                      : 'Location Hidden',
+                                  _isSharingLocation ? 'Sharing Location' : 'Location Hidden',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: _isSharingLocation
-                                        ? Colors.green
-                                        : Colors.grey.shade700,
+                                    color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey.shade400,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 SizedBox(
                                   height: 20,
-                                  width: 30,
+                                  width: 36,
                                   child: Switch(
                                     value: _isSharingLocation,
                                     onChanged: _toggleLocationSharing,
-                                    activeThumbColor: Colors.green,
-                                    materialTapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
+                                    activeThumbColor: const Color(0xFF00FF41),
+                                    activeTrackColor: const Color(0xFF00FF41).withValues(alpha: 0.3),
+                                    inactiveThumbColor: Colors.grey.shade600,
+                                    inactiveTrackColor: Colors.grey.shade800,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   ),
                                 ),
                               ],
@@ -396,52 +416,48 @@ class _MapTabState extends State<MapTab> {
                       ),
                     ),
                   ),
-                  ),
-                  ),
 
-                  // Action buttons (Zoom) - Removed Location FAB
+                  // Action buttons (Zoom & Search)
                   Positioned(
                     bottom: 100,
                     right: 16,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        FloatingActionButton(
-                          mini: true,
-                          heroTag: 'search',
+                        _buildMapButton(
+                          icon: Icons.search_rounded,
                           onPressed: () {
                             showSearch(
                               context: context,
                               delegate: PostSearchDelegate(userPosts),
                             );
                           },
-                          backgroundColor: Theme.of(context).colorScheme.surface,
-                          foregroundColor: Theme.of(context).colorScheme.primary,
-                          child: const Icon(Icons.search),
+                          backgroundColor: Colors.black.withValues(alpha: 0.8),
+                          iconColor: const Color(0xFF00FF41),
                         ),
-                        const SizedBox(height: 8),
-                        FloatingActionButton(
-                          mini: true,
+                        const SizedBox(height: 12),
+                        _buildMapButton(
+                          icon: Icons.add_rounded,
                           onPressed: () {
                             mapController.move(
                               mapController.camera.center,
                               mapController.camera.zoom + 1,
                             );
                           },
-                          backgroundColor: Colors.green,
-                          child: const Icon(Icons.add),
+                          backgroundColor: const Color(0xFF00FF41),
+                          iconColor: Colors.black,
                         ),
-                        const SizedBox(height: 8),
-                        FloatingActionButton(
-                          mini: true,
+                        const SizedBox(height: 12),
+                        _buildMapButton(
+                          icon: Icons.remove_rounded,
                           onPressed: () {
                             mapController.move(
                               mapController.camera.center,
                               mapController.camera.zoom - 1,
                             );
                           },
-                          backgroundColor: Colors.green,
-                          child: const Icon(Icons.remove),
+                          backgroundColor: const Color(0xFF00FF41),
+                          iconColor: Colors.black,
                         ),
                       ],
                     ),
@@ -450,12 +466,34 @@ class _MapTabState extends State<MapTab> {
                   Positioned(
                     bottom: 16,
                     right: 16,
-                    child: FloatingActionButton(
-                      onPressed: _togglePinMode,
-                      backgroundColor: _isPinMode
-                          ? Colors.red
-                          : Colors.green,
-                      child: Icon(_isPinMode ? Icons.close : Icons.location_on),
+                    child: Material(
+                      elevation: 8,
+                      shadowColor: (_isPinMode ? Colors.red : const Color(0xFF00FF41)).withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(16),
+                      child: InkWell(
+                        onTap: _togglePinMode,
+                        borderRadius: BorderRadius.circular(16),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: _isPinMode ? Colors.red.shade600 : const Color(0xFF00FF41),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (_isPinMode ? Colors.red : const Color(0xFF00FF41)).withValues(alpha: 0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            _isPinMode ? Icons.close_rounded : Icons.add_location_rounded,
+                            color: _isPinMode ? Colors.white : Colors.black,
+                            size: 28,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -464,6 +502,47 @@ class _MapTabState extends State<MapTab> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildMapButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    required Color backgroundColor,
+    required Color iconColor,
+  }) {
+    return Material(
+      elevation: 6,
+      shadowColor: backgroundColor == Colors.white 
+          ? Colors.black.withValues(alpha: 0.2)
+          : backgroundColor.withValues(alpha: 0.4),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: backgroundColor == Colors.white
+                    ? Colors.black.withValues(alpha: 0.1)
+                    : backgroundColor.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(
+            icon,
+            color: iconColor,
+            size: 24,
+          ),
+        ),
+      ),
     );
   }
 

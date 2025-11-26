@@ -123,7 +123,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 'Game Mode',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: matrixGreen.withOpacity(0.8),
+                  color: matrixGreen.withValues(alpha: 0.8),
                 ),
               ),
               const SizedBox(height: 8),
@@ -132,10 +132,10 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 dropdownColor: matrixBlack,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
-                    borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                    borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                    borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: matrixGreen, width: 2),
@@ -174,14 +174,14 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                   style: const TextStyle(color: matrixGreen),
                   decoration: InputDecoration(
                     labelText: 'Custom Letters',
-                    labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
+                    labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
                     hintText: 'e.g., TRICK',
-                    hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                    hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
                     border: OutlineInputBorder(
-                      borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                      borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                      borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: matrixGreen, width: 2),
@@ -209,20 +209,20 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 style: const TextStyle(color: matrixGreen),
                 decoration: InputDecoration(
                   labelText: 'Opponent User ID',
-                  labelStyle: TextStyle(color: matrixGreen.withOpacity(0.7)),
+                  labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
                   hintText: 'Enter opponent\'s user ID',
-                  hintStyle: TextStyle(color: matrixGreen.withOpacity(0.3)),
+                  hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
                   border: OutlineInputBorder(
-                    borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                    borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: matrixGreen.withOpacity(0.5)),
+                    borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: matrixGreen, width: 2),
                   ),
                   helperText: 'You need to know your opponent\'s user ID',
-                  helperStyle: TextStyle(color: matrixGreen.withOpacity(0.5)),
+                  helperStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -237,9 +237,9 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: matrixGreen.withOpacity(0.1),
+                  color: matrixGreen.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: matrixGreen.withOpacity(0.3)),
+                  border: Border.all(color: matrixGreen.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -247,7 +247,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                     Text(
                       'Your Balance',
                       style: TextStyle(
-                        color: matrixGreen.withOpacity(0.7),
+                        color: matrixGreen.withValues(alpha: 0.7),
                         fontFamily: 'monospace',
                         fontSize: 12,
                       ),
@@ -271,7 +271,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 'Bet Amount: ${_betAmount.toInt()} PTS',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: matrixGreen.withOpacity(0.8),
+                  color: matrixGreen.withValues(alpha: 0.8),
                   fontFamily: 'monospace',
                 ),
               ),
@@ -279,9 +279,9 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
               SliderTheme(
                 data: SliderThemeData(
                   activeTrackColor: matrixGreen,
-                  inactiveTrackColor: matrixGreen.withOpacity(0.2),
+                  inactiveTrackColor: matrixGreen.withValues(alpha: 0.2),
                   thumbColor: matrixGreen,
-                  overlayColor: matrixGreen.withOpacity(0.2),
+                  overlayColor: matrixGreen.withValues(alpha: 0.2),
                   valueIndicatorColor: matrixGreen,
                   valueIndicatorTextStyle: const TextStyle(
                     color: Colors.black,
@@ -308,7 +308,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                     : 'No bet - just for fun!',
                 style: TextStyle(
                   fontSize: 11,
-                  color: matrixGreen.withOpacity(0.6),
+                  color: matrixGreen.withValues(alpha: 0.6),
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -319,13 +319,13 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: _isQuickfire 
-                      ? matrixGreen.withOpacity(0.15)
-                      : matrixGreen.withOpacity(0.05),
+                      ? matrixGreen.withValues(alpha: 0.15)
+                      : matrixGreen.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: _isQuickfire 
                         ? matrixGreen 
-                        : matrixGreen.withOpacity(0.2),
+                        : matrixGreen.withValues(alpha: 0.2),
                     width: _isQuickfire ? 2 : 1,
                   ),
                 ),
@@ -335,7 +335,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                       Icons.flash_on,
                       color: _isQuickfire 
                           ? matrixGreen 
-                          : matrixGreen.withOpacity(0.5),
+                          : matrixGreen.withValues(alpha: 0.5),
                       size: 20,
                     ),
                     const SizedBox(width: 8),
@@ -358,7 +358,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                                 ? '4:20 timer per turn'
                                 : '24 hour timer per turn',
                             style: TextStyle(
-                              color: matrixGreen.withOpacity(0.6),
+                              color: matrixGreen.withValues(alpha: 0.6),
                               fontSize: 11,
                             ),
                           ),
@@ -367,10 +367,10 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                     ),
                     Switch(
                       value: _isQuickfire,
-                      activeColor: matrixGreen,
-                      activeTrackColor: matrixGreen.withOpacity(0.5),
-                      inactiveThumbColor: matrixGreen.withOpacity(0.5),
-                      inactiveTrackColor: matrixGreen.withOpacity(0.2),
+                      activeThumbColor: matrixGreen,
+                      activeTrackColor: matrixGreen.withValues(alpha: 0.5),
+                      inactiveThumbColor: matrixGreen.withValues(alpha: 0.5),
+                      inactiveTrackColor: matrixGreen.withValues(alpha: 0.2),
                       onChanged: (value) {
                         setState(() {
                           _isQuickfire = value;
@@ -385,7 +385,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 'Note: In a future update, you\'ll be able to search for opponents by username.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: matrixGreen.withOpacity(0.5),
+                  color: matrixGreen.withValues(alpha: 0.5),
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -399,7 +399,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
           child: Text(
             'CANCEL',
             style: TextStyle(
-              color: matrixGreen.withOpacity(0.7),
+              color: matrixGreen.withValues(alpha: 0.7),
               fontFamily: 'monospace',
             ),
           ),
@@ -410,7 +410,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
             border: Border.all(color: matrixGreen, width: 2),
             boxShadow: [
               BoxShadow(
-                color: matrixGreen.withOpacity(0.3),
+                color: matrixGreen.withValues(alpha: 0.3),
                 blurRadius: 8,
               ),
             ],

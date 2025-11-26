@@ -193,7 +193,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
         border: Border.all(color: matrixGreen, width: 2),
         boxShadow: [
           BoxShadow(
-            color: matrixGreen.withOpacity(0.3),
+            color: matrixGreen.withValues(alpha: 0.3),
             blurRadius: 20,
             spreadRadius: 2,
           ),
@@ -207,7 +207,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: matrixGreen.withOpacity(0.5),
+              color: matrixGreen.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -251,7 +251,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
                   decoration: BoxDecoration(
                     color: matrixSurface,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: matrixGreen.withOpacity(0.3)),
+                    border: Border.all(color: matrixGreen.withValues(alpha: 0.3)),
                   ),
                   child: Text(
                     '${_currentStep.index + 1}/${TutorialStep.values.length}',
@@ -264,7 +264,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: matrixGreen.withOpacity(0.7)),
+                  icon: Icon(Icons.close, color: matrixGreen.withValues(alpha: 0.7)),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -278,7 +278,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
             decoration: BoxDecoration(
               color: matrixSurface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: matrixGreen.withOpacity(0.2)),
+              border: Border.all(color: matrixGreen.withValues(alpha: 0.2)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -287,7 +287,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
                 Container(
                   height: 30,
                   width: 2,
-                  color: matrixGreen.withOpacity(0.3),
+                  color: matrixGreen.withValues(alpha: 0.3),
                 ),
                 _buildCompactScore('OPP', _opponentLetters.isEmpty ? '-' : _opponentLetters),
               ],
@@ -330,7 +330,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
                           border: Border.all(color: matrixGreen, width: 2),
                           boxShadow: [
                             BoxShadow(
-                              color: matrixGreen.withOpacity(0.2),
+                              color: matrixGreen.withValues(alpha: 0.2),
                               blurRadius: 8,
                             ),
                           ],
@@ -340,7 +340,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
                             Text(
                               'TRICK',
                               style: TextStyle(
-                                color: matrixGreen.withOpacity(0.6),
+                                color: matrixGreen.withValues(alpha: 0.6),
                                 fontSize: 10,
                                 fontFamily: 'monospace',
                                 letterSpacing: 1.5,
@@ -365,12 +365,12 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
                       decoration: BoxDecoration(
                         color: matrixSurface,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: matrixGreen.withOpacity(0.2)),
+                        border: Border.all(color: matrixGreen.withValues(alpha: 0.2)),
                       ),
                       child: Text(
                         _getStepDescription(),
                         style: TextStyle(
-                          color: matrixGreen.withOpacity(0.9),
+                          color: matrixGreen.withValues(alpha: 0.9),
                           fontSize: 14,
                           height: 1.5,
                         ),
@@ -387,7 +387,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
                         decoration: BoxDecoration(
                           color: matrixSurface,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: matrixGreen.withOpacity(0.2)),
+                          border: Border.all(color: matrixGreen.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -428,7 +428,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: matrixGreen.withOpacity(0.4),
+                      color: matrixGreen.withValues(alpha: 0.4),
                       blurRadius: 16,
                       spreadRadius: 2,
                     ),
@@ -473,7 +473,7 @@ class _TutorialBattleModalState extends State<TutorialBattleModal> with SingleTi
         Text(
           label,
           style: TextStyle(
-            color: matrixGreen.withOpacity(0.6),
+            color: matrixGreen.withValues(alpha: 0.6),
             fontSize: 10,
             fontWeight: FontWeight.bold,
             fontFamily: 'monospace',

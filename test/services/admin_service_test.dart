@@ -3,10 +3,8 @@ import 'package:prototype_0_0_1/services/admin_service.dart';
 
 void main() {
   group('AdminService', () {
-    late AdminService adminService;
-
     setUp(() {
-      adminService = AdminService();
+      // No setup needed
     });
 
     group('AdminService instantiation', () {

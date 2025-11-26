@@ -4,12 +4,9 @@ import 'package:prototype_0_0_1/services/post_service.dart';
 
 void main() {
   group('PostService', () {
-    late PostService postService;
-
     setUp(() {
       // Create service without client for unit tests
       // Integration tests would use mock client
-      postService = PostService();
     });
 
     group('Model Operations', () {

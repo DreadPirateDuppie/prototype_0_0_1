@@ -11,8 +11,9 @@ class AdminService {
 
   /// Gets the Supabase client, using injected client or falling back to getIt or Supabase.instance
   SupabaseClient get _client {
-    if (_injectedClient != null) {
-      return _injectedClient!;
+    final injected = _injectedClient;
+    if (injected != null) {
+      return injected;
     }
     // Try getIt first, but fallback to Supabase.instance if not registered
     if (getIt.isRegistered<SupabaseClient>()) {

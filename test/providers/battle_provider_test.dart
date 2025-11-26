@@ -70,7 +70,7 @@ void main() {
         ];
 
         final activeBattles = battles
-            .where((b) => !b.isComplete() && b.player2Id != null)
+            .where((b) => !b.isComplete())
             .toList();
         final completedBattles = battles.where((b) => b.isComplete()).toList();
 
@@ -83,7 +83,7 @@ void main() {
           Battle(
             id: '1',
             player1Id: 'p1',
-            player2Id: null, // Pending - no opponent yet
+            player2Id: '', // Pending - no opponent yet
             gameMode: GameMode.skate,
             currentTurnPlayerId: 'p1',
             createdAt: DateTime.now(),
@@ -99,7 +99,7 @@ void main() {
         ];
 
         final pendingBattles = battles
-            .where((b) => !b.isComplete() && b.player2Id == null)
+            .where((b) => !b.isComplete() && b.player2Id.isEmpty)
             .toList();
 
         expect(pendingBattles.length, 1);

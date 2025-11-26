@@ -133,7 +133,7 @@ class _RewardsTabState extends State<RewardsTab> {
                   border: Border.all(color: const Color(0xFF00FF41), width: 1),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF00FF41).withOpacity(0.2),
+                      color: const Color(0xFF00FF41).withValues(alpha: 0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -298,9 +298,9 @@ class _RewardsTabState extends State<RewardsTab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00FF41).withOpacity(0.1),
+                  color: const Color(0xFF00FF41).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF00FF41).withOpacity(0.3)),
+                  border: Border.all(color: const Color(0xFF00FF41).withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -336,15 +336,15 @@ class _RewardsTabState extends State<RewardsTab> {
                     height: 36,
                     decoration: BoxDecoration(
                       color: isActive 
-                          ? matrixGreen.withOpacity(0.2)
-                          : (isToday ? matrixGreen.withOpacity(0.1) : Colors.transparent),
+                          ? matrixGreen.withValues(alpha: 0.2)
+                          : (isToday ? matrixGreen.withValues(alpha: 0.1) : Colors.transparent),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isActive || isToday ? matrixGreen : matrixGreen.withOpacity(0.2),
+                        color: isActive || isToday ? matrixGreen : matrixGreen.withValues(alpha: 0.2),
                       ),
                       boxShadow: isActive ? [
                         BoxShadow(
-                          color: matrixGreen.withOpacity(0.3),
+                          color: matrixGreen.withValues(alpha: 0.3),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         )
@@ -353,7 +353,7 @@ class _RewardsTabState extends State<RewardsTab> {
                     child: Icon(
                       Icons.local_fire_department,
                       size: 20,
-                      color: isActive || isToday ? matrixGreen : matrixGreen.withOpacity(0.3),
+                      color: isActive || isToday ? matrixGreen : matrixGreen.withValues(alpha: 0.3),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -361,7 +361,7 @@ class _RewardsTabState extends State<RewardsTab> {
                     'Day ${index + 1}',
                     style: TextStyle(
                       fontSize: 10,
-                      color: isActive || isToday ? matrixGreen : matrixGreen.withOpacity(0.5),
+                      color: isActive || isToday ? matrixGreen : matrixGreen.withValues(alpha: 0.5),
                       fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                       fontFamily: 'monospace',
                     ),
@@ -407,6 +407,7 @@ class _RewardsTabState extends State<RewardsTab> {
                 color: const Color(0xFF00FF41),
                 title: 'Daily Login',
                 points: '+10+',
+                onTap: _checkDailyLogin,
               ),
               const SizedBox(width: 12),
               _buildEarnCard(
@@ -426,55 +427,102 @@ class _RewardsTabState extends State<RewardsTab> {
     );
   }
 
+  Future<void> _checkDailyLogin() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final points = await SupabaseService.checkDailyStreak();
+      await _loadData(); // Reload to show new streak/points
+      
+      if (mounted) {
+        if (points > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text('Daily Check-in: Earned $points points!'),
+                ],
+              ),
+              backgroundColor: Colors.green.shade700,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Already checked in today! Come back tomorrow.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error checking in: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   Widget _buildEarnCard({
     required IconData icon,
     required Color color,
     required String title,
     required String points,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      width: 120,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 120,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            points,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w900,
-              fontSize: 16,
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              points,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -494,7 +542,7 @@ class _RewardsTabState extends State<RewardsTab> {
             border: Border.all(color: const Color(0xFF00FF41), width: 1),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF00FF41).withOpacity(0.2),
+              color: const Color(0xFF00FF41).withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -543,7 +591,7 @@ class _RewardsTabState extends State<RewardsTab> {
         border: Border.all(color: const Color(0xFF00FF41), width: 1),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00FF41).withOpacity(0.2),
+            color: const Color(0xFF00FF41).withValues(alpha: 0.2),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -580,7 +628,7 @@ class _RewardsTabState extends State<RewardsTab> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFD700).withOpacity(0.2),
+                        color: const Color(0xFFFFD700).withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
@@ -770,7 +818,7 @@ class _RewardsTabState extends State<RewardsTab> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF00FF41).withOpacity(0.1),
+                color: const Color(0xFF00FF41).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: isLoading

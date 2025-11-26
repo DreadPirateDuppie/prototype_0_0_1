@@ -5,7 +5,6 @@ import '../services/supabase_service.dart';
 import '../screens/edit_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
 import '../screens/trick_history_screen.dart';
-import 'star_rating_display.dart';
 import 'vote_buttons.dart';
 import 'mini_map_snapshot.dart';
 import '../utils/error_helper.dart';
@@ -96,6 +95,7 @@ class _PostCardState extends State<PostCard> {
       final rating = currentPost.popularityRating > 0 
           ? '${currentPost.popularityRating.toStringAsFixed(1)}/5 ⭐' 
           : 'Not rated yet';
+      // ignore: deprecated_member_use
       await Share.share(
         'Check out "${currentPost.title}" 🛹\n'
         'Rating: $rating\n'
@@ -140,8 +140,6 @@ class _PostCardState extends State<PostCard> {
   @override
   Widget build(BuildContext context) {
     const matrixGreen = Color(0xFF00FF41);
-    const matrixBlack = Color(0xFF000000);
-    const matrixSurface = Color(0xFF0D0D0D);
     
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -149,14 +147,14 @@ class _PostCardState extends State<PostCard> {
       color: const Color(0xFF000000), // Pure black background
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: matrixGreen.withOpacity(0.3), width: 1),
+        side: BorderSide(color: matrixGreen.withValues(alpha: 0.3), width: 1),
       ),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: matrixGreen.withOpacity(0.2),
+              color: matrixGreen.withValues(alpha: 0.2),
               blurRadius: 8,
               spreadRadius: 0,
             ),
@@ -176,7 +174,7 @@ class _PostCardState extends State<PostCard> {
                       border: Border.all(color: matrixGreen, width: 2),
                       boxShadow: [
                         BoxShadow(
-                          color: matrixGreen.withOpacity(0.5),
+                          color: matrixGreen.withValues(alpha: 0.5),
                           blurRadius: 4,
                         ),
                       ],
@@ -391,12 +389,12 @@ class _PostCardState extends State<PostCard> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: matrixGreen.withOpacity(0.05),
+          color: matrixGreen.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: matrixGreen.withOpacity(0.5)),
+          border: Border.all(color: matrixGreen.withValues(alpha: 0.5)),
           boxShadow: [
             BoxShadow(
-              color: matrixGreen.withOpacity(0.3),
+              color: matrixGreen.withValues(alpha: 0.3),
               blurRadius: 4,
             ),
           ],
@@ -421,7 +419,7 @@ class _PostCardState extends State<PostCard> {
               children: List.generate(5, (index) {
                 return Icon(
                   index < rating ? Icons.star : Icons.star_border,
-                  color: index < rating ? matrixGreen : matrixGreen.withOpacity(0.3),
+                  color: index < rating ? matrixGreen : matrixGreen.withValues(alpha: 0.3),
                   size: 12,
                 );
               }),

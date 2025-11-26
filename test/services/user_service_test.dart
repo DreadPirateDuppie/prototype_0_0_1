@@ -3,10 +3,8 @@ import 'package:prototype_0_0_1/services/user_service.dart';
 
 void main() {
   group('UserService', () {
-    late UserService userService;
-
     setUp(() {
-      userService = UserService();
+      // No setup needed
     });
 
     group('UserService instantiation', () {

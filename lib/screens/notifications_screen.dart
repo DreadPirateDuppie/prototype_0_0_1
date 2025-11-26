@@ -82,7 +82,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 final isRead = notification['is_read'] as bool;
 
                 return Container(
-                  color: isRead ? null : Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                  color: isRead ? null : Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: isRead ? Colors.grey : Theme.of(context).colorScheme.primary,

@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import 'screens/signin_screen.dart';
 import 'screens/home_screen.dart';
 import 'providers/theme_provider.dart';
+import 'providers/user_provider.dart';
+import 'providers/battle_provider.dart';
+import 'providers/post_provider.dart';
 import 'services/error_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/rewarded_ad_service.dart';
@@ -49,8 +52,13 @@ Future<void> main() async {
   await RewardedAdService.instance.initialize();
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => BattleProvider()),
+        ChangeNotifierProvider(create: (_) => PostProvider()),
+      ],
       child: const MyApp(),
     ),
   );

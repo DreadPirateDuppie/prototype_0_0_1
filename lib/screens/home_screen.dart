@@ -81,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           border: Border(
             top: BorderSide(
-              color: const Color(0xFF00FF41).withOpacity(0.3),
+              color: const Color(0xFF00FF41).withValues(alpha: 0.3),
               width: 1,
             ),
           ),
