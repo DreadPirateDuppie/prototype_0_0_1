@@ -6,7 +6,14 @@ import '../services/supabase_service.dart';
 import '../utils/error_helper.dart';
 
 class CreateBattleDialog extends StatefulWidget {
-  const CreateBattleDialog({super.key});
+  final String? prefilledOpponentId;
+  final bool isQuickMatch;
+
+  const CreateBattleDialog({
+    super.key,
+    this.prefilledOpponentId,
+    this.isQuickMatch = false,
+  });
 
   @override
   State<CreateBattleDialog> createState() => _CreateBattleDialogState();
@@ -20,13 +27,26 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
   final _wagerController = TextEditingController();
   bool _isLoading = false;
   int _userPoints = 0;
+  int _opponentPoints = 0;
   double _betAmount = 0;
   bool _isQuickfire = false;
+  List<Map<String, dynamic>> _mutualFollowers = [];
+  bool _isLoadingFollowers = true;
+  String? _selectedMutualFollowerId;
 
   @override
   void initState() {
     super.initState();
     _loadUserPoints();
+    _loadMutualFollowers();
+    
+    if (widget.prefilledOpponentId != null) {
+      _opponentIdController.text = widget.prefilledOpponentId!;
+      // If quick match, default to quickfire for faster games
+      if (widget.isQuickMatch) {
+        _isQuickfire = true;
+      }
+    }
   }
 
   @override
@@ -49,6 +69,62 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
     }
   }
 
+  Future<void> _loadOpponentPoints(String opponentId) async {
+    try {
+      final points = await SupabaseService.getUserPoints(opponentId);
+      if (mounted) {
+        setState(() {
+          _opponentPoints = points.toInt();
+          // Reset bet if it exceeds new limit
+          final maxBet = _getMaxBet();
+          if (_betAmount > maxBet) {
+            _betAmount = maxBet.toDouble();
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _opponentPoints = 0;
+          _betAmount = 0;
+        });
+      }
+    }
+  }
+
+  int _getMaxBet() {
+    if (_opponentPoints > 0 && _userPoints > 0) {
+      return _userPoints < _opponentPoints ? _userPoints : _opponentPoints;
+    }
+    return _userPoints;
+  }
+
+  Future<void> _loadMutualFollowers() async {
+    try {
+      final followers = await SupabaseService.getMutualFollowers();
+      if (mounted) {
+        setState(() {
+          _mutualFollowers = followers;
+          _isLoadingFollowers = false;
+          
+          // If prefilled ID matches a mutual follower, select it in dropdown
+          if (widget.prefilledOpponentId != null) {
+            final match = followers.where((f) => f['id'] == widget.prefilledOpponentId);
+            if (match.isNotEmpty) {
+              _selectedMutualFollowerId = widget.prefilledOpponentId;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingFollowers = false;
+        });
+      }
+    }
+  }
+
   Future<void> _createBattle() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -58,7 +134,8 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
 
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
-      final opponentId = _opponentIdController.text.trim();
+      // Use selected mutual follower ID if available, otherwise use text input
+      final opponentId = _selectedMutualFollowerId ?? _opponentIdController.text.trim();
       final wagerAmount = int.tryParse(_wagerController.text) ?? 0;
 
       await BattleService.createBattle(
@@ -103,13 +180,14 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: matrixGreen, width: 2),
       ),
-      title: const Text(
-        'CREATE NEW BATTLE',
+      title: Text(
+        widget.isQuickMatch ? 'QUICK MATCH FOUND!' : 'CREATE NEW BATTLE',
         style: TextStyle(
           color: matrixGreen,
           fontFamily: 'monospace',
           fontWeight: FontWeight.bold,
           letterSpacing: 1.5,
+          fontSize: widget.isQuickMatch ? 18 : 20,
         ),
       ),
       content: Form(
@@ -119,6 +197,30 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (widget.isQuickMatch) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.flash_on, color: Colors.blue),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Opponent found! Configure your game settings below.',
+                          style: TextStyle(color: Colors.blue),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               Text(
                 'Game Mode',
                 style: TextStyle(
@@ -204,33 +306,97 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 const SizedBox(height: 16),
               ],
 
-              TextFormField(
-                controller: _opponentIdController,
-                style: const TextStyle(color: matrixGreen),
-                decoration: InputDecoration(
-                  labelText: 'Opponent User ID',
-                  labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
-                  hintText: 'Enter opponent\'s user ID',
-                  hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+              // Opponent Selection
+              if (_mutualFollowers.isNotEmpty && !widget.isQuickMatch) ...[
+                Text(
+                  'Select Opponent',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: matrixGreen.withValues(alpha: 0.8),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: matrixGreen, width: 2),
-                  ),
-                  helperText: 'You need to know your opponent\'s user ID',
-                  helperStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter opponent user ID';
-                  }
-                  return null;
-                },
-              ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: _selectedMutualFollowerId,
+                  dropdownColor: matrixBlack,
+                  decoration: InputDecoration(
+                    labelText: 'Mutual Followers',
+                    labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: matrixGreen, width: 2),
+                    ),
+                  ),
+                  style: const TextStyle(color: matrixGreen),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Enter User ID manually...'),
+                    ),
+                    ..._mutualFollowers.map((user) {
+                      final name = user['display_name'] ?? user['username'] ?? 'User';
+                      return DropdownMenuItem<String>(
+                        value: user['id'] as String,
+                        child: Text(name),
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedMutualFollowerId = value;
+                      if (value != null) {
+                        _opponentIdController.text = value;
+                        _loadOpponentPoints(value);
+                      } else {
+                        _opponentIdController.clear();
+                        _opponentPoints = 0;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Manual ID Entry (only show if no mutual follower selected)
+              if (_selectedMutualFollowerId == null || widget.isQuickMatch)
+                TextFormField(
+                  controller: _opponentIdController,
+                  style: const TextStyle(color: matrixGreen),
+                  readOnly: widget.isQuickMatch, // Lock if quick match
+                  decoration: InputDecoration(
+                    labelText: 'Opponent User ID',
+                    labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
+                    hintText: 'Enter opponent\'s user ID',
+                    hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: matrixGreen, width: 2),
+                    ),
+                    helperText: widget.isQuickMatch 
+                        ? 'Opponent automatically selected'
+                        : 'You need to know your opponent\'s user ID',
+                    helperStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.5)),
+                    suffixIcon: widget.isQuickMatch 
+                        ? const Icon(Icons.lock, color: matrixGreen, size: 16)
+                        : null,
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter opponent user ID';
+                    }
+                    return null;
+                  },
+                ),
               const SizedBox(height: 16),
               
               // Points balance display
@@ -292,8 +458,8 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 child: Slider(
                   value: _betAmount,
                   min: 0,
-                  max: _userPoints.toDouble(),
-                  divisions: _userPoints > 0 ? _userPoints : 1,
+                  max: _getMaxBet().toDouble(),
+                  divisions: _getMaxBet() > 0 ? _getMaxBet() : 1,
                   label: _betAmount.toInt().toString(),
                   onChanged: (value) {
                     setState(() {
@@ -304,7 +470,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
               ),
               Text(
                 _betAmount > 0 
-                    ? 'Winner takes ${(_betAmount * 2).toInt()} PTS (both players bet ${_betAmount.toInt()} PTS)'
+                    ? 'Winner gets ${_betAmount.toInt()} PTS back'
                     : 'No bet - just for fun!',
                 style: TextStyle(
                   fontSize: 11,
@@ -350,6 +516,7 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                               fontFamily: 'monospace',
+                              letterSpacing: 0.5,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -381,14 +548,15 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                'Note: In a future update, you\'ll be able to search for opponents by username.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: matrixGreen.withValues(alpha: 0.5),
-                  fontStyle: FontStyle.italic,
+              if (!widget.isQuickMatch)
+                Text(
+                  'Note: In a future update, you\'ll be able to search for opponents by username.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: matrixGreen.withValues(alpha: 0.5),
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
-              ),
             ],
           ),
         ),

@@ -15,7 +15,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 0; // Default to Feed tab (Map crashes on startup)
 
   String? _avatarUrl;
 
@@ -23,10 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadUserProfile();
-    // Check daily streak on app launch
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      SupabaseService.checkDailyStreak();
-    });
   }
 
   Future<void> _loadUserProfile() async {

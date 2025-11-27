@@ -14,6 +14,7 @@ class RewardsTab extends StatefulWidget {
 class _RewardsTabState extends State<RewardsTab> {
   double _points = 0.0;
   int _streak = 0;
+  DateTime? _lastLoginDate;
   List<Map<String, dynamic>> _transactions = [];
   bool _isLoading = true;
 
@@ -33,8 +34,38 @@ class _RewardsTabState extends State<RewardsTab> {
       if (mounted) {
         setState(() {
           _points = points;
-          _streak = streakData['current_streak'] as int;
           _transactions = transactions;
+          
+          // Calculate effective streak
+          final dbStreak = streakData['current_streak'] as int;
+          final lastLoginStr = streakData['last_login_date'] as String?;
+          _lastLoginDate = lastLoginStr != null ? DateTime.parse(lastLoginStr) : null;
+          
+          if (_lastLoginDate == null) {
+            _streak = 0;
+          } else {
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            final lastLogin = DateTime(_lastLoginDate!.year, _lastLoginDate!.month, _lastLoginDate!.day);
+            final difference = today.difference(lastLogin).inDays;
+            
+            if (difference > 1) {
+              // Streak is broken (missed more than 1 day)
+              _streak = 0;
+            } else if (difference == 0) {
+              // Last login was today - verify we have a transaction
+              final hasTransaction = transactions.any((tx) {
+                final txDate = DateTime.parse(tx['created_at'] as String).toLocal();
+                final txDay = DateTime(txDate.year, txDate.month, txDate.day);
+                return tx['transaction_type'] == 'daily_login' && txDay.isAtSameMomentAs(today);
+              });
+              _streak = hasTransaction ? dbStreak : 0;
+            } else {
+              // Last login was yesterday - show previous streak until check-in
+              _streak = dbStreak;
+            }
+          }
+          
           _isLoading = false;
         });
       }
@@ -320,13 +351,62 @@ class _RewardsTabState extends State<RewardsTab> {
             ],
           ),
           const SizedBox(height: 20),
+          // Check In Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _hasCheckedInToday() ? null : _checkDailyLogin,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF41),
+                foregroundColor: Colors.black,
+                disabledBackgroundColor: Colors.grey.shade800,
+                disabledForegroundColor: Colors.grey,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: _hasCheckedInToday() ? 0 : 4,
+                shadowColor: const Color(0xFF00FF41).withValues(alpha: 0.4),
+              ),
+              child: _isLoading 
+                  ? const SizedBox(
+                      height: 20, 
+                      width: 20, 
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(_hasCheckedInToday() ? Icons.check_circle : Icons.touch_app),
+                        const SizedBox(width: 8),
+                        Text(
+                          _hasCheckedInToday() ? 'CHECKED IN TODAY' : 'CHECK IN NOW',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(7, (index) {
-              // Simple logic: assume streak fills from left
-              // In a real app, we'd map this to actual days of the week
-              final isActive = index < (_streak % 8); 
-              final isToday = index == (_streak % 8);
+              // Calculate how many days are active in the current 7-day cycle
+              // Streak 0 -> 0 active
+              // Streak 1 -> 1 active
+              // Streak 7 -> 7 active
+              // Streak 8 -> 1 active
+              final activeCount = _streak == 0 ? 0 : ((_streak - 1) % 7) + 1;
+              final isActive = index < activeCount;
+              
+              // Is this the specific day we just checked in for?
+              // (Only relevant if we want to animate or highlight the "current" one differently)
+              final isToday = index == (activeCount - 1) && _streak > 0;
+              
               const matrixGreen = Color(0xFF00FF41);
               
               return Column(
@@ -337,10 +417,10 @@ class _RewardsTabState extends State<RewardsTab> {
                     decoration: BoxDecoration(
                       color: isActive 
                           ? matrixGreen.withValues(alpha: 0.2)
-                          : (isToday ? matrixGreen.withValues(alpha: 0.1) : Colors.transparent),
+                          : Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isActive || isToday ? matrixGreen : matrixGreen.withValues(alpha: 0.2),
+                        color: isActive ? matrixGreen : matrixGreen.withValues(alpha: 0.2),
                       ),
                       boxShadow: isActive ? [
                         BoxShadow(
@@ -353,7 +433,7 @@ class _RewardsTabState extends State<RewardsTab> {
                     child: Icon(
                       Icons.local_fire_department,
                       size: 20,
-                      color: isActive || isToday ? matrixGreen : matrixGreen.withValues(alpha: 0.3),
+                      color: isActive ? matrixGreen : matrixGreen.withValues(alpha: 0.3),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -361,7 +441,7 @@ class _RewardsTabState extends State<RewardsTab> {
                     'Day ${index + 1}',
                     style: TextStyle(
                       fontSize: 10,
-                      color: isActive || isToday ? matrixGreen : matrixGreen.withValues(alpha: 0.5),
+                      color: isActive ? matrixGreen : matrixGreen.withValues(alpha: 0.5),
                       fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                       fontFamily: 'monospace',
                     ),
@@ -373,6 +453,28 @@ class _RewardsTabState extends State<RewardsTab> {
         ],
       ),
     );
+  }
+
+  bool _hasCheckedInToday() {
+    if (_lastLoginDate == null) return false;
+    
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lastLogin = DateTime(_lastLoginDate!.year, _lastLoginDate!.month, _lastLoginDate!.day);
+    
+    // Check if last login was today
+    if (!lastLogin.isAtSameMomentAs(today)) {
+      return false;
+    }
+
+    // If logged in today, verify we have a transaction (to handle failed awards)
+    final hasTransaction = _transactions.any((tx) {
+      final txDate = DateTime.parse(tx['created_at'] as String).toLocal();
+      final txDay = DateTime(txDate.year, txDate.month, txDate.day);
+      return tx['transaction_type'] == 'daily_login' && txDay.isAtSameMomentAs(today);
+    });
+
+    return hasTransaction;
   }
 
   Widget _buildEarnSection(BuildContext context) {
@@ -397,11 +499,13 @@ class _RewardsTabState extends State<RewardsTab> {
                 icon: Icons.add_location_alt,
                 color: const Color(0xFF00FF41),
                 title: 'Create Spot',
-                points: '+4',
+                points: '+3.5',
               ),
               const SizedBox(width: 12),
               _buildWatchAdCard(),
               const SizedBox(width: 12),
+              /* 
+              // Removed redundant Daily Login card as it is now a main button
               _buildEarnCard(
                 icon: Icons.login,
                 color: const Color(0xFF00FF41),
@@ -410,11 +514,12 @@ class _RewardsTabState extends State<RewardsTab> {
                 onTap: _checkDailyLogin,
               ),
               const SizedBox(width: 12),
+              */
               _buildEarnCard(
                 icon: Icons.sports_kabaddi,
                 color: const Color(0xFF00FF41),
                 title: 'Win Battle',
-                points: '2x Pot',
+                points: 'Win Pot',
               ),
               const SizedBox(width: 12),
               _buildBettingCard(context),
@@ -614,27 +719,39 @@ class _RewardsTabState extends State<RewardsTab> {
               children: [
                 Row(
                   children: [
-                      const Text(
-                        'WEB3 READY',
-                        style: TextStyle(
-                          color: Color(0xFF00D9FF),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                          letterSpacing: 1.5,
-                          fontFamily: 'monospace',
-                        ),
+                    const Text(
+                      'WEB3',
+                      style: TextStyle(
+                        color: Color(0xFF00FF41),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                        letterSpacing: 1.5,
+                        fontFamily: 'monospace',
                       ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'READY',
+                      style: TextStyle(
+                        color: Color(0xFFFF0000),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                        letterSpacing: 1.5,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFD700).withValues(alpha: 0.2),
+                        color: Colors.black,
                         borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
                       ),
                       child: const Text(
                         'COMING SOON',
                         style: TextStyle(
-                          color: Color(0xFFFFD700),
+                          color: Color(0xFF00FF41),
                           fontSize: 8,
                           fontWeight: FontWeight.bold,
                           fontFamily: 'monospace',
@@ -647,7 +764,7 @@ class _RewardsTabState extends State<RewardsTab> {
                 const Text(
                   'Crypto Conversion',
                   style: TextStyle(
-                    color: Color(0xFF00D9FF),
+                    color: Color(0xFF00FF41),
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -721,7 +838,7 @@ class _RewardsTabState extends State<RewardsTab> {
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final tx = _transactions[index];
-              final amount = tx['amount'] as int;
+              final amount = (tx['amount'] as num).toDouble();
               final isPositive = amount > 0;
               final date = DateTime.parse(tx['created_at'] as String);
               
@@ -846,7 +963,7 @@ class _RewardsTabState extends State<RewardsTab> {
             ),
             const SizedBox(height: 4),
             Text(
-              '+4',
+              '+4.2',
               style: TextStyle(
                 color: isReady ? const Color(0xFF00FF41) : Colors.grey,
                 fontWeight: FontWeight.w900,

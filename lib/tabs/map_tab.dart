@@ -324,6 +324,38 @@ class _MapTabState extends State<MapTab> {
       children: [
         Column(
           children: [
+            // App Name Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                border: Border(
+                  bottom: BorderSide(
+                    color: const Color(0xFF00FF41).withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      '> PUSHINN_',
+                      style: TextStyle(
+                        color: Color(0xFF00FF41),
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const AdBanner(),
             Expanded(
               child: Stack(

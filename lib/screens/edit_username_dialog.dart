@@ -65,8 +65,9 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
       return;
     }
 
-    // Check if username is the same as current
-    if (username.toLowerCase() == widget.currentUsername.toLowerCase()) {
+    // Check if username is the same as current (only if current username exists)
+    if (widget.currentUsername.isNotEmpty && 
+        username.toLowerCase() == widget.currentUsername.toLowerCase()) {
       Navigator.of(context).pop();
       return;
     }
@@ -78,20 +79,20 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
     });
 
     try {
-      // Check if username is available
-      final isAvailable = await SupabaseService.isUsernameAvailable(username);
-      
-      if (!isAvailable) {
-        setState(() {
-          _errorMessage = 'Username is already taken';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      // Save username
+      // Check if username is available (excluding current user)
       final user = SupabaseService.getCurrentUser();
       if (user != null) {
+        final isAvailable = await SupabaseService.isUsernameAvailableForUser(username, user.id);
+        
+        if (!isAvailable) {
+          setState(() {
+            _errorMessage = 'Username is already taken';
+            _isLoading = false;
+          });
+          return;
+        }
+
+        // Save username
         await SupabaseService.saveUserUsername(user.id, username);
         
         if (mounted) {

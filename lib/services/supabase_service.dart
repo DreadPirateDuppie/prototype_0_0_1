@@ -68,6 +68,40 @@ class SupabaseService {
     }
   }
 
+  // Check if username is available for a specific user (excludes their own current username)
+  static Future<bool> isUsernameAvailableForUser(String username, String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('id')
+          .eq('username', username.toLowerCase().trim())
+          .neq('id', userId);  // Exclude current user
+      return (response as List).isEmpty;
+    } catch (e) {
+      developer.log('Error checking username availability: $e', name: 'SupabaseService');
+      return true; // Assume available if query fails
+    }
+  }
+
+  // Search for users by username or display name (excludes current user)
+  static Future<List<Map<String, dynamic>>> searchUsers(String query) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) return [];
+
+      final response = await _client
+          .from('user_profiles')
+          .select('id, username, display_name, avatar_url')
+          .or('username.ilike.%$query%,display_name.ilike.%$query%')
+          .limit(20);
+
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error searching users: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
   // Save user display name
   static Future<void> saveUserDisplayName(
     String userId,
@@ -105,6 +139,212 @@ class SupabaseService {
       throw Exception('Failed to save username: $e');
     }
   }
+
+  // ========== FOLLOW SYSTEM ==========
+
+  /// Follow a user
+  static Future<void> followUser(String userIdToFollow) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) throw Exception('User not logged in');
+      
+      if (currentUser.id == userIdToFollow) {
+        throw Exception('Cannot follow yourself');
+      }
+
+      await _client.from('follows').insert({
+        'follower_id': currentUser.id,
+        'following_id': userIdToFollow,
+      });
+      
+      developer.log('User ${currentUser.id} followed $userIdToFollow', name: 'SupabaseService');
+    } catch (e) {
+      throw Exception('Failed to follow user: $e');
+    }
+  }
+
+  /// Unfollow a user
+  static Future<void> unfollowUser(String userIdToUnfollow) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) throw Exception('User not logged in');
+
+      await _client
+          .from('follows')
+          .delete()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', userIdToUnfollow);
+      
+      developer.log('User ${currentUser.id} unfollowed $userIdToUnfollow', name: 'SupabaseService');
+    } catch (e) {
+      throw Exception('Failed to unfollow user: $e');
+    }
+  }
+
+  /// Check if current user is following a specific user
+  static Future<bool> isFollowing(String userId) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) return false;
+
+      final response = await _client
+          .from('follows')
+          .select('id')
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', userId)
+          .maybeSingle();
+
+      return response != null;
+    } catch (e) {
+      developer.log('Error checking follow status: $e', name: 'SupabaseService');
+      return false;
+    }
+  }
+
+  /// Get list of users who follow the specified user
+  static Future<List<Map<String, dynamic>>> getFollowers(String userId) async {
+    try {
+      // Get follower IDs
+      final followsResponse = await _client
+          .from('follows')
+          .select('follower_id')
+          .eq('following_id', userId);
+
+      final followerIds = (followsResponse as List)
+          .map((f) => f['follower_id'] as String)
+          .toList();
+
+      if (followerIds.isEmpty) return [];
+
+      // Get user profiles for followers
+      final profilesResponse = await _client
+          .from('user_profiles')
+          .select('id, username, display_name, avatar_url')
+          .filter('id', 'in', followerIds);
+
+      return (profilesResponse as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error getting followers: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
+  /// Get list of users that the specified user is following
+  static Future<List<Map<String, dynamic>>> getFollowing(String userId) async {
+    try {
+      // Get following IDs
+      final followsResponse = await _client
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', userId);
+
+      final followingIds = (followsResponse as List)
+          .map((f) => f['following_id'] as String)
+          .toList();
+
+      if (followingIds.isEmpty) return [];
+
+      // Get user profiles for following
+      final profilesResponse = await _client
+          .from('user_profiles')
+          .select('id, username, display_name, avatar_url')
+          .filter('id', 'in', followingIds);
+
+      return (profilesResponse as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error getting following: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
+  /// Get mutual followers - users who follow you AND you follow back
+  static Future<List<Map<String, dynamic>>> getMutualFollowers() async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) return [];
+
+      // Get users who follow me
+      final myFollowers = await getFollowers(currentUser.id);
+      final followerIds = myFollowers.map((f) => f['id'] as String).toSet();
+
+      // Get users I follow
+      final myFollowing = await getFollowing(currentUser.id);
+      final followingIds = myFollowing.map((f) => f['id'] as String).toSet();
+
+      // Find intersection (mutual follows)
+      final mutualIds = followerIds.intersection(followingIds).toList();
+
+      if (mutualIds.isEmpty) return [];
+
+      // Return user profiles for mutual followers
+      return myFollowers.where((user) => mutualIds.contains(user['id'])).toList();
+    } catch (e) {
+      developer.log('Error getting mutual followers: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
+  /// Get follower and following counts for a user
+  static Future<Map<String, int>> getFollowCounts(String userId) async {
+    try {
+      // Count followers
+      final followersCount = await _client
+          .from('follows')
+          .count(CountOption.exact)
+          .eq('following_id', userId);
+      
+      // Count following
+      final followingCount = await _client
+          .from('follows')
+          .count(CountOption.exact)
+          .eq('follower_id', userId);
+      
+      return {
+        'followers': followersCount,
+        'following': followingCount,
+      };
+    } catch (e) {
+      developer.log('Error getting follow counts: $e', name: 'SupabaseService');
+      return {'followers': 0, 'following': 0};
+    }
+  }
+
+  /// Get a random opponent for quick match
+  /// Prioritizes mutual followers, falls back to any user if mutualOnly is false
+  static Future<String?> getRandomOpponent({bool mutualOnly = false}) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) return null;
+
+      // Try to get mutual followers first
+      final mutualFollowers = await getMutualFollowers();
+      
+      if (mutualFollowers.isNotEmpty) {
+        mutualFollowers.shuffle();
+        return mutualFollowers.first['id'] as String;
+      }
+
+      // If mutualOnly is true and no mutual followers found, return null
+      if (mutualOnly) return null;
+
+      // Fall back to any random user (excluding self)
+      final usersResponse = await _client
+          .from('user_profiles')
+          .select('id')
+          .neq('id', currentUser.id)
+          .limit(100);  // Get up to 100 users
+
+      final users = (usersResponse as List).cast<Map<String, dynamic>>();
+      if (users.isEmpty) return null;
+
+      users.shuffle();
+      return users.first['id'] as String;
+    } catch (e) {
+      developer.log('Error getting random opponent: $e', name: 'SupabaseService');
+      return null;
+    }
+  }
+
 
   // Sign up with email and password
   static Future<AuthResponse> signUp(
@@ -280,7 +520,7 @@ class SupabaseService {
     await _updatePosterXP(userId, 15);
     
     // Award Points for creating a post (4.20 Points)
-    await awardPoints(userId, 4.20, 'post_reward', referenceId: post.id, description: 'Created a new spot');
+    await awardPoints(userId, 3.5, 'post_reward', referenceId: post.id, description: 'Created a new spot');
     
     return post;
     } on SocketException catch (e) {
@@ -861,8 +1101,8 @@ class SupabaseService {
       // If never logged in before
       if (lastLoginStr == null) {
         await _updateStreak(user.id, 1, 1, today);
-        const points = 10.0;
-        await awardPoints(user.id, points, 'daily_login', description: 'First login bonus');
+        const points = 1.0;
+        await awardPoints(user.id, points, 'daily_login', description: 'Daily check-in');
         return points;
       }
 
@@ -872,28 +1112,56 @@ class SupabaseService {
       final difference = today.difference(lastLoginDate).inDays;
 
       if (difference == 0) {
-        // Already logged in today, do nothing
-        return 0.0;
+        // Already logged in today, check if points were actually awarded
+        final hasTransaction = await _hasDailyLoginTransaction(user.id, today);
+        if (hasTransaction) {
+          return 0.0;
+        }
+        // If no transaction, proceed to award points (retry)
+        const points = 1.0;
+        await awardPoints(user.id, points, 'daily_login', description: 'Daily check-in (Retry)');
+        return points;
       } else if (difference == 1) {
         // Logged in yesterday, increment streak
         final newStreak = currentStreak + 1;
         final newLongest = newStreak > longestStreak ? newStreak : longestStreak;
         await _updateStreak(user.id, newStreak, newLongest, today);
         
-        // Calculate bonus: Base 3.5 + (Streak * 0.5)
-        final bonus = 3.5 + (newStreak * 0.5);
-        await awardPoints(user.id, bonus, 'daily_login', description: 'Daily streak: $newStreak days');
-        return bonus;
+        const points = 1.0;
+        await awardPoints(user.id, points, 'daily_login', description: 'Daily check-in: $newStreak day streak');
+        return points;
       } else {
         // Missed a day (or more), reset streak
         await _updateStreak(user.id, 1, longestStreak, today);
-        const points = 3.5;
-        await awardPoints(user.id, points, 'daily_login', description: 'Daily login (streak reset)');
+        const points = 1.0;
+        await awardPoints(user.id, points, 'daily_login', description: 'Daily check-in (streak reset)');
         return points;
       }
     } catch (e) {
       developer.log('Error checking daily streak: $e', name: 'SupabaseService');
-      return 0.0;
+      rethrow; // Rethrow to let UI handle/display error
+    }
+  }
+
+  static Future<bool> _hasDailyLoginTransaction(String userId, DateTime date) async {
+    try {
+      // date is assumed to be Local midnight
+      // Convert start and end of local day to UTC for database query
+      final startOfDay = date.toUtc().toIso8601String();
+      final endOfDay = date.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1)).toUtc().toIso8601String();
+
+      final response = await _client
+          .from('point_transactions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('transaction_type', 'daily_login')
+          .gte('created_at', startOfDay)
+          .lte('created_at', endOfDay)
+          .maybeSingle();
+
+      return response != null;
+    } catch (e) {
+      return false;
     }
   }
 

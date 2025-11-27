@@ -99,11 +99,11 @@ class RewardedAdService {
           if (user != null) {
             await SupabaseService.awardPoints(
               user.id,
-              4, // Changed to 4.2 points per ad (rounded to 4 for integer)
+              4.2, // 4.2 points per ad
               'ad_watch',
               description: 'Watched rewarded video ad',
             );
-            debugPrint('Awarded 4 points for watching ad');
+            debugPrint('Awarded 4.2 points for watching ad');
           }
         } catch (e) {
           debugPrint('Error awarding points: $e');

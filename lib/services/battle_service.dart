@@ -359,11 +359,10 @@ class BattleService {
       
       // Handle Wager Payout
       if (battle.betAmount > 0) {
-        // Winner takes the pot (2x bet)
-        final potAmount = battle.betAmount * 2;
+        // Winner gets their bet back (no doubling)
         await SupabaseService.awardPoints(
           winnerId,
-          potAmount.toDouble(),
+          battle.betAmount.toDouble(),
           'battle_win', 
           referenceId: battleId, 
           description: 'Won battle wager'
