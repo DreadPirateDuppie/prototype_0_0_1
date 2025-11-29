@@ -539,10 +539,10 @@ class _BattleDetailPopupState extends State<BattleDetailPopup> {
         const SizedBox(height: 8),
         Text(
           helperText,
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.7),
             fontSize: 11,
-            textAlign: TextAlign.center,
           ),
         ),
       ],
