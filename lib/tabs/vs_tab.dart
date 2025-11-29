@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../models/battle.dart';
 import '../providers/battle_provider.dart';
-import '../screens/battle_detail_screen.dart';
 import '../screens/battle_leaderboard_screen.dart';
 import '../screens/create_battle_dialog.dart';
 import '../screens/community_verification_screen.dart';
@@ -11,6 +10,7 @@ import '../screens/tutorial_battle_screen.dart';
 import '../services/battle_service.dart';
 import '../services/supabase_service.dart';
 import '../widgets/ad_banner.dart';
+import '../widgets/battle_detail_popup.dart';
 import '../utils/error_helper.dart';
 
 class VsTab extends StatefulWidget {
@@ -89,13 +89,7 @@ class _VsTabState extends State<VsTab> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => BattleDetailScreen(battle: battle),
-              ),
-            );
-            _loadBattles();
+            await showBattleDetailPopup(context, battle, onUpdate: _loadBattles);
           },
           borderRadius: BorderRadius.circular(20),
           child: Container(
