@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'dart:developer' as developer;
 import 'dart:async' as async;
+import 'dart:math';
 import '../models/post.dart';
 import 'error_types.dart';
 import 'admin_service.dart';
@@ -345,8 +346,255 @@ class SupabaseService {
     }
   }
 
+  // ========== LOCATION SHARING SYSTEM ==========
 
-  // Sign up with email and password
+  /// Update user's current location
+  static Future<void> updateUserLocation(double latitude, double longitude) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) throw Exception('User not logged in');
+
+      await _client.from('user_profiles').update({
+        'current_latitude': latitude,
+        'current_longitude': longitude,
+        'location_updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', currentUser.id);
+
+      developer.log('Updated location for user ${currentUser.id}', name: 'SupabaseService');
+    } catch (e) {
+      developer.log('Error updating location: $e', name: 'SupabaseService');
+      rethrow;
+    }
+  }
+
+  /// Update location sharing mode (off, public, friends)
+  static Future<void> updateLocationSharingMode(String mode) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) throw Exception('User not logged in');
+
+      if (!['off', 'public', 'friends'].contains(mode)) {
+        throw Exception('Invalid sharing mode: $mode');
+      }
+
+      await _client.from('user_profiles').update({
+        'location_sharing_mode': mode,
+      }).eq('id', currentUser.id);
+
+      developer.log('Updated location sharing mode to $mode for user ${currentUser.id}', name: 'SupabaseService');
+    } catch (e) {
+      throw Exception('Failed to update sharing mode: $e');
+    }
+  }
+
+  /// Update location blacklist
+  static Future<void> updateLocationBlacklist(List<String> blacklist) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) throw Exception('User not logged in');
+
+      await _client.from('user_profiles').update({
+        'location_blacklist': blacklist,
+      }).eq('id', currentUser.id);
+
+      developer.log('Updated location blacklist for user ${currentUser.id}', name: 'SupabaseService');
+    } catch (e) {
+      throw Exception('Failed to update blacklist: $e');
+    }
+  }
+
+  /// Get user's current location privacy settings
+  static Future<Map<String, dynamic>> getLocationPrivacySettings() async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) {
+        return {
+          'sharing_mode': 'off',
+          'blacklist': <String>[],
+        };
+      }
+
+      final response = await _client
+          .from('user_profiles')
+          .select('location_sharing_mode, location_blacklist')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+      if (response == null) {
+        return {
+          'sharing_mode': 'off',
+          'blacklist': <String>[],
+        };
+      }
+
+      return {
+        'sharing_mode': response['location_sharing_mode'] ?? 'off',
+        'blacklist': (response['location_blacklist'] as List<dynamic>?)?.cast<String>() ?? <String>[],
+      };
+    } catch (e) {
+      developer.log('Error getting privacy settings: $e', name: 'SupabaseService');
+      return {
+        'sharing_mode': 'off',
+        'blacklist': <String>[],
+      };
+    }
+  }
+
+  /// Get visible user locations based on privacy settings
+  /// Returns users whose location is visible to the current user
+  static Future<List<Map<String, dynamic>>> getVisibleUserLocations() async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) return [];
+
+      // Get all users who are sharing their location
+      final response = await _client
+          .from('user_profiles')
+          .select('id, username, display_name, avatar_url, current_latitude, current_longitude, location_sharing_mode, location_blacklist')
+          .neq('location_sharing_mode', 'off')
+          .not('current_latitude', 'is', null)
+          .not('current_longitude', 'is', null);
+
+      final users = (response as List).cast<Map<String, dynamic>>();
+      final visibleUsers = <Map<String, dynamic>>[];
+
+      // Get current user's friends (mutual followers)
+      final mutualFollowers = await getMutualFollowers();
+      final friendIds = mutualFollowers.map((f) => f['id'] as String).toSet();
+
+      for (final user in users) {
+        final userId = user['id'] as String;
+        
+        // Skip self
+        if (userId == currentUser.id) continue;
+
+        final sharingMode = user['location_sharing_mode'] as String;
+        final blacklist = (user['location_blacklist'] as List<dynamic>?)?.cast<String>() ?? <String>[];
+
+        // Check if current user is blacklisted
+        if (blacklist.contains(currentUser.id)) continue;
+
+        // Check visibility based on sharing mode
+        if (sharingMode == 'public') {
+          visibleUsers.add(user);
+        } else if (sharingMode == 'friends' && friendIds.contains(userId)) {
+          visibleUsers.add(user);
+        }
+      }
+
+      return visibleUsers;
+    } catch (e) {
+      developer.log('Error getting visible user locations: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
+  /// Get top battle players with their win/loss statistics
+  static Future<List<Map<String, dynamic>>> getTopBattlePlayers({int limit = 10}) async {
+    try {
+      // Get battles where the user participated and won
+      final response = await _client.rpc('get_battle_leaderboard', params: {
+        'limit_count': limit,
+      });
+
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error fetching battle leaderboard: $e', name: 'SupabaseService');
+      
+      // Fallback: manual calculation if RPC doesn't exist yet
+      try {
+        return await _getBattleLeaderboardFallback(limit);
+      } catch (fallbackError) {
+        developer.log('Fallback leaderboard also failed: $fallbackError', name: 'SupabaseService');
+        return [];
+      }
+    }
+  }
+
+  /// Fallback leaderboard calculation (client-side)
+  static Future<List<Map<String, dynamic>>> _getBattleLeaderboardFallback(int limit) async {
+    try {
+      // Get all completed battles
+      final battles = await _client
+          .from('battles')
+          .select('player1_id, player2_id, winner_id, status')
+          .eq('status', 'completed');
+
+      if (battles == null || (battles as List).isEmpty) return [];
+
+      // Calculate stats per user
+      final Map<String, Map<String, dynamic>> userStats = {};
+
+      for (final battle in (battles as List)) {
+        final player1 = battle['player1_id'] as String;
+        final player2 = battle['player2_id'] as String;
+        final winner = battle['winner_id'] as String?;
+
+        // Initialize if needed
+        userStats[player1] ??= {'wins': 0, 'losses': 0, 'total': 0};
+        userStats[player2] ??= {'wins': 0, 'losses': 0, 'total': 0};
+
+        // Update stats
+        if (winner != null) {
+          if (winner == player1) {
+            userStats[player1]!['wins'] = (userStats[player1]!['wins'] as int) + 1;
+            userStats[player2]!['losses'] = (userStats[player2]!['losses'] as int) + 1;
+          } else if (winner == player2) {
+            userStats[player2]!['wins'] = (userStats[player2]!['wins'] as int) + 1;
+            userStats[player1]!['losses'] = (userStats[player1]!['losses'] as int) + 1;
+          }
+        }
+        userStats[player1]!['total'] = (userStats[player1]!['total'] as int) + 1;
+        userStats[player2]!['total'] = (userStats[player2]!['total'] as int) + 1;
+      }
+
+      // Fetch user profiles for players
+      final userIds = userStats.keys.toList();
+      if (userIds.isEmpty) return [];
+
+      final profiles = await _client
+          .from('user_profiles')
+          .select('id, username, display_name, avatar_url')
+          .inFilter('id', userIds);
+
+      // Build leaderboard
+      final List<Map<String, dynamic>> leaderboard = [];
+
+      for (final profile in (profiles as List)) {
+        final userId = profile['id'] as String;
+        final stats = userStats[userId]!;
+        final wins = stats['wins'] as int;
+        final losses = stats['losses'] as int;
+        final total = stats['total'] as int;
+        final winRate = total > 0 ? (wins / total * 100).toStringAsFixed(1) : '0.0';
+
+        leaderboard.add({
+          'user_id': userId,
+          'username': profile['username'] ?? profile['display_name'] ?? 'Unknown',
+          'display_name': profile['display_name'],
+          'avatar_url': profile['avatar_url'],
+          'wins': wins,
+          'losses': losses,
+          'total_battles': total,
+          'win_percentage': double.parse(winRate),
+        });
+      }
+
+      // Sort by wins, then by win percentage
+      leaderboard.sort((a, b) {
+        final winsCompare = (b['wins'] as int).compareTo(a['wins'] as int);
+        if (winsCompare != 0) return winsCompare;
+        return (b['win_percentage'] as double).compareTo(a['win_percentage'] as double);
+      });
+
+      return leaderboard.take(limit).toList();
+    } catch (e) {
+      developer.log('Error in fallback leaderboard: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
+
   static Future<AuthResponse> signUp(
     String email,
     String password, {
@@ -550,7 +798,7 @@ class SupabaseService {
     }
   }
 
-  // Recalculate user XP based on posts and votes
+
   // Recalculate user XP - delegates to PointsService
   static Future<void> recalculateUserXP(String userId) async {
     final pointsService = PointsService();
@@ -1554,5 +1802,200 @@ class SupabaseService {
     } catch (e) {
       developer.log('Error creating notification: $e', name: 'SupabaseService');
     }
+  }
+  // ========== SKATE LOBBY SYSTEM ==========
+
+  /// Create a new lobby
+  static Future<String> createLobby() async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) throw Exception('User not logged in');
+
+      // Generate a unique 4-character code
+      String code = '';
+      bool isUnique = false;
+      int attempts = 0;
+
+      while (!isUnique && attempts < 5) {
+        // Generate random 4-char alphanumeric code
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        final rnd = Random();
+        code = String.fromCharCodes(Iterable.generate(
+            4, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
+
+        // Check uniqueness
+        final existing = await _client
+            .from('skate_lobbies')
+            .select('id')
+            .eq('code', code)
+            .maybeSingle();
+        
+        if (existing == null) isUnique = true;
+        attempts++;
+      }
+
+      if (!isUnique) throw Exception('Failed to generate unique lobby code');
+
+      // Create lobby
+      final lobby = await _client
+          .from('skate_lobbies')
+          .insert({
+            'code': code,
+            'host_id': currentUser.id,
+            'status': 'waiting',
+          })
+          .select()
+          .single();
+
+      final lobbyId = lobby['id'] as String;
+
+      // Add host as player
+      await _client.from('skate_lobby_players').insert({
+        'lobby_id': lobbyId,
+        'user_id': currentUser.id,
+        'is_host': true,
+      });
+
+      return lobbyId;
+    } catch (e) {
+      developer.log('Error creating lobby: $e', name: 'SupabaseService');
+      rethrow;
+    }
+  }
+
+  /// Join a lobby by code
+  static Future<String> joinLobby(String code) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) throw Exception('User not logged in');
+
+      // Find lobby
+      final lobby = await _client
+          .from('skate_lobbies')
+          .select('id, status')
+          .eq('code', code.toUpperCase())
+          .maybeSingle();
+
+      if (lobby == null) throw Exception('Lobby not found');
+      
+      final lobbyId = lobby['id'] as String;
+
+      // Check if already joined
+      final existingPlayer = await _client
+          .from('skate_lobby_players')
+          .select()
+          .eq('lobby_id', lobbyId)
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+      if (existingPlayer != null) return lobbyId;
+
+      // Join lobby
+      await _client.from('skate_lobby_players').insert({
+        'lobby_id': lobbyId,
+        'user_id': currentUser.id,
+        'is_host': false,
+      });
+
+      // Log join event
+      await sendLobbyEvent(lobbyId, 'join', await getCurrentUserDisplayName() ?? 'Player');
+
+      return lobbyId;
+    } catch (e) {
+      developer.log('Error joining lobby: $e', name: 'SupabaseService');
+      rethrow;
+    }
+  }
+
+  /// Leave a lobby
+  static Future<void> leaveLobby(String lobbyId) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) return;
+
+      await _client
+          .from('skate_lobby_players')
+          .delete()
+          .eq('lobby_id', lobbyId)
+          .eq('user_id', currentUser.id);
+
+      // Log leave event
+      await sendLobbyEvent(lobbyId, 'leave', await getCurrentUserDisplayName() ?? 'Player');
+    } catch (e) {
+      developer.log('Error leaving lobby: $e', name: 'SupabaseService');
+    }
+  }
+
+  /// Get lobby details
+  static Future<Map<String, dynamic>?> getLobby(String lobbyId) async {
+    try {
+      return await _client
+          .from('skate_lobbies')
+          .select()
+          .eq('id', lobbyId)
+          .maybeSingle();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Stream of lobby details
+  static Stream<Map<String, dynamic>> streamLobby(String lobbyId) {
+    return _client
+        .from('skate_lobbies')
+        .stream(primaryKey: ['id'])
+        .eq('id', lobbyId)
+        .map((event) => event.isNotEmpty ? event.first : {});
+  }
+
+  /// Stream of lobby players (with user profiles)
+  static Stream<List<Map<String, dynamic>>> streamLobbyPlayers(String lobbyId) {
+    return _client
+        .from('skate_lobby_players')
+        .stream(primaryKey: ['lobby_id', 'user_id'])
+        .eq('lobby_id', lobbyId);
+  }
+
+  /// Stream of lobby events
+  static Stream<List<Map<String, dynamic>>> streamLobbyEvents(String lobbyId) {
+    return _client
+        .from('skate_lobby_events')
+        .stream(primaryKey: ['id'])
+        .eq('lobby_id', lobbyId)
+        .order('created_at', ascending: false)
+        .limit(50);
+  }
+
+  /// Update lobby status (Host only)
+  static Future<void> updateLobbyStatus(String lobbyId, String status) async {
+    await _client
+        .from('skate_lobbies')
+        .update({'status': status})
+        .eq('id', lobbyId);
+  }
+
+  /// Update player letters
+  static Future<void> updatePlayerLetters(String lobbyId, String letters) async {
+    final currentUser = getCurrentUser();
+    if (currentUser == null) return;
+
+    await _client
+        .from('skate_lobby_players')
+        .update({'letters': letters})
+        .eq('lobby_id', lobbyId)
+        .eq('user_id', currentUser.id);
+  }
+
+  /// Send a lobby event
+  static Future<void> sendLobbyEvent(String lobbyId, String type, String data) async {
+    final currentUser = getCurrentUser();
+    if (currentUser == null) return;
+
+    await _client.from('skate_lobby_events').insert({
+      'lobby_id': lobbyId,
+      'user_id': currentUser.id,
+      'event_type': type,
+      'data': data,
+    });
   }
 }

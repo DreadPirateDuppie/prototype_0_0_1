@@ -52,6 +52,7 @@ dependencies:
   url_launcher: ^6.2.0
   share_plus: ^12.0.1
   get_it: ^8.0.3
+  flutter_map_marker_cluster: ^8.2.2
 
 dev_dependencies:
   flutter_test:

@@ -78,8 +78,12 @@ class _RewardsTabState extends State<RewardsTab> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
-          'Rewards',
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          '> PUSHINN_',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF00FF41),
+            letterSpacing: 2,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,

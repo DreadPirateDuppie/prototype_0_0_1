@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/battle.dart';
 import '../providers/battle_provider.dart';
 import '../screens/battle_detail_screen.dart';
+import '../screens/battle_leaderboard_screen.dart';
 import '../screens/create_battle_dialog.dart';
 import '../screens/community_verification_screen.dart';
 import '../screens/tutorial_battle_screen.dart';
@@ -21,6 +22,8 @@ class VsTab extends StatefulWidget {
 
 class _VsTabState extends State<VsTab> {
   final _currentUser = Supabase.instance.client.auth.currentUser;
+  List<Map<String, dynamic>> _leaderboard = [];
+  bool _isLoadingLeaderboard = true;
 
   // Matrix theme colors
   static const Color matrixGreen = Color(0xFF00FF41);
@@ -29,6 +32,7 @@ class _VsTabState extends State<VsTab> {
   void initState() {
     super.initState();
     _loadBattles();
+    _loadLeaderboard();
   }
 
   Future<void> _loadBattles() async {
@@ -37,6 +41,23 @@ class _VsTabState extends State<VsTab> {
     // Use the BattleProvider to load battles
     final provider = context.read<BattleProvider>();
     await provider.loadBattles(_currentUser.id);
+  }
+
+  Future<void> _loadLeaderboard() async {
+    try {
+      setState(() => _isLoadingLeaderboard = true);
+      final leaderboard = await SupabaseService.getTopBattlePlayers(limit: 10);
+      if (mounted) {
+        setState(() {
+          _leaderboard = leaderboard;
+          _isLoadingLeaderboard = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingLeaderboard = false);
+      }
+    }
   }
 
   String _getGameModeDisplay(GameMode mode) {
@@ -274,7 +295,7 @@ class _VsTabState extends State<VsTab> {
                           Text(
                             'OPPONENT',
                             style: TextStyle(
-                              color: Colors.orange.withValues(alpha: 0.5),
+                              color: Colors.red.withValues(alpha: 0.5),
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'monospace',
@@ -290,7 +311,7 @@ class _VsTabState extends State<VsTab> {
                               Text(
                                 opponentLetters,
                                 style: const TextStyle(
-                                  color: Colors.orange,
+                                  color: Colors.red,
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                   fontFamily: 'monospace',
@@ -300,7 +321,7 @@ class _VsTabState extends State<VsTab> {
                               Text(
                                 ' / ${battle.getGameLetters()}',
                                 style: TextStyle(
-                                  color: Colors.orange.withValues(alpha: 0.4),
+                                  color: Colors.red.withValues(alpha: 0.4),
                                   fontSize: 14,
                                   fontFamily: 'monospace',
                                 ),
@@ -325,15 +346,15 @@ class _VsTabState extends State<VsTab> {
                               matrixGreen.withValues(alpha: 0.1),
                             ]
                           : [
-                              Colors.orange.withValues(alpha: 0.2),
-                              Colors.orange.withValues(alpha: 0.1),
+                              Colors.red.withValues(alpha: 0.2),
+                              Colors.red.withValues(alpha: 0.1),
                             ],
                     ),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: isMyTurn 
                           ? matrixGreen.withValues(alpha: 0.4)
-                          : Colors.orange.withValues(alpha: 0.4),
+                          : Colors.red.withValues(alpha: 0.4),
                     ),
                   ),
                   child: Row(
@@ -344,10 +365,10 @@ class _VsTabState extends State<VsTab> {
                         height: 8,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: isMyTurn ? matrixGreen : Colors.orange,
+                          color: isMyTurn ? matrixGreen : Colors.red,
                           boxShadow: [
                             BoxShadow(
-                              color: (isMyTurn ? matrixGreen : Colors.orange).withValues(alpha: 0.6),
+                              color: (isMyTurn ? matrixGreen : Colors.red).withValues(alpha: 0.6),
                               blurRadius: 6,
                               spreadRadius: 1,
                             ),
@@ -358,7 +379,7 @@ class _VsTabState extends State<VsTab> {
                       Text(
                         isMyTurn ? 'YOUR TURN' : "OPPONENT'S TURN",
                         style: TextStyle(
-                          color: isMyTurn ? matrixGreen : Colors.orange,
+                          color: isMyTurn ? matrixGreen : Colors.red,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                           fontFamily: 'monospace',
@@ -380,6 +401,289 @@ class _VsTabState extends State<VsTab> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLeaderboardSection() {
+    const matrixGreen = Color(0xFF00FF41);
+    const matrixBlack = Color(0xFF000000);
+    const matrixDark = Color(0xFF0A0A0A);
+    const goldColor = Color(0xFFFFD700);
+    const silverColor = Color(0xFFC0C0C0);
+    const bronzeColor = Color(0xFFCD7F32);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with View All button
+          Row(
+            children: [
+              Icon(
+                Icons.emoji_events,
+                color: goldColor,
+                size: 24,
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'TOP PLAYERS',
+                style: TextStyle(
+                  color: goldColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const Spacer(),
+              if (_isLoadingLeaderboard)
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    color: matrixGreen,
+                    strokeWidth: 2,
+                  ),
+                )
+              else
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const BattleLeaderboardScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.arrow_forward,
+                    size: 16,
+                  ),
+                  label: const Text(
+                    'View All',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: matrixGreen,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Compact Leaderboard (Top 3 only)
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  matrixDark,
+                  matrixBlack,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: matrixGreen.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: _isLoadingLeaderboard
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: matrixGreen,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  )
+                : _leaderboard.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.sports_kabaddi,
+                                color: matrixGreen.withValues(alpha: 0.3),
+                                size: 36,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'No battles yet',
+                                style: TextStyle(
+                                  color: matrixGreen.withValues(alpha: 0.5),
+                                  fontSize: 13,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        itemCount: _leaderboard.length > 3 ? 3 : _leaderboard.length,
+                        separatorBuilder: (context, index) => Divider(
+                          height: 1,
+                          color: matrixGreen.withValues(alpha: 0.1),
+                          indent: 16,
+                          endIndent: 16,
+                        ),
+                        itemBuilder: (context, index) {
+                          final player = _leaderboard[index];
+                          final rank = index + 1;
+                          final isCurrentUser = player['user_id'] == _currentUser?.id;
+                          
+                          Color rankColor = matrixGreen;
+                          if (rank == 1) rankColor = goldColor;
+                          else if (rank == 2) rankColor = silverColor;
+                          else if (rank == 3) rankColor = bronzeColor;
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: isCurrentUser
+                                ? BoxDecoration(
+                                    color: matrixGreen.withValues(alpha: 0.1),
+                                    border: Border(
+                                      left: BorderSide(
+                                        color: matrixGreen,
+                                        width: 3,
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                            child: Row(
+                              children: [
+                                // Rank Badge
+                                Container(
+                                  width: 28,
+                                  height: 28,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        rankColor.withValues(alpha: 0.3),
+                                        rankColor.withValues(alpha: 0.1),
+                                      ],
+                                    ),
+                                    border: Border.all(
+                                      color: rankColor,
+                                      width: 2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: rankColor.withValues(alpha: 0.4),
+                                        blurRadius: 8,
+                                        spreadRadius: 1,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '$rank',
+                                      style: TextStyle(
+                                        color: rankColor,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+
+                                // Avatar
+                                if (player['avatar_url'] != null)
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: matrixGreen.withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: ClipOval(
+                                      child: Image.network(
+                                        player['avatar_url'],
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Icon(
+                                            Icons.person,
+                                            color: matrixGreen.withValues(alpha: 0.5),
+                                            size: 18,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+
+                                // Username
+                                Expanded(
+                                  child: Text(
+                                    player['username'] ?? 'Unknown',
+                                    style: TextStyle(
+                                      color: isCurrentUser ? matrixGreen : Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.normal,
+                                      fontFamily: 'monospace',
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+
+                                // Stats
+                                Row(
+                                  children: [
+                                    Text(
+                                      '${player['wins']}W',
+                                      style: const TextStyle(
+                                        color: matrixGreen,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: matrixGreen.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        '${player['win_percentage'].toStringAsFixed(0)}%',
+                                        style: TextStyle(
+                                          color: matrixGreen,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'monospace',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }
@@ -686,11 +990,11 @@ class _VsTabState extends State<VsTab> {
           backgroundColor: matrixBlack,
           appBar: AppBar(
             title: const Text(
-              'VS BATTLES',
+              '> PUSHINN_',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
+                color: Color(0xFF00FF41),
                 letterSpacing: 2,
-                fontFamily: 'monospace',
               ),
             ),
             centerTitle: true,
@@ -741,99 +1045,138 @@ class _VsTabState extends State<VsTab> {
                     : RefreshIndicator(
                         color: matrixGreen,
                         backgroundColor: matrixBlack,
-                        onRefresh: _loadBattles,
+                        onRefresh: () async {
+                          await Future.wait([
+                            _loadBattles(),
+                            _loadLeaderboard(),
+                          ]);
+                        },
                         child: ListView.builder(
-                          itemCount: battles.length + 1, // +1 for tutorial
+                          itemCount: battles.length + 2, // +1 for leaderboard, +1 for tutorial
                           itemBuilder: (context, index) {
-                            // First item is the tutorial battle
+                            // First item is the leaderboard
                             if (index == 0) {
+                              return _buildLeaderboardSection();
+                            }
+                            // Second item is the tutorial battle
+                            if (index == 1) {
                               return _buildTutorialBattleCard();
                             }
                             // Remaining items are real battles
-                            return _buildBattleCard(battles[index - 1]);
+                            return _buildBattleCard(battles[index - 2]);
                           },
                         ),
                       ),
               ),
             ],
           ),
-          floatingActionButton: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Quick Match Button
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      spreadRadius: 2,
+          floatingActionButton: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Quick Match Button
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.only(left: 32, right: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withValues(alpha: 0.5),
+                          blurRadius: 24,
+                          spreadRadius: 3,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: FloatingActionButton.extended(
-                  heroTag: 'quick_match',
-                  onPressed: _isQuickMatching ? null : _startQuickMatch,
-                  backgroundColor: matrixBlack,
-                  foregroundColor: Colors.blue,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    side: const BorderSide(color: Colors.blue, width: 1),
-                  ),
-                  label: _isQuickMatching
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.blue,
-                          ),
-                        )
-                      : const Text('Quick Match'),
-                  icon: _isQuickMatching ? null : const Icon(Icons.flash_on),
-                ),
-              ),
-              
-              // New Battle Button
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: matrixGreen.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      spreadRadius: 2,
+                    child: FloatingActionButton.extended(
+                      heroTag: 'quick_match',
+                      onPressed: _isQuickMatching ? null : _startQuickMatch,
+                      backgroundColor: matrixBlack,
+                      foregroundColor: Colors.red,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(32),
+                        side: const BorderSide(color: Colors.red, width: 3),
+                      ),
+                      label: _isQuickMatching
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                color: Colors.red,
+                              ),
+                            )
+                          : const Text(
+                              'Quick Match',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                      icon: _isQuickMatching
+                          ? null
+                          : const Icon(
+                              Icons.flash_on,
+                              size: 24,
+                            ),
                     ),
-                  ],
-                ),
-                child: FloatingActionButton.extended(
-                  heroTag: 'new_battle',
-                  onPressed: () async {
-                    final result = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => const CreateBattleDialog(),
-                    );
-                    if (result == true) {
-                      _loadBattles();
-                    }
-                  },
-                  backgroundColor: matrixBlack,
-                  foregroundColor: matrixGreen,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    side: const BorderSide(color: matrixGreen, width: 2),
                   ),
-                  label: const Text('New Battle'),
-                  icon: const Icon(Icons.add),
                 ),
-              ),
-            ],
+                
+                // New Battle Button
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.only(left: 8, right: 32),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: [
+                        BoxShadow(
+                          color: matrixGreen.withValues(alpha: 0.5),
+                          blurRadius: 24,
+                          spreadRadius: 3,
+                        ),
+                      ],
+                    ),
+                    child: FloatingActionButton.extended(
+                      heroTag: 'new_battle',
+                      onPressed: () async {
+                        final result = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => const CreateBattleDialog(),
+                        );
+                        if (result == true) {
+                          _loadBattles();
+                        }
+                      },
+                      backgroundColor: matrixBlack,
+                      foregroundColor: matrixGreen,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(32),
+                        side: const BorderSide(color: matrixGreen, width: 3),
+                      ),
+                      label: const Text(
+                        'New Battle',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      icon: const Icon(
+                        Icons.add_circle,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
+          floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
         );
       },
     );

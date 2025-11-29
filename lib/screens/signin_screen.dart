@@ -75,14 +75,15 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          gradient: RadialGradient(
+            center: Alignment.center,
+            radius: 1.5,
             colors: [
-              const Color(0xFF0D0D0D), // Dark background
               const Color(0xFF1A1A1A),
+              Colors.black,
             ],
           ),
         ),
@@ -94,17 +95,36 @@ class _SignInScreenState extends State<SignInScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Logo Image
-                  Container(
-                    constraints: const BoxConstraints(maxWidth: 300),
-                    child: Image.asset(
-                      'assets/images/pushinn_logo.jpg',
-                      fit: BoxFit.contain,
+                  Image.asset(
+                    'assets/images/app_icon.png',
+                    width: 140,
+                    height: 140,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // App Name
+                  const Text(
+                    'PUSHINN',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF00FF41),
+                      letterSpacing: 4,
+                      shadows: [
+                        Shadow(
+                          color: Color(0xFF00FF41),
+                          blurRadius: 10,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
                   Text(
                     'Find Spots. Skate. Connect.',
                     style: TextStyle(
+                      fontFamily: 'monospace',
                       fontSize: 14,
                       color: Colors.grey[400],
                       letterSpacing: 1,
@@ -115,42 +135,56 @@ class _SignInScreenState extends State<SignInScreen> {
                   // Input Fields
                   TextField(
                     controller: _emailController,
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'monospace',
+                    ),
                     decoration: InputDecoration(
-                      labelText: 'Email',
-                      labelStyle: TextStyle(color: Colors.grey[400]),
+                      labelText: 'EMAIL',
+                      labelStyle: TextStyle(
+                        color: Colors.grey[500],
+                        fontFamily: 'monospace',
+                        letterSpacing: 1,
+                      ),
                       prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF00FF41)),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: Colors.grey[800]!),
                       ),
-                      focusedBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                        borderSide: BorderSide(color: Color(0xFF00FF41)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF00FF41), width: 2),
                       ),
                       filled: true,
-                      fillColor: Colors.black26,
+                      fillColor: Colors.black.withValues(alpha: 0.5),
                     ),
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _passwordController,
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'monospace',
+                    ),
                     decoration: InputDecoration(
-                      labelText: 'Password',
-                      labelStyle: TextStyle(color: Colors.grey[400]),
+                      labelText: 'PASSWORD',
+                      labelStyle: TextStyle(
+                        color: Colors.grey[500],
+                        fontFamily: 'monospace',
+                        letterSpacing: 1,
+                      ),
                       prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF00FF41)),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: Colors.grey[800]!),
                       ),
-                      focusedBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                        borderSide: BorderSide(color: Color(0xFF00FF41)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF00FF41), width: 2),
                       ),
                       filled: true,
-                      fillColor: Colors.black26,
+                      fillColor: Colors.black.withValues(alpha: 0.5),
                     ),
                     obscureText: true,
                   ),
@@ -159,10 +193,22 @@ class _SignInScreenState extends State<SignInScreen> {
                   if (_errorMessage != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: Colors.red, fontSize: 13),
-                        textAlign: TextAlign.center,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 13,
+                            fontFamily: 'monospace',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
 
@@ -175,23 +221,25 @@ class _SignInScreenState extends State<SignInScreen> {
                   // Sign In Button
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 56,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _signIn,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00FF41),
                         foregroundColor: Colors.black,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         elevation: 0,
+                        shadowColor: const Color(0xFF00FF41).withValues(alpha: 0.5),
                       ),
                       child: const Text(
                         'SIGN IN',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
-                          letterSpacing: 1,
+                          letterSpacing: 2,
+                          fontFamily: 'monospace',
                         ),
                       ),
                     ),
@@ -201,21 +249,29 @@ class _SignInScreenState extends State<SignInScreen> {
                   // Google Sign In
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 56,
                     child: OutlinedButton.icon(
                       onPressed: _isLoading ? null : _signInWithGoogle,
-                      icon: const Icon(Icons.account_circle), // Fallback icon
-                      label: const Text('Sign in with Google'),
+                      icon: const Icon(Icons.account_circle),
+                      label: const Text(
+                        'SIGN IN WITH GOOGLE',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          letterSpacing: 1,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
-                        side: BorderSide(color: Colors.grey[700]!),
+                        side: BorderSide(color: Colors.grey[800]!),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                        backgroundColor: Colors.transparent,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
                   // Sign Up Link
                   TextButton(
@@ -227,15 +283,20 @@ class _SignInScreenState extends State<SignInScreen> {
                       );
                     },
                     child: RichText(
-                      text: const TextSpan(
-                        text: "Don't have an account? ",
-                        style: TextStyle(color: Colors.grey),
-                        children: [
+                      text: TextSpan(
+                        text: "NEW USER? ",
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                        ),
+                        children: const [
                           TextSpan(
-                            text: 'Sign Up',
+                            text: 'INITIALIZE >',
                             style: TextStyle(
                               color: Color(0xFF00FF41),
                               fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
                           ),
                         ],

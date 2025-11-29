@@ -3,7 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/battle.dart';
 import '../services/battle_service.dart';
 import '../services/supabase_service.dart';
+import '../services/user_service.dart';
 import '../utils/error_helper.dart';
+import 'skate_lobby_setup_screen.dart';
 
 class CreateBattleDialog extends StatefulWidget {
   final String? prefilledOpponentId;
@@ -33,6 +35,10 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
   List<Map<String, dynamic>> _mutualFollowers = [];
   bool _isLoadingFollowers = true;
   String? _selectedMutualFollowerId;
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isSearching = false;
+  String? _selectedUserId;
+  bool _isLocalGame = false;
 
   @override
   void initState() {
@@ -42,19 +48,74 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
     
     if (widget.prefilledOpponentId != null) {
       _opponentIdController.text = widget.prefilledOpponentId!;
+      _selectedUserId = widget.prefilledOpponentId;
       // If quick match, default to quickfire for faster games
       if (widget.isQuickMatch) {
         _isQuickfire = true;
       }
     }
+    
+    // Listen to username input changes for search
+    _opponentIdController.addListener(_onUsernameChanged);
   }
 
   @override
   void dispose() {
     _customLettersController.dispose();
+    _opponentIdController.removeListener(_onUsernameChanged);
     _opponentIdController.dispose();
     _wagerController.dispose();
     super.dispose();
+  }
+
+  void _onUsernameChanged() async {
+    final query = _opponentIdController.text.trim();
+    
+    if (query.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _selectedUserId = null;
+          _isSearching = false;
+        });
+      }
+      return;
+    }
+    
+    // Debounce: wait 500ms before searching
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Check if text changed while waiting (user still typing)
+    if (query != _opponentIdController.text.trim()) {
+      return; // Skip this search, another one will trigger
+    }
+    
+    if (!mounted) return;
+    
+    setState(() {
+      _isSearching = true;
+    });
+    
+    try {
+      // Remove @ if present
+      final searchQuery = query.startsWith('@') ? query.substring(1) : query;
+      final results = await SupabaseService.searchUsers(searchQuery);
+      
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      print('Search error: $e');
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _isSearching = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadUserPoints() async {
@@ -134,8 +195,39 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
 
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
-      // Use selected mutual follower ID if available, otherwise use text input
-      final opponentId = _selectedMutualFollowerId ?? _opponentIdController.text.trim();
+      
+      // Get opponent ID - either from mutual follower or from selected user
+      String opponentId;
+      if (_selectedMutualFollowerId != null) {
+        opponentId = _selectedMutualFollowerId!;
+      } else if (_selectedUserId != null) {
+        // User was selected from search results
+        opponentId = _selectedUserId!;
+      } else {
+        // Fallback: Look up user ID from username (if user hit Enter without selecting)
+        final usernameInput = _opponentIdController.text.trim();
+        
+        // Remove @ if user included it
+        final username = usernameInput.startsWith('@') 
+            ? usernameInput.substring(1) 
+            : usernameInput;
+        
+        // Search for user by username
+        final results = await SupabaseService.searchUsers(username);
+        
+        if (results.isEmpty) {
+          throw Exception('User not found with username: $username');
+        }
+        
+        // Find exact match (case insensitive)
+        final exactMatch = results.firstWhere(
+          (user) => (user['username'] as String).toLowerCase() == username.toLowerCase(),
+          orElse: () => throw Exception('No exact match found for username: $username'),
+        );
+        
+        opponentId = exactMatch['id'] as String;
+      }
+      
       final wagerAmount = int.tryParse(_wagerController.text) ?? 0;
 
       await BattleService.createBattle(
@@ -197,6 +289,52 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Local Game Toggle (only if not quick match)
+              if (!widget.isQuickMatch) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: matrixGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _isLocalGame ? matrixGreen : matrixGreen.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: SwitchListTile(
+                    title: const Text(
+                      'Local Game (IRL)',
+                      style: TextStyle(
+                        color: matrixGreen,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Track letters for an offline game',
+                      style: TextStyle(
+                        color: matrixGreen.withValues(alpha: 0.7),
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    value: _isLocalGame,
+                    activeColor: matrixGreen,
+                    secondary: Icon(
+                      Icons.people_outline,
+                      color: _isLocalGame ? matrixGreen : matrixGreen.withValues(alpha: 0.5),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _isLocalGame = value;
+                      });
+                    },
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  ),
+                ),
+              ],
+
               if (widget.isQuickMatch) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -307,14 +445,16 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
               ],
 
               // Opponent Selection
-              if (_mutualFollowers.isNotEmpty && !widget.isQuickMatch) ...[
-                Text(
-                  'Select Opponent',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: matrixGreen.withValues(alpha: 0.8),
+              // Opponent Selection (Online Only)
+              if (!_isLocalGame) ...[
+                if (_mutualFollowers.isNotEmpty && !widget.isQuickMatch) ...[
+                  Text(
+                    'Select Opponent',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: matrixGreen.withValues(alpha: 0.8),
+                    ),
                   ),
-                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _selectedMutualFollowerId,
@@ -362,51 +502,151 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 const SizedBox(height: 16),
               ],
 
-              // Manual ID Entry (only show if no mutual follower selected)
+              // Manual Username Entry (only show if no mutual follower selected)
               if (_selectedMutualFollowerId == null || widget.isQuickMatch)
-                TextFormField(
-                  controller: _opponentIdController,
-                  style: const TextStyle(color: matrixGreen),
-                  readOnly: widget.isQuickMatch, // Lock if quick match
-                  decoration: InputDecoration(
-                    labelText: 'Opponent User ID',
-                    labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
-                    hintText: 'Enter opponent\'s user ID',
-                    hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: _opponentIdController,
+                      style: const TextStyle(color: matrixGreen),
+                      readOnly: widget.isQuickMatch, // Lock if quick match
+                      decoration: InputDecoration(
+                        labelText: 'Opponent Username',
+                        labelStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
+                        hintText: 'Enter opponent\'s username',
+                        hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: matrixGreen, width: 2),
+                        ),
+                        helperText: widget.isQuickMatch 
+                            ? 'Opponent automatically selected'
+                            : 'Search by username (e.g., @skater123)',
+                        helperStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.5)),
+                        suffixIcon: widget.isQuickMatch 
+                            ? const Icon(Icons.lock, color: matrixGreen, size: 16)
+                            : _isSearching
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: matrixGreen,
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(Icons.search, color: matrixGreen, size: 20),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter opponent username';
+                        }
+                        return null;
+                      },
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: matrixGreen, width: 2),
-                    ),
-                    helperText: widget.isQuickMatch 
-                        ? 'Opponent automatically selected'
-                        : 'You need to know your opponent\'s user ID',
-                    helperStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.5)),
-                    suffixIcon: widget.isQuickMatch 
-                        ? const Icon(Icons.lock, color: matrixGreen, size: 16)
-                        : null,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter opponent user ID';
-                    }
-                    return null;
-                  },
+                    
+                    // Search Results Dropdown
+                    if (_searchResults.isNotEmpty && !widget.isQuickMatch)
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        decoration: BoxDecoration(
+                          color: matrixBlack,
+                          border: Border.all(color: matrixGreen.withValues(alpha: 0.5)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _searchResults.length,
+                          itemBuilder: (context, index) {
+                            final user = _searchResults[index];
+                            final username = user['username'] ?? user['display_name'] ?? 'Unknown';
+                            final displayName = user['display_name'];
+                            final userId = user['id'] as String;
+                            
+                            return Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _opponentIdController.text = username;
+                                    _selectedUserId = userId;
+                                    _searchResults = [];
+                                    _loadOpponentPoints(userId);
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      bottom: index < _searchResults.length - 1
+                                          ? BorderSide(color: matrixGreen.withValues(alpha: 0.2))
+                                          : BorderSide.none,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.person,
+                                        color: matrixGreen.withValues(alpha: 0.7),
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '@$username',
+                                              style: const TextStyle(
+                                                color: matrixGreen,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            if (displayName != null && displayName != username)
+                                              Text(
+                                                displayName,
+                                                style: TextStyle(
+                                                  color: matrixGreen.withValues(alpha: 0.6),
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
                 ),
+              ], // End of online-only opponent selection
+
               const SizedBox(height: 16),
               
-              // Points balance display
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: matrixGreen.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: matrixGreen.withValues(alpha: 0.3)),
-                ),
+              // Betting & Quickfire (Online Only)
+              if (!_isLocalGame) ...[
+                // Points balance display
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: matrixGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: matrixGreen.withValues(alpha: 0.3)),
+                  ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -548,15 +788,8 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
                 ),
               ),
               const SizedBox(height: 8),
-              if (!widget.isQuickMatch)
-                Text(
-                  'Note: In a future update, you\'ll be able to search for opponents by username.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: matrixGreen.withValues(alpha: 0.5),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
+
+              ], // End of online-only betting section
             ],
           ),
         ),
@@ -572,43 +805,43 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
             ),
           ),
         ),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: matrixGreen, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: matrixGreen.withValues(alpha: 0.3),
-                blurRadius: 8,
-              ),
-            ],
-          ),
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _createBattle,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: matrixBlack,
-              foregroundColor: matrixGreen,
-              elevation: 0,
+        ElevatedButton(
+          onPressed: _isLoading ? null : (_isLocalGame ? _startLocalGame : _createBattle),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: matrixBlack,
+            foregroundColor: matrixGreen,
+            side: const BorderSide(color: matrixGreen),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: _isLoading
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: matrixGreen,
-                    ),
-                  )
-                : const Text(
-                    'CREATE',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
           ),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: matrixGreen,
+                  ),
+                )
+              : Text(
+                  _isLocalGame ? 'START GAME' : 'CREATE',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                  ),
+                ),
         ),
       ],
+    );
+  }
+
+  void _startLocalGame() {
+    Navigator.of(context).pop(true);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SkateLobbySetupScreen(),
+      ),
     );
   }
 }

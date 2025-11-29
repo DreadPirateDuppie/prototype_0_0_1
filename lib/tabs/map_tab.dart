@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_bottom_sheet.dart';
+import '../screens/location_privacy_dialog.dart';
 import '../widgets/ad_banner.dart';
 import '../utils/error_helper.dart';
 
@@ -22,9 +23,11 @@ class _MapTabState extends State<MapTab> {
   List<MapPost> userPosts = [];
   Map<String, MapPost> markerPostMap = {}; // Map marker location to post
   LatLng currentLocation = const LatLng(37.7749, -122.4194); // Default: SF
-  bool _isLoading = false;
+  bool _isLoadingLocation = false;
   bool _isPinMode = false;
-  bool _isSharingLocation = false; // Slider state
+  bool _isSharingLocation = false; // Slider: Others can see you
+  bool _hasLocationPermission = false; // User's location is visible to self
+  String _sharingMode = 'off';
 
   final String _selectedCategory = 'All';
 
@@ -34,8 +37,9 @@ class _MapTabState extends State<MapTab> {
     mapController = MapController();
     _addSampleMarkers();
     _loadUserPosts();
-    // Automatically try to get location on startup
+    // Automatically get location and privacy settings
     _getCurrentLocation();
+    _loadPrivacySettings();
   }
 
   Future<void> _loadUserPosts() async {
@@ -51,13 +55,14 @@ class _MapTabState extends State<MapTab> {
           markers.clear();
           markerPostMap.clear();
           _addSampleMarkers();
-          // Add current location marker if available and sharing is on
-          if (!_isLoading && _isSharingLocation) {
+          // Always add user location if permission granted
+          if (_hasLocationPermission) {
             _addMarkerToList(
               currentLocation,
               'Your Location',
               'You are here',
               Colors.blue,
+              isUserLocation: true,
             );
           }
           _addUserPostMarkers();
@@ -87,7 +92,7 @@ class _MapTabState extends State<MapTab> {
 
   Future<void> _getCurrentLocation() async {
     setState(() {
-      _isLoading = true;
+      _isLoadingLocation = true;
     });
 
     try {
@@ -96,8 +101,8 @@ class _MapTabState extends State<MapTab> {
         final requested = await Geolocator.requestPermission();
         if (requested == LocationPermission.denied) {
            setState(() {
-            _isLoading = false;
-            _isSharingLocation = false; // Turn off slider if denied
+            _isLoadingLocation = false;
+            _hasLocationPermission = false;
           });
           return;
         }
@@ -105,8 +110,8 @@ class _MapTabState extends State<MapTab> {
 
       if (permission == LocationPermission.deniedForever) {
          setState(() {
-            _isLoading = false;
-            _isSharingLocation = false; // Turn off slider if denied
+            _isLoadingLocation = false;
+            _hasLocationPermission = false;
           });
           if (mounted) {
              ErrorHelper.showError(context, 'Location permission permanently denied. Please enable in settings.');
@@ -125,8 +130,8 @@ class _MapTabState extends State<MapTab> {
         final newLocation = LatLng(position.latitude, position.longitude);
         setState(() {
           currentLocation = newLocation;
-          _isLoading = false;
-          _isSharingLocation = true; // Enable slider on success
+          _isLoadingLocation = false;
+          _hasLocationPermission = true;
         });
 
         // Animate to current location
@@ -137,8 +142,8 @@ class _MapTabState extends State<MapTab> {
       }
     } catch (e) {
       setState(() {
-        _isLoading = false;
-        _isSharingLocation = false;
+        _isLoadingLocation = false;
+        _hasLocationPermission = false;
       });
       if (mounted) {
         ErrorHelper.showError(context, 'Error getting location: $e');
@@ -146,16 +151,72 @@ class _MapTabState extends State<MapTab> {
     }
   }
 
-  void _toggleLocationSharing(bool value) {
+  Future<void> _loadPrivacySettings() async {
+    try {
+      final settings = await SupabaseService.getLocationPrivacySettings();
+      if (mounted) {
+        setState(() {
+          _sharingMode = settings['sharing_mode'] as String;
+          _isSharingLocation = _sharingMode != 'off';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading privacy settings: $e');
+    }
+  }
+
+  Future<void> _toggleLocationSharing(bool value) async {
+    // Update sharing state
     setState(() {
       _isSharingLocation = value;
     });
 
-    if (value) {
-      _getCurrentLocation();
-    } else {
-      // Remove location marker by reloading posts (which checks _isSharingLocation)
-      _loadUserPosts();
+    // Update backend based on current privacy mode
+    try {
+      if (value) {
+        // Turn ON: Set to previous mode or default to 'public'
+        final mode = _sharingMode == 'off' ? 'public' : _sharingMode;
+        await SupabaseService.updateLocationSharingMode(mode);
+        setState(() => _sharingMode = mode);
+        
+        // Update location in database
+        if (_hasLocationPermission) {
+          await SupabaseService.updateUserLocation(
+            currentLocation.latitude,
+            currentLocation.longitude,
+          );
+        }
+      } else {
+        // Turn OFF
+        await SupabaseService.updateLocationSharingMode('off');
+        setState(() => _sharingMode = 'off');
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Error updating sharing: $e');
+        // Revert slider on error
+        setState(() => _isSharingLocation = !value);
+      }
+    }
+  }
+
+  Future<void> _openPrivacySettings() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => const LocationPrivacyDialog(),
+    );
+
+    if (result == true) {
+      // Reload settings after save
+      await _loadPrivacySettings();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Privacy settings updated'),
+            backgroundColor: Color(0xFF00FF41),
+          ),
+        );
+      }
     }
   }
 
@@ -188,6 +249,7 @@ class _MapTabState extends State<MapTab> {
     Color color, {
     String? postId,
     MapPost? post,
+    bool isUserLocation = false,
   }) {
     final key = '${location.latitude},${location.longitude}';
     if (post != null) {
@@ -228,53 +290,72 @@ class _MapTabState extends State<MapTab> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Outer glow effect
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                ),
-                // Pin background
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: post != null ? const Color(0xFF00FF41) : color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 3,
+                if (!isUserLocation) ...[
+                  // Outer glow effect (only for pins, not user location)
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: post != null
-                            ? const Color(0xFF00FF41).withValues(alpha: 0.5)
-                            : color.withValues(alpha: 0.4),
-                        blurRadius: 8,
-                        spreadRadius: 2,
+                  ),
+                  // Pin background
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: post != null ? const Color(0xFF00FF41) : color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.black,
+                        width: 1.5,
                       ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: post != null
+                              ? const Color(0xFF00FF41).withValues(alpha: 0.5)
+                              : color.withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          spreadRadius: 2,
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      post != null ? Icons.location_on_rounded : Icons.location_on,
+                      color: Colors.black,
+                      size: 20,
+                    ),
+                  ),
+                ] else
+                  // User location: GPS crosshair icon
+                  Icon(
+                    Icons.my_location,
+                    color: const Color(0xFF00FF41),
+                    size: 32,
+                    shadows: [
+                      Shadow(
+                        color: const Color(0xFF00FF41).withValues(alpha: 0.8),
+                        blurRadius: 8,
+                      ),
+                      Shadow(
+                        color: Colors.black.withValues(alpha: 0.5),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: Icon(
-                    post != null ? Icons.location_on_rounded : Icons.location_on,
-                    color: Colors.black,
-                    size: 20,
-                  ),
-                ),
               ],
             ),
           ),
@@ -349,7 +430,6 @@ class _MapTabState extends State<MapTab> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 2,
-                        fontFamily: 'monospace',
                       ),
                     ),
                   ],
@@ -379,7 +459,7 @@ class _MapTabState extends State<MapTab> {
                       MarkerLayer(markers: markers),
                     ],
                   ),
-                  if (_isLoading)
+                  if (_isLoadingLocation)
                     Center(
                       child: Container(
                         padding: const EdgeInsets.all(16),
@@ -396,12 +476,11 @@ class _MapTabState extends State<MapTab> {
                     top: 0,
                     left: 0,
                     right: 0,
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 0),
                         child: Center(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(30),
@@ -414,41 +493,52 @@ class _MapTabState extends State<MapTab> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  _isSharingLocation ? Icons.my_location : Icons.location_disabled,
-                                  size: 18,
+                                  _isSharingLocation ? Icons.visibility : Icons.visibility_off,
+                                  size: 16,
                                   color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey,
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 10),
                                 Text(
-                                  _isSharingLocation ? 'Sharing Location' : 'Location Hidden',
+                                  _isSharingLocation ? 'Visible to Others' : 'Hidden',
                                   style: TextStyle(
-                                    fontSize: 13,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                     color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey.shade400,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 10),
                                 SizedBox(
-                                  height: 20,
-                                  width: 36,
-                                  child: Switch(
-                                    value: _isSharingLocation,
-                                    onChanged: _toggleLocationSharing,
-                                    activeThumbColor: const Color(0xFF00FF41),
-                                    activeTrackColor: const Color(0xFF00FF41).withValues(alpha: 0.3),
-                                    inactiveThumbColor: Colors.grey.shade600,
-                                    inactiveTrackColor: Colors.grey.shade800,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  height: 16,
+                                  width: 28,
+                                  child: FittedBox(
+                                    fit: BoxFit.contain,
+                                    child: Switch(
+                                      value: _isSharingLocation,
+                                      onChanged: _toggleLocationSharing,
+                                      activeThumbColor: const Color(0xFF00FF41),
+                                      activeTrackColor: const Color(0xFF00FF41).withValues(alpha: 0.3),
+                                      inactiveThumbColor: Colors.grey.shade600,
+                                      inactiveTrackColor: Colors.grey.shade800,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
                                   ),
+                                ),
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  icon: const Icon(Icons.settings, size: 18),
+                                  color: const Color(0xFF00FF41),
+                                  onPressed: _openPrivacySettings,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  tooltip: 'Privacy Settings',
                                 ),
                               ],
                             ),
                           ),
-                        ),
                       ),
                     ),
                   ),
-
+                  
                   // Action buttons (Zoom & Search)
                   Positioned(
                     bottom: 100,

@@ -307,6 +307,15 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                   floating: false,
                   pinned: true,
                   backgroundColor: Colors.green,
+                  title: const Text(
+                    '> PUSHINN_',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  centerTitle: true,
                   actions: [
                     IconButton(
                       icon: const Icon(Icons.refresh, color: Colors.white),
