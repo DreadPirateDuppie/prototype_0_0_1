@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUSHINN_ - Page Not Found</title>
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: #000;
+            color: #00FF41;
+            text-align: center;
+            padding: 50px;
+        }
+
+        .matrix-green {
+            color: #00FF41;
+            text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background: transparent;
+            border: 2px solid #00FF41;
+            color: #00FF41;
+            text-decoration: none;
+            margin: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #00FF41;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <h1 class="matrix-green">ERROR 404_</h1>
+    <h2>PAGE_NOT_FOUND_</h2>
+    <p>WAKING UP... OR MAYBE WE'RE ALREADY AWAKE_</p>
+    <a href="/" class="btn">RETURN TO HOME_</a>
+    <a href="/index.html" class="btn">LOAD MAIN SITE_</a>
+
+    <script>
+        // Redirect to main site after 3 seconds
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 3000);
+    </script>
+</body>
+
+</html>
