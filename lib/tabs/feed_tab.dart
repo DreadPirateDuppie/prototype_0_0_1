@@ -15,11 +15,11 @@ class FeedTab extends StatefulWidget {
 class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
   List<MapPost> _posts = [];
   List<Map<String, dynamic>> _users = [];
+  List<Map<String, dynamic>> _onlineFriends = [];
   bool _isLoading = false;
   String _searchQuery = '';
   String _selectedCategory = 'All';
   String _selectedSort = 'newest'; // 'newest', 'popularity', 'oldest'
-  String _searchMode = 'posts'; // 'posts' or 'users'
   final List<String> _categories = ['All', 'Street', 'Park', 'DIY', 'Shop', 'Other'];
   final TextEditingController _searchController = TextEditingController();
 
@@ -27,6 +27,7 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
   void initState() {
     super.initState();
     _loadPosts();
+    _loadOnlineFriends();
   }
 
   @override
@@ -108,11 +109,8 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
       _searchQuery = query;
     });
 
-    if (_searchMode == 'posts') {
-      _loadPosts();
-    } else {
-      _searchUsers();
-    }
+    _loadPosts();
+    _searchUsers();
   }
 
   void _onCategoryChanged(String? category) {
@@ -133,17 +131,20 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
     }
   }
 
-  void _toggleSearchMode() {
-    setState(() {
-      _searchMode = _searchMode == 'posts' ? 'users' : 'posts';
-      _searchQuery = '';
-      _searchController.clear();
-      _users.clear();
-      _posts.clear();
-    });
-    
-    if (_searchMode == 'posts') {
-      _loadPosts();
+  Future<void> _loadOnlineFriends() async {
+    try {
+      final friends = await SupabaseService.getMutualFollowers();
+      final visibleLocations = await SupabaseService.getVisibleUserLocations();
+
+      final onlineFriends = visibleLocations.where((user) => friends.any((friend) => friend['id'] == user['id'])).toList();
+
+      if (mounted) {
+        setState(() {
+          _onlineFriends = onlineFriends;
+        });
+      }
+    } catch (e) {
+      developer.log('Error loading online friends: $e', name: 'FeedTab');
     }
   }
 
@@ -195,9 +196,128 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
     }
   }
 
+  Widget _buildOnlineFriendCard(Map<String, dynamic> user) {
+    const matrixGreen = Color(0xFF00FF41);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: matrixGreen.withValues(alpha: 0.6), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: matrixGreen.withValues(alpha: 0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: Stack(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: matrixGreen.withValues(alpha: 0.2),
+              backgroundImage: user['avatar_url'] != null
+                  ? NetworkImage(user['avatar_url'])
+                  : null,
+              child: user['avatar_url'] == null
+                  ? Text(
+                      (user['display_name'] ?? user['username'] ?? 'U')[0].toUpperCase(),
+                      style: const TextStyle(
+                        color: matrixGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
+            ),
+            Positioned(
+              right: 0,
+              top: 0,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
+        ),
+        title: Row(
+          children: [
+            Text(
+              user['display_name'] ?? user['username'] ?? 'Unknown User',
+              style: const TextStyle(
+                color: matrixGreen,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'ONLINE',
+                style: TextStyle(
+                  color: Colors.green,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Text(
+          '@${user['username'] ?? 'unknown'}',
+          style: TextStyle(
+            color: matrixGreen.withValues(alpha: 0.7),
+            fontFamily: 'monospace',
+            fontSize: 12,
+          ),
+        ),
+        trailing: SizedBox(
+          width: 80,
+          child: ElevatedButton(
+            onPressed: () {
+              // Navigate to map or user's location
+              // For now, just show location on map (could switch to map tab)
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${user['display_name'] ?? user['username']} is online and sharing location!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: matrixGreen.withValues(alpha: 0.2),
+              foregroundColor: matrixGreen,
+              side: BorderSide(color: matrixGreen, width: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: const Size(70, 32),
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+              ),
+            ),
+            child: const Text('VIEW'),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildUserCard(Map<String, dynamic> user) {
     const matrixGreen = Color(0xFF00FF41);
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -216,13 +336,13 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
         future: _isFollowingUser(user['id']),
         builder: (context, snapshot) {
           final isFollowing = snapshot.data ?? false;
-          
+
           return ListTile(
             leading: CircleAvatar(
               radius: 20,
               backgroundColor: matrixGreen.withValues(alpha: 0.2),
-              backgroundImage: user['avatar_url'] != null 
-                  ? NetworkImage(user['avatar_url']) 
+              backgroundImage: user['avatar_url'] != null
+                  ? NetworkImage(user['avatar_url'])
                   : null,
               child: user['avatar_url'] == null
                   ? Text(
@@ -253,12 +373,12 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
             trailing: SizedBox(
               width: 80,
               child: ElevatedButton(
-                onPressed: () => isFollowing 
-                    ? _onUserUnfollow(user) 
+                onPressed: () => isFollowing
+                    ? _onUserUnfollow(user)
                     : _onUserAction(user),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isFollowing 
-                      ? Colors.orange.withValues(alpha: 0.8) 
+                  backgroundColor: isFollowing
+                      ? Colors.orange.withValues(alpha: 0.8)
                       : matrixGreen.withValues(alpha: 0.2),
                   foregroundColor: isFollowing ? Colors.white : matrixGreen,
                   side: BorderSide(
@@ -298,21 +418,11 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
         ),
         centerTitle: true,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(80),
+          preferredSize: const Size.fromHeight(60),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Column(
               children: [
-                // Search Mode Toggle
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildModeToggle('POSTS', _searchMode == 'posts'),
-                    const SizedBox(width: 8),
-                    _buildModeToggle('USERS', _searchMode == 'users'),
-                  ],
-                ),
-                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -336,15 +446,16 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
                             fontSize: 13,
                           ),
                           cursorColor: matrixGreen,
+                          maxLines: 1,
                           decoration: InputDecoration(
-                            hintText: _searchMode == 'posts' ? 'Search posts...' : 'Search users...',
+                            hintText: 'Search posts and users...',
                             hintStyle: TextStyle(
                               color: matrixGreen.withValues(alpha: 0.5),
                               fontFamily: 'monospace',
                               fontSize: 13,
                             ),
-                            prefixIcon: Icon(
-                              _searchMode == 'posts' ? Icons.search : Icons.person_search,
+                            prefixIcon: const Icon(
+                              Icons.search,
                               color: matrixGreen,
                               size: 18,
                             ),
@@ -357,83 +468,81 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (_searchMode == 'posts')
-                      Container(
-                        height: 36,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                        decoration: BoxDecoration(
-                          color: Colors.black,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: matrixGreen, width: 1),
-                          boxShadow: [
-                            BoxShadow(
-                              color: matrixGreen.withValues(alpha: 0.2),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedCategory,
-                            icon: const Icon(Icons.filter_list, color: matrixGreen, size: 18),
-                            dropdownColor: Colors.black,
-                            isDense: true,
-                            style: const TextStyle(
-                              color: matrixGreen,
-                              fontFamily: 'monospace',
-                              fontSize: 13,
-                            ),
-                            items: _categories.map((String category) {
-                              return DropdownMenuItem<String>(
-                                value: category,
-                                child: Text(category),
-                              );
-                            }).toList(),
-                            onChanged: _onCategoryChanged,
+                    Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: matrixGreen, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: matrixGreen.withValues(alpha: 0.2),
+                            blurRadius: 4,
                           ),
+                        ],
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedCategory,
+                          icon: const Icon(Icons.filter_list, color: matrixGreen, size: 18),
+                          dropdownColor: Colors.black,
+                          isDense: true,
+                          style: const TextStyle(
+                            color: matrixGreen,
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                          ),
+                          items: _categories.map((String category) {
+                            return DropdownMenuItem<String>(
+                              value: category,
+                              child: Text(category),
+                            );
+                          }).toList(),
+                          onChanged: _onCategoryChanged,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      if (_searchMode == 'posts')
-                        Container(
-                          height: 36,
-                          padding: const EdgeInsets.symmetric(horizontal: 0),
-                          decoration: BoxDecoration(
-                            color: Colors.black,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: matrixGreen, width: 1),
-                            boxShadow: [
-                              BoxShadow(
-                                color: matrixGreen.withValues(alpha: 0.2),
-                                blurRadius: 4,
-                              ),
-                            ],
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: matrixGreen, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: matrixGreen.withValues(alpha: 0.2),
+                            blurRadius: 4,
                           ),
-                          child: PopupMenuButton<String>(
-                            icon: const Icon(Icons.sort, color: matrixGreen, size: 18),
-                            color: Colors.black,
-                            offset: const Offset(0, 40),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
-                            ),
-                            onSelected: _onSortChanged,
-                            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                              const PopupMenuItem<String>(
-                                value: 'newest',
-                                child: Text('Newest', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
-                              ),
-                              const PopupMenuItem<String>(
-                                value: 'popularity',
-                                child: Text('Popularity', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
-                              ),
-                              const PopupMenuItem<String>(
-                                value: 'oldest',
-                                child: Text('Oldest', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
-                              ),
-                            ],
-                          ),
+                        ],
+                      ),
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(Icons.sort, color: matrixGreen, size: 18),
+                        color: Colors.black,
+                        offset: const Offset(0, 40),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                         ),
+                        onSelected: _onSortChanged,
+                        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                          const PopupMenuItem<String>(
+                            value: 'newest',
+                            child: Text('Newest', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'popularity',
+                            child: Text('Popularity', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'oldest',
+                            child: Text('Oldest', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -454,95 +563,101 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
     );
   }
 
-  Widget _buildModeToggle(String text, bool isActive) {
+  Widget _buildSectionHeader(String title) {
     const matrixGreen = Color(0xFF00FF41);
-    
-    return GestureDetector(
-      onTap: _toggleSearchMode,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive ? matrixGreen.withValues(alpha: 0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isActive ? matrixGreen : matrixGreen.withValues(alpha: 0.3),
-            width: 1,
-          ),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: isActive ? matrixGreen : matrixGreen.withValues(alpha: 0.7),
-            fontFamily: 'monospace',
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
+
+    return Container(
+      margin: const EdgeInsets.only(left: 16, top: 16, bottom: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: matrixGreen,
+          fontFamily: 'monospace',
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
   Widget _buildContent() {
-    if (_searchMode == 'users') {
-      // User search results
-      if (_users.isEmpty) {
-        if (_searchQuery.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.person_search,
-                  size: 64,
-                  color: const Color(0xFF00FF41).withValues(alpha: 0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Search for users',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
-                  ),
-                ),
-              ],
-            ),
-          );
-        } else {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.person_off,
-                  size: 64,
-                  color: const Color(0xFF00FF41).withValues(alpha: 0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No users found',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Theme.of(context).textTheme.bodyLarge?.color,
-                  ),
-                ),
-              ],
-            ),
-          );
+    if (_searchQuery.isEmpty) {
+      // Show online friends first, then posts with filters
+      final List<Widget> items = [];
+
+      // Add online friends if any
+      if (_onlineFriends.isNotEmpty) {
+        items.add(_buildSectionHeader('FRIENDS ONLINE'));
+        for (final friend in _onlineFriends) {
+          items.add(_buildOnlineFriendCard(friend));
         }
       }
 
+      // Add posts
+      for (final post in _posts) {
+        items.add(PostCard(
+          post: post,
+          onPostUpdated: _loadPosts,
+        ));
+      }
+
+      if (items.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.article,
+                size: 64,
+                color: const Color(0xFF00FF41).withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'No posts to display',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Color(0xFF00FF41),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
       return RefreshIndicator(
-        onRefresh: _searchUsers,
-        child: ListView.builder(
-          itemCount: _users.length,
-          itemBuilder: (context, index) {
-            return _buildUserCard(_users[index]);
-          },
+        onRefresh: () async {
+          await _loadPosts();
+          await _loadOnlineFriends();
+        },
+        child: ListView(
+          children: items,
         ),
       );
     } else {
-      // Post search results
-      if (_posts.isEmpty) {
+      // Search mode: show combined results
+      final List<Widget> items = [];
+
+      // Add users section if any
+      if (_users.isNotEmpty) {
+        items.add(_buildSectionHeader('USERS'));
+        for (final user in _users) {
+          items.add(_buildUserCard(user));
+        }
+      }
+
+      // Add posts section if any
+      if (_posts.isNotEmpty) {
+        items.add(_buildSectionHeader('POSTS'));
+        for (final post in _posts) {
+          items.add(PostCard(
+            post: post,
+            onPostUpdated: _loadPosts,
+          ));
+        }
+      }
+
+      // If no results
+      if (_users.isEmpty && _posts.isEmpty) {
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -553,11 +668,11 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
                 color: const Color(0xFF00FF41).withValues(alpha: 0.5),
               ),
               const SizedBox(height: 16),
-              Text(
-                'No posts found',
+              const Text(
+                'No results found',
                 style: TextStyle(
                   fontSize: 18,
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  color: Color(0xFF00FF41),
                 ),
               ),
             ],
@@ -566,15 +681,12 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
       }
 
       return RefreshIndicator(
-        onRefresh: _loadPosts,
-        child: ListView.builder(
-          itemCount: _posts.length,
-          itemBuilder: (context, index) {
-            return PostCard(
-              post: _posts[index],
-              onPostUpdated: _loadPosts,
-            );
-          },
+        onRefresh: () async {
+          await _loadPosts();
+          await _searchUsers();
+        },
+        child: ListView(
+          children: items,
         ),
       );
     }
