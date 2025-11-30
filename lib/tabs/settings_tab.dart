@@ -84,6 +84,10 @@ class _SettingsTabState extends State<SettingsTab> {
   Future<void> _handleSignOut() async {
     try {
       await SupabaseService.signOut();
+      if (mounted) {
+        // Pop all routes to return to the root AuthWrapper
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } catch (error) {
       if (mounted) {
         ErrorHelper.showError(context, 'Sign out error: $error');

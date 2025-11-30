@@ -159,6 +159,53 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     }
   }
 
+  Future<void> _forfeitBattle() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Forfeit Match?'),
+        content: const Text(
+          'Are you sure you want to forfeit? You will automatically lose this match and points will be deducted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Forfeit'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      await BattleService.forfeitBattle(
+        battleId: _battle.id!,
+        forfeitingUserId: userId,
+      );
+      
+      if (mounted) {
+        Navigator.pop(context); // Close screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Match forfeited')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Failed to forfeit: $e');
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   void _noop() {}
 
   String _modeLabel(GameMode mode) {
@@ -394,6 +441,27 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
         foregroundColor: Colors.white,
         centerTitle: true,
         elevation: 0,
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'forfeit') {
+                _forfeitBattle();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'forfeit',
+                child: Row(
+                  children: [
+                    Icon(Icons.flag, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Forfeit Match', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -644,7 +712,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                             final bool canUploadSet =
                                 _isMyTurn && _battle.setTrickVideoUrl == null;
                             final bool canUploadAttempt =
-                                !_isMyTurn &&
+                                _isMyTurn &&
                                 _battle.setTrickVideoUrl != null &&
                                 _battle.verificationStatus ==
                                     VerificationStatus.pending;

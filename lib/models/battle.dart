@@ -37,6 +37,11 @@ class Battle {
   final bool isQuickfire;
   final DateTime? turnDeadline;
   final bool betAccepted;
+  final String? setterId;
+  final String? attempterId;
+  final String? setterVote; // 'landed' or 'missed'
+  final String? attempterVote; // 'landed' or 'missed'
+  final String? trickName;
 
   Battle({
     this.id,
@@ -58,6 +63,11 @@ class Battle {
     this.isQuickfire = false,
     this.turnDeadline,
     this.betAccepted = false,
+    this.setterId,
+    this.attempterId,
+    this.setterVote,
+    this.attempterVote,
+    this.trickName,
   });
 
   String getGameLetters() {
@@ -114,6 +124,11 @@ class Battle {
       'is_quickfire': isQuickfire,
       'turn_deadline': turnDeadline?.toIso8601String(),
       'bet_accepted': betAccepted,
+      'setter_id': setterId,
+      'attempter_id': attempterId,
+      'setter_vote': setterVote,
+      'attempter_vote': attempterVote,
+      'trick_name': trickName,
     };
   }
 

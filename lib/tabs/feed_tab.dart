@@ -18,6 +18,7 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
   bool _isLoading = false;
   String _searchQuery = '';
   String _selectedCategory = 'All';
+  String _selectedSort = 'newest'; // 'newest', 'popularity', 'oldest'
   String _searchMode = 'posts'; // 'posts' or 'users'
   final List<String> _categories = ['All', 'Street', 'Park', 'DIY', 'Shop', 'Other'];
   final TextEditingController _searchController = TextEditingController();
@@ -40,7 +41,7 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
     });
 
     try {
-      List<MapPost> posts = await SupabaseService.getAllMapPostsWithVotes();
+      List<MapPost> posts = await SupabaseService.getAllMapPostsWithVotes(sortBy: _selectedSort);
       
       // Apply filters
       if (_selectedCategory != 'All') {
@@ -118,6 +119,15 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
     if (category != null) {
       setState(() {
         _selectedCategory = category;
+      });
+      _loadPosts();
+    }
+  }
+
+  void _onSortChanged(String? sort) {
+    if (sort != null) {
+      setState(() {
+        _selectedSort = sort;
       });
       _loadPosts();
     }
@@ -383,6 +393,47 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      if (_searchMode == 'posts')
+                        Container(
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 0),
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: matrixGreen, width: 1),
+                            boxShadow: [
+                              BoxShadow(
+                                color: matrixGreen.withValues(alpha: 0.2),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: PopupMenuButton<String>(
+                            icon: const Icon(Icons.sort, color: matrixGreen, size: 18),
+                            color: Colors.black,
+                            offset: const Offset(0, 40),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+                            ),
+                            onSelected: _onSortChanged,
+                            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                              const PopupMenuItem<String>(
+                                value: 'newest',
+                                child: Text('Newest', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'popularity',
+                                child: Text('Popularity', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'oldest',
+                                child: Text('Oldest', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
+                              ),
+                            ],
+                          ),
+                        ),
                   ],
                 ),
               ],

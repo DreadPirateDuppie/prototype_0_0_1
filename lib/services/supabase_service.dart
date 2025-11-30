@@ -870,17 +870,7 @@ class SupabaseService {
 
   // Search map posts
   static Future<List<MapPost>> searchPosts(String query) async {
-    try {
-      final response = await _client
-          .from('map_posts')
-          .select()
-          .or('title.ilike.%$query%,description.ilike.%$query%')
-          .order('created_at', ascending: false);
-
-      return (response as List).map((post) => MapPost.fromMap(post)).toList();
-    } catch (e) {
-      return [];
-    }
+    return getAllMapPosts(searchQuery: query);
   }
 
   // Get all map posts for a specific user
@@ -894,10 +884,21 @@ class SupabaseService {
 
       final posts = (response as List).cast<Map<String, dynamic>>();
       
-      // Fetch current username to ensure consistency
+      // Fetch user profile (name and avatar)
       String? currentUsername;
+      String? currentAvatarUrl;
+      
       try {
-        currentUsername = await getUserDisplayName(userId);
+        final profile = await _client
+            .from('user_profiles')
+            .select('display_name, username, avatar_url')
+            .eq('id', userId)
+            .maybeSingle();
+            
+        if (profile != null) {
+            currentUsername = profile['display_name'] as String? ?? profile['username'] as String?;
+            currentAvatarUrl = profile['avatar_url'] as String?;
+        }
       } catch (e) {
         // Ignore error, will fallback
       }
@@ -909,6 +910,11 @@ class SupabaseService {
           // Clear email if no username set
           post['user_name'] = null;
         }
+        
+        if (currentAvatarUrl != null) {
+          post['avatar_url'] = currentAvatarUrl;
+        }
+        
         return MapPost.fromMap(post);
       }).toList();
     } catch (e) {
@@ -1213,35 +1219,48 @@ class SupabaseService {
   }
 
   // Get all map posts with user's vote status
-  static Future<List<MapPost>> getAllMapPostsWithVotes() async {
+  static Future<List<MapPost>> getAllMapPostsWithVotes({String sortBy = 'newest'}) async {
     try {
       final user = getCurrentUser();
       
       // Get all posts with vote counts
-      final postsResponse = await _client
+      dynamic query = _client
           .from('map_posts')
-          .select()
-          .order('created_at', ascending: false);
+          .select();
+
+      // Apply sorting
+      if (sortBy == 'popularity') {
+        query = query.order('vote_score', ascending: false);
+      } else if (sortBy == 'oldest') {
+        query = query.order('created_at', ascending: true);
+      } else {
+        // Default to newest
+        query = query.order('created_at', ascending: false);
+      }
+
+      final postsResponse = await query;
 
       final posts = (postsResponse as List).cast<Map<String, dynamic>>();
       
-      // Fetch user profiles for these posts to get up-to-date display names
+      // Fetch user profiles for these posts to get up-to-date display names and avatars
       final userIds = posts.map((p) => p['user_id'] as String).toSet().toList();
-      Map<String, String> userNames = {};
+      Map<String, Map<String, String?>> userProfiles = {};
       
       if (userIds.isNotEmpty) {
         try {
           final profilesResponse = await _client
               .from('user_profiles')
-              .select('id, display_name, username')
+              .select('id, display_name, username, avatar_url')
               .filter('id', 'in', userIds);
               
           for (final profile in (profilesResponse as List)) {
             final id = profile['id'] as String;
             final name = profile['display_name'] as String? ?? profile['username'] as String?;
-            if (name != null) {
-              userNames[id] = name;
-            }
+            final avatarUrl = profile['avatar_url'] as String?;
+            userProfiles[id] = {
+              'name': name,
+              'avatar_url': avatarUrl,
+            };
           }
         } catch (e) {
           developer.log('Error fetching profiles: $e', name: 'SupabaseService');
@@ -1268,9 +1287,10 @@ class SupabaseService {
         
         post['user_vote'] = voteMap[postId];
         
-        // Use fetched profile name if available
-        if (userNames.containsKey(userId)) {
-          post['user_name'] = userNames[userId];
+        // Use fetched profile name and avatar if available
+        if (userProfiles.containsKey(userId)) {
+          post['user_name'] = userProfiles[userId]!['name'];
+          post['avatar_url'] = userProfiles[userId]!['avatar_url'];
         } else {
           // Clear email from user_name if no username is set
           // This ensures UI shows 'User' instead of email

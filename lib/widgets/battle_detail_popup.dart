@@ -109,6 +109,60 @@ class _BattleDetailPopupState extends State<BattleDetailPopup> {
     }
   }
 
+  Future<void> _forfeitBattle() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: matrixDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: matrixGreen.withValues(alpha: 0.3)),
+        ),
+        title: const Text(
+          'Forfeit Match?',
+          style: TextStyle(color: matrixGreen),
+        ),
+        content: const Text(
+          'Are you sure you want to forfeit? You will automatically lose this match and points will be deducted.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Forfeit'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      await BattleService.forfeitBattle(
+        battleId: _battle.id!,
+        forfeitingUserId: userId,
+      );
+      
+      if (mounted) {
+        Navigator.pop(context); // Close popup
+        widget.onBattleUpdate?.call();
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Failed to forfeit: $e');
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   String _modeLabel(GameMode mode) {
     switch (mode) {
       case GameMode.skate:
@@ -543,6 +597,17 @@ class _BattleDetailPopupState extends State<BattleDetailPopup> {
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.7),
             fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Forfeit button
+        TextButton.icon(
+          onPressed: _forfeitBattle,
+          icon: const Icon(Icons.flag, size: 16, color: Colors.white),
+          label: const Text('FORFEIT MATCH'),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.red.withValues(alpha: 0.8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           ),
         ),
       ],

@@ -247,14 +247,36 @@ class BattleService {
     required String videoUrl,
   }) async {
     try {
+      // Get current battle state
+      final battle = await getBattle(battleId);
+      if (battle == null) return null;
+
+      // Determine who is attempting (the person who is NOT the current turn holder)
+      final attempterId = battle.currentTurnPlayerId == battle.player1Id
+          ? battle.player2Id
+          : battle.player1Id;
+
+      // Switch turn to the attempter (they set the next trick)
+      final nextPlayer = attempterId;
+
+      // Calculate new deadline
+      final Duration timerDuration = battle.isQuickfire
+          ? const Duration(minutes: 4, seconds: 20)
+          : const Duration(hours: 24);
+      final newDeadline = DateTime.now().add(timerDuration);
+
+      // Clear videos and switch turn (no letter assignment yet - only on timer expiry)
       final response = await _client
           .from('battles')
           .update({
-            'attempt_video_url': videoUrl,
-            'verification_status': VerificationStatus.quickFireVoting
+            'set_trick_video_url': null,
+            'attempt_video_url': null,
+            'current_turn_player_id': nextPlayer,
+            'verification_status': VerificationStatus.pending
                 .toString()
                 .split('.')
                 .last,
+            'turn_deadline': newDeadline.toIso8601String(),
           })
           .eq('id', battleId)
           .select()
@@ -547,6 +569,30 @@ class BattleService {
     } catch (e) {
       // Silently fail to avoid blocking UI
       debugPrint('Error checking expired turns: $e');
+    }
+  }
+  // Forfeit battle
+  static Future<Battle?> forfeitBattle({
+    required String battleId,
+    required String forfeitingUserId,
+  }) async {
+    try {
+      final battle = await getBattle(battleId);
+      if (battle == null) return null;
+
+      // Determine winner (the other player)
+      final winnerId = battle.player1Id == forfeitingUserId
+          ? battle.player2Id
+          : battle.player1Id;
+
+      // Complete battle with the other player as winner
+      // This handles score updates and wager payouts
+      return await completeBattle(
+        battleId: battleId,
+        winnerId: winnerId,
+      );
+    } catch (e) {
+      throw Exception('Failed to forfeit battle: $e');
     }
   }
 }
