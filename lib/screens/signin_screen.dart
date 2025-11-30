@@ -94,12 +94,23 @@ class _SignInScreenState extends State<SignInScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo Image
-                  Image.asset(
-                    'assets/images/app_icon.png',
-                    width: 140,
-                    height: 140,
-                    fit: BoxFit.contain,
+                  // Logo Image with glow effect
+                  Container(
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00FF41).withValues(alpha: 0.5),
+                          blurRadius: 40,
+                          spreadRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: Image.asset(
+                      'assets/images/pushinn_logo.png',
+                      width: 180,
+                      height: 180,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                   const SizedBox(height: 32),
                   

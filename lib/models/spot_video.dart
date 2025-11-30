@@ -27,7 +27,10 @@ class SpotVideo {
     this.approvedAt,
     this.approvedBy,
     this.userVote,
+    this.thumbnailUrl,
   });
+
+  final String? thumbnailUrl;
 
   factory SpotVideo.fromMap(Map<String, dynamic> map) {
     return SpotVideo(
@@ -46,6 +49,7 @@ class SpotVideo {
           : null,
       approvedBy: map['approved_by'] as String?,
       userVote: map['user_vote'] as int?,
+      thumbnailUrl: map['thumbnail_url'] as String?,
     );
   }
 
@@ -63,6 +67,7 @@ class SpotVideo {
       'created_at': createdAt.toIso8601String(),
       'approved_at': approvedAt?.toIso8601String(),
       'approved_by': approvedBy,
+      'thumbnail_url': thumbnailUrl,
     };
   }
 

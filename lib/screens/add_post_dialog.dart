@@ -27,7 +27,8 @@ class _AddPostDialogState extends State<AddPostDialog> {
   String _selectedCategory = 'Other';
   final List<String> _categories = ['Street', 'Park', 'DIY', 'Shop', 'Other'];
   bool _isLoading = false;
-  File? _selectedImage;
+  final List<File> _selectedImages = [];
+  double _rating = 0.0; // Star rating (0-5)
 
   @override
   void dispose() {
@@ -37,65 +38,44 @@ class _AddPostDialogState extends State<AddPostDialog> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImages() async {
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        // Show loading indicator
+      final List<XFile> images = await picker.pickMultiImage();
+      
+      if (images.isNotEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Compressing image...')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Compressing images...')),
+          );
         }
 
-        // Compress the image
-        final compressedImage = await ImageService.compressImage(
-          File(image.path),
-        );
-
-        if (compressedImage != null) {
-          setState(() {
-            _selectedImage = compressedImage;
-          });
-
-          if (!mounted) return;
-          final sizeMB = await ImageService.getFileSizeMB(compressedImage);
-          if (!mounted) return;
-
-          final messenger = ScaffoldMessenger.of(context);
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text('Image ready (${sizeMB.toStringAsFixed(2)} MB)'),
-            ),
-          );
+        for (final image in images) {
+          final compressedImage = await ImageService.compressImage(File(image.path));
+          if (compressedImage != null) {
+            setState(() {
+              _selectedImages.add(compressedImage);
+            });
+          }
         }
       }
     } catch (e) {
       if (mounted) {
-        ErrorHelper.showError(context, 'Error picking image: $e');
+        ErrorHelper.showError(context, 'Error picking images: $e');
       }
     }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
   }
 
   Future<void> _createPost() async {
     if (_titleController.text.trim().isEmpty ||
         _descriptionController.text.trim().isEmpty) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Missing Information'),
-          content: const Text(
-            'Please fill in both title and description fields.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+      ErrorHelper.showError(context, 'Please fill in both title and description fields.');
       return;
     }
 
@@ -110,12 +90,12 @@ class _AddPostDialogState extends State<AddPostDialog> {
       // Get user's display name
       final userName = await SupabaseService.getCurrentUserDisplayName();
 
-      String? photoUrl;
-      if (_selectedImage != null) {
-        photoUrl = await SupabaseService.uploadPostImage(
-          _selectedImage!,
-          user.id,
-        );
+      List<String> photoUrls = [];
+      for (final image in _selectedImages) {
+        final url = await SupabaseService.uploadPostImage(image, user.id);
+        if (url != null) {
+          photoUrls.add(url);
+        }
       }
 
       final tags = _tagsController.text
@@ -132,16 +112,17 @@ class _AddPostDialogState extends State<AddPostDialog> {
         longitude: widget.location.longitude,
         title: _titleController.text,
         description: _descriptionController.text,
-        photoUrl: photoUrl,
+        photoUrls: photoUrls,
         category: _selectedCategory,
         tags: tags,
+        rating: _rating,
       );
 
       if (mounted) {
         widget.onPostAdded();
         Navigator.of(context).pop();
       }
-      } catch (e) {
+    } catch (e) {
       if (mounted) {
         ErrorHelper.showError(context, 'Error creating post: $e');
       }
@@ -163,7 +144,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
       backgroundColor: matrixBlack,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: matrixGreen, width: 2),
+        side: const BorderSide(color: matrixGreen, width: 2),
       ),
       title: const Text(
         'ADD PIN/POST',
@@ -201,13 +182,12 @@ class _AddPostDialogState extends State<AddPostDialog> {
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
-                focusedBorder: OutlineInputBorder(
+                focusedBorder: const OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen, width: 2),
                 ),
               ),
               enabled: !_isLoading,
             ),
-            const SizedBox(height: 12),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _selectedCategory,
@@ -222,7 +202,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
-                focusedBorder: OutlineInputBorder(
+                focusedBorder: const OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen, width: 2),
                 ),
               ),
@@ -253,7 +233,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
-                focusedBorder: OutlineInputBorder(
+                focusedBorder: const OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen, width: 2),
                 ),
               ),
@@ -274,46 +254,139 @@ class _AddPostDialogState extends State<AddPostDialog> {
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
-                focusedBorder: OutlineInputBorder(
+                focusedBorder: const OutlineInputBorder(
                   borderSide: BorderSide(color: matrixGreen, width: 2),
                 ),
               ),
               maxLines: 3,
               enabled: !_isLoading,
             ),
-            const SizedBox(height: 12),
-            if (_selectedImage != null) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: matrixGreen.withValues(alpha: 0.5)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Image.file(
-                    _selectedImage!,
-                    height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
+            const SizedBox(height: 16),
+            
+            // Star Rating Section
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Spot Quality Rating',
+                  style: TextStyle(
+                    color: matrixGreen.withValues(alpha: 0.7),
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final starValue = index + 1.0;
+                    return GestureDetector(
+                      onTap: _isLoading ? null : () {
+                        setState(() {
+                          _rating = starValue;
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Icon(
+                          _rating >= starValue 
+                              ? Icons.star 
+                              : Icons.star_border,
+                          color: _rating >= starValue 
+                              ? const Color(0xFFFFD700) // Gold color
+                              : matrixGreen.withValues(alpha: 0.3),
+                          size: 36,
+                          shadows: _rating >= starValue ? [
+                            Shadow(
+                              color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+                              blurRadius: 8,
+                            ),
+                          ] : null,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 4),
+                Center(
+                  child: Text(
+                    _rating > 0 
+                        ? '${_rating.toInt()} / 5 stars' 
+                        : 'Tap to rate',
+                    style: TextStyle(
+                      color: matrixGreen.withValues(alpha: 0.5),
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Image List
+            if (_selectedImages.isNotEmpty)
+              SizedBox(
+                height: 100,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  shrinkWrap: true,
+                  physics: const ClampingScrollPhysics(),
+                  itemCount: _selectedImages.length,
+                  separatorBuilder: (context, index) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    return Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            _selectedImages[index],
+                            height: 100,
+                            width: 100,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () => _removeImage(index),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
-              const SizedBox(height: 8),
-            ],
+            
+            const SizedBox(height: 12),
+            
             Container(
               decoration: BoxDecoration(
                 border: Border.all(color: matrixGreen.withValues(alpha: 0.5)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _pickImage,
+                onPressed: _isLoading ? null : _pickImages,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: matrixBlack,
                   foregroundColor: matrixGreen,
                 ),
-                icon: const Icon(Icons.image),
+                icon: const Icon(Icons.add_photo_alternate),
                 label: Text(
-                  _selectedImage != null ? 'Change Photo' : 'Add Photo',
+                  _selectedImages.isEmpty ? 'Add Photos' : 'Add More Photos',
                 ),
               ),
             ),
@@ -350,7 +423,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
               elevation: 0,
             ),
             child: _isLoading
-                ? SizedBox(
+                ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(

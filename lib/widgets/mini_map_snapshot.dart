@@ -61,7 +61,7 @@ class MiniMapSnapshot extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: const Color(0xFF00FF41),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
+                        border: Border.all(color: Colors.black, width: 3),
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFF00FF41).withValues(alpha: 0.5),

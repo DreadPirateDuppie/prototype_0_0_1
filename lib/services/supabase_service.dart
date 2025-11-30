@@ -732,11 +732,12 @@ class SupabaseService {
     required double longitude,
     required String title,
     required String description,
-    String? photoUrl,
+    List<String>? photoUrls,
     String? userName,  // Deprecated - will fetch from user_profiles
     String? userEmail,  // Deprecated - will fetch from user
     String category = 'Other',
     List<String> tags = const [],
+    double rating = 0.0,  // Quality rating (0-5)
   }) async {
     try {
       // Fetch current username from user_profiles
@@ -753,24 +754,21 @@ class SupabaseService {
             'longitude': longitude,
             'title': title,
             'description': description,
-            'created_at': DateTime.now().toIso8601String(),
-            'likes': 0,
-            'photo_url': photoUrl,
+            'photo_urls': photoUrls,
             'category': category,
             'tags': tags,
+            'quality_rating': rating,
+            'created_at': DateTime.now().toIso8601String(),
           })
           .select()
           .single();
 
       final post = MapPost.fromMap(response);
       
-      // Award XP for creating a post (e.g., 15 XP)
-    await _updatePosterXP(userId, 15);
-    
-    // Award Points for creating a post (4.20 Points)
-    await awardPoints(userId, 3.5, 'post_reward', referenceId: post.id, description: 'Created a new spot');
-    
-    return post;
+      // Award points for creating a post
+      await awardPoints(userId, 5.0, 'create_post', description: 'Created a new spot: $title');
+      
+      return post;
     } on SocketException catch (e) {
       throw AppNetworkException(
         'Network error while creating post',
@@ -831,23 +829,25 @@ class SupabaseService {
       final response = await query.order('created_at', ascending: false);
       final posts = (response as List).cast<Map<String, dynamic>>();
 
-      // Fetch user profiles for these posts to get up-to-date display names
+      // Fetch user profiles for these posts to get up-to-date display names and avatars
       final userIds = posts.map((p) => p['user_id'] as String).toSet().toList();
-      Map<String, String> userNames = {};
+      Map<String, Map<String, String?>> userProfiles = {};
       
       if (userIds.isNotEmpty) {
         try {
           final profilesResponse = await _client
               .from('user_profiles')
-              .select('id, display_name, username')
+              .select('id, display_name, username, avatar_url')
               .filter('id', 'in', userIds);
               
           for (final profile in (profilesResponse as List)) {
             final id = profile['id'] as String;
             final name = profile['display_name'] as String? ?? profile['username'] as String?;
-            if (name != null) {
-              userNames[id] = name;
-            }
+            final avatarUrl = profile['avatar_url'] as String?;
+            userProfiles[id] = {
+              'name': name,
+              'avatar_url': avatarUrl,
+            };
           }
         } catch (e) {
           developer.log('Error fetching profiles: $e', name: 'SupabaseService');
@@ -856,8 +856,9 @@ class SupabaseService {
 
       return posts.map((post) {
         final userId = post['user_id'] as String;
-        if (userNames.containsKey(userId)) {
-          post['user_name'] = userNames[userId];
+        if (userProfiles.containsKey(userId)) {
+          post['user_name'] = userProfiles[userId]!['name'];
+          post['avatar_url'] = userProfiles[userId]!['avatar_url'];
         }
         return MapPost.fromMap(post);
       }).toList();

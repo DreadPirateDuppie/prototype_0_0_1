@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
-import '../screens/spot_details_bottom_sheet.dart';
+import '../screens/spot_details_screen.dart';
 import '../screens/location_privacy_dialog.dart';
 import '../widgets/ad_banner.dart';
 import '../utils/error_helper.dart';
@@ -20,6 +21,7 @@ class MapTab extends StatefulWidget {
 class _MapTabState extends State<MapTab> {
   late MapController mapController;
   List<Marker> markers = [];
+  List<Marker> nonClusterMarkers = [];
   List<MapPost> userPosts = [];
   Map<String, MapPost> markerPostMap = {}; // Map marker location to post
   LatLng currentLocation = const LatLng(37.7749, -122.4194); // Default: SF
@@ -51,10 +53,13 @@ class _MapTabState extends State<MapTab> {
       if (mounted) {
         setState(() {
           userPosts = posts;
-          // Clear all markers and rebuild from scratch
-          markers.clear();
+          // Create new lists to ensure state update
+          markers = []; // This will now hold only clusterable markers (posts)
+          nonClusterMarkers = []; // This will hold non-clusterable markers (user location)
           markerPostMap.clear();
-          _addSampleMarkers();
+          
+          _addSampleMarkers(); // Adds to markers (clusterable)
+          
           // Always add user location if permission granted
           if (_hasLocationPermission) {
             _addMarkerToList(
@@ -63,9 +68,11 @@ class _MapTabState extends State<MapTab> {
               'You are here',
               Colors.blue,
               isUserLocation: true,
+              addToNonCluster: true,
             );
           }
-          _addUserPostMarkers();
+          _addUserPostMarkers(); // Adds to markers (clusterable)
+          debugPrint('MapTab: Updated markers. Cluster: ${markers.length}, Non-Cluster: ${nonClusterMarkers.length}');
         });
       }
     } catch (e) {
@@ -250,117 +257,115 @@ class _MapTabState extends State<MapTab> {
     String? postId,
     MapPost? post,
     bool isUserLocation = false,
+    bool addToNonCluster = false, // New parameter
   }) {
     final key = '${location.latitude},${location.longitude}';
     if (post != null) {
       markerPostMap[key] = post;
     }
 
-    setState(() {
-      markers.add(
-        Marker(
-          point: location,
-          width: 40,
-          height: 40,
-          child: GestureDetector(
-            onTap: () {
-              if (post != null) {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
+    final marker = Marker(
+      point: location,
+      width: 40,
+      height: 40,
+      child: GestureDetector(
+        onTap: () {
+          if (post != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SpotDetailsScreen(post: post),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('$title - $subtitle'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        },
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (!isUserLocation) ...[
+              // Outer glow effect (only for pins, not user location)
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      spreadRadius: 2,
                     ),
+                  ],
+                ),
+              ),
+              // Pin background
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: post != null ? const Color(0xFF00FF41) : color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.black,
+                    width: 1.5,
                   ),
-                  builder: (context) => SpotDetailsBottomSheet(
-                    post: post,
-                    onClose: () => Navigator.pop(context),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$title - $subtitle'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              }
-            },
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                if (!isUserLocation) ...[
-                  // Outer glow effect (only for pins, not user location)
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: color.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: post != null
+                          ? const Color(0xFF00FF41).withValues(alpha: 0.5)
+                          : color.withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      spreadRadius: 2,
                     ),
-                  ),
-                  // Pin background
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: post != null ? const Color(0xFF00FF41) : color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.black,
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: post != null
-                              ? const Color(0xFF00FF41).withValues(alpha: 0.5)
-                              : color.withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
-                    child: Icon(
-                      post != null ? Icons.location_on_rounded : Icons.location_on,
-                      color: Colors.black,
-                      size: 20,
-                    ),
+                  ],
+                ),
+                child: Icon(
+                  post != null ? Icons.location_on_rounded : Icons.location_on,
+                  color: Colors.black,
+                  size: 20,
+                ),
+              ),
+            ] else
+              // User location: GPS crosshair icon
+              Icon(
+                Icons.my_location,
+                color: const Color(0xFF00FF41),
+                size: 32,
+                shadows: [
+                  Shadow(
+                    color: const Color(0xFF00FF41).withValues(alpha: 0.8),
+                    blurRadius: 8,
                   ),
-                ] else
-                  // User location: GPS crosshair icon
-                  Icon(
-                    Icons.my_location,
-                    color: const Color(0xFF00FF41),
-                    size: 32,
-                    shadows: [
-                      Shadow(
-                        color: const Color(0xFF00FF41).withValues(alpha: 0.8),
-                        blurRadius: 8,
-                      ),
-                      Shadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
                   ),
-              ],
-            ),
-          ),
+                ],
+              ),
+          ],
         ),
-      );
+      ),
+    );
+
+    setState(() {
+      if (addToNonCluster) {
+        nonClusterMarkers.add(marker);
+      } else {
+        markers.add(marker);
+      }
     });
   }
 
@@ -401,6 +406,7 @@ class _MapTabState extends State<MapTab> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('MapTab: Building with ${markers.length} markers');
     return Stack(
       children: [
         Column(
@@ -456,7 +462,43 @@ class _MapTabState extends State<MapTab> {
                         userAgentPackageName: 'com.example.prototype_0_0_1',
                         maxZoom: 19,
                       ),
-                      MarkerLayer(markers: markers),
+                      MarkerLayer(markers: nonClusterMarkers), // Add non-clustered markers (user location)
+                      MarkerClusterLayerWidget(
+                        options: MarkerClusterLayerOptions(
+                          maxClusterRadius: 120,
+                          size: const Size(40, 40),
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.all(50),
+                          maxZoom: 15,
+                          markers: markers,
+                          builder: (context, markers) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00FF41),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.black, width: 2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF00FF41).withValues(alpha: 0.5),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  markers.length.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ],
                   ),
                   if (_isLoadingLocation)

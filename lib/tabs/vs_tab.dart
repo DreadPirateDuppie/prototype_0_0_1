@@ -1046,18 +1046,15 @@ class _VsTabState extends State<VsTab> {
                           ]);
                         },
                         child: ListView.builder(
-                          itemCount: battles.length + 2, // +1 for leaderboard, +1 for tutorial
+                          padding: const EdgeInsets.only(bottom: 100), // Add padding for FABs
+                          itemCount: battles.length + 1, // +1 for leaderboard only
                           itemBuilder: (context, index) {
                             // First item is the leaderboard
                             if (index == 0) {
                               return _buildLeaderboardSection();
                             }
-                            // Second item is the tutorial battle
-                            if (index == 1) {
-                              return _buildTutorialBattleCard();
-                            }
                             // Remaining items are real battles
-                            return _buildBattleCard(battles[index - 2]);
+                            return _buildBattleCard(battles[index - 1]);
                           },
                         ),
                       ),

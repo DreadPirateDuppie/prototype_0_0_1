@@ -174,15 +174,40 @@ class AdminService {
   }
 
   /// Get all users (for admin management)
-  Future<List<Map<String, dynamic>>> getAllUsers({int limit = 50, int offset = 0}) async {
+  /// Joins with auth.users to include email addresses
+  Future<List<Map<String, dynamic>>> getAllUsers({int limit = 1000, int offset = 0}) async {
     try {
-      final response = await _client
+      // Use RPC to query auth.users via a custom function, or query user_profiles and fetch emails separately
+      // Since we can't directly join auth.users in Supabase client, we fetch profiles first
+      final profiles = await _client
           .from('user_profiles')
-          .select()
-          .order('created_at', ascending: false)
-          .range(offset, offset + limit - 1);
+          .select('id, username, display_name, avatar_url, bio, is_admin, is_banned, ban_reason, banned_at, points, created_at, updated_at')
+          .order('created_at', ascending: false);
+          // Removed .range() to get all users
 
-      return (response as List).cast<Map<String, dynamic>>();
+      // Now fetch emails from auth.users for each user
+      final List<Map<String, dynamic>> usersWithEmails = [];
+      for (var profile in profiles as List) {
+        try {
+          // Fetch email from auth.users using admin API
+          final userResponse = await _client.auth.admin.getUserById(profile['id']);
+          final email = userResponse.user?.email ?? 'No email';
+          
+          usersWithEmails.add({
+            ...profile,
+            'email': email,
+          });
+        } catch (e) {
+          // If we can't fetch email, add profile without email
+          developer.log('Error fetching email for user ${profile['id']}: $e', name: 'AdminService');
+          usersWithEmails.add({
+            ...profile,
+            'email': 'No email',
+          });
+        }
+      }
+
+      return usersWithEmails;
     } catch (e) {
       developer.log('Error getting all users: $e', name: 'AdminService');
       return [];
@@ -216,6 +241,19 @@ class AdminService {
     } catch (e) {
       developer.log('Error unbanning user: $e', name: 'AdminService');
       throw Exception('Failed to unban user: $e');
+    }
+  }
+
+  /// Toggle posting restriction for a user
+  Future<void> togglePostingRestriction(String userId, bool canPost) async {
+    try {
+      await _client.from('user_profiles').update({
+        'can_post': canPost,
+      }).eq('id', userId);
+      developer.log('Set posting restriction for $userId to $canPost', name: 'AdminService');
+    } catch (e) {
+      developer.log('Error toggling posting restriction: $e', name: 'AdminService');
+      throw Exception('Failed to toggle posting restriction: $e');
     }
   }
 

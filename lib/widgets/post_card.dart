@@ -3,8 +3,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/post.dart';
 import '../services/supabase_service.dart';
 import '../screens/edit_post_dialog.dart';
-import '../screens/spot_details_bottom_sheet.dart';
-import '../screens/trick_history_screen.dart';
+import '../screens/spot_details_screen.dart';
 import 'vote_buttons.dart';
 import 'mini_map_snapshot.dart';
 import '../utils/error_helper.dart';
@@ -123,18 +122,12 @@ class _PostCardState extends State<PostCard> {
   }
 
   void _showDetails() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SpotDetailsScreen(post: currentPost),
       ),
-      builder: (context) => SpotDetailsBottomSheet(
-        post: currentPost,
-        onClose: () => Navigator.pop(context),
-        onPostUpdated: widget.onPostUpdated,
-      ),
-    );
+    ).then((_) => widget.onPostUpdated?.call());
   }
 
   @override
@@ -182,16 +175,21 @@ class _PostCardState extends State<PostCard> {
                     child: CircleAvatar(
                       radius: 18,
                       backgroundColor: const Color(0xFF000000), // Pure black
-                      child: Text(
-                        (currentPost.userName?.isNotEmpty == true)
-                            ? currentPost.userName![0].toUpperCase()
-                            : 'U',
-                        style: const TextStyle(
-                          color: matrixGreen,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      backgroundImage: currentPost.avatarUrl != null
+                          ? NetworkImage(currentPost.avatarUrl!)
+                          : null,
+                      child: currentPost.avatarUrl == null
+                          ? Text(
+                              (currentPost.userName?.isNotEmpty == true)
+                                  ? currentPost.userName![0].toUpperCase()
+                                  : 'U',
+                              style: const TextStyle(
+                                color: matrixGreen,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
                     ),
                   ),
                 const SizedBox(width: 12),
@@ -341,14 +339,7 @@ class _PostCardState extends State<PostCard> {
                 Row(
                   children: [
                     TextButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => TrickHistoryScreen(spot: currentPost),
-                          ),
-                        );
-                      },
+                      onPressed: _showDetails,
                       icon: const Icon(Icons.history, size: 18, color: Color(0xFF00FF41)),
                       label: const Text(
                         'History',

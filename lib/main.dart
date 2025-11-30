@@ -94,8 +94,66 @@ class AuthWrapper extends StatelessWidget {
       builder: (context, snapshot) {
         // Check connection state
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          return Scaffold(
+            backgroundColor: Colors.black,
+            body: Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.center,
+                  radius: 1.5,
+                  colors: [
+                    const Color(0xFF1A1A1A),
+                    Colors.black,
+                  ],
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Logo with glow
+                    Container(
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF00FF41).withValues(alpha: 0.6),
+                            blurRadius: 60,
+                            spreadRadius: 20,
+                          ),
+                        ],
+                      ),
+                      child: Image.asset(
+                        'assets/images/pushinn_logo.png',
+                        width: 200,
+                        height: 200,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    // Loading indicator
+                    const SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00FF41)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Loading text
+                    Text(
+                      'INITIALIZING...',
+                      style: TextStyle(
+                        color: const Color(0xFF00FF41).withValues(alpha: 0.7),
+                        fontFamily: 'monospace',
+                        fontSize: 14,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         }
 
