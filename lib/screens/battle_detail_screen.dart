@@ -93,6 +93,38 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     
     if (video == null) return;
 
+    // Ask for trick name
+    String? trickName;
+    if (mounted) {
+      trickName = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          String name = '';
+          return AlertDialog(
+            title: const Text('Name your trick'),
+            content: TextField(
+              autofocus: true,
+              onChanged: (value) => name = value,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Kickflip',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Skip'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, name),
+                child: const Text('Set Name'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -107,6 +139,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       final updatedBattle = await BattleService.uploadSetTrick(
         battleId: _battle.id!,
         videoUrl: videoUrl,
+        trickName: trickName,
       );
 
       if (updatedBattle != null && mounted) {
@@ -397,6 +430,126 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     );
   }
 
+  Widget _buildVotingSection() {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return const SizedBox.shrink();
+
+    final isParticipant = _battle.player1Id == userId || _battle.player2Id == userId;
+    if (!isParticipant) return const SizedBox.shrink();
+
+    final isSetter = userId == _battle.setterId;
+    final myVote = isSetter ? _battle.setterVote : _battle.attempterVote;
+    final hasVoted = myVote != null;
+
+    if (hasVoted) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            const Text(
+              'Vote Submitted',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Waiting for opponent...',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: matrixGreen.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: matrixGreen.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'Vote on Attempt',
+            style: TextStyle(
+              color: matrixGreen,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _submitVote('missed'),
+                  icon: const Icon(Icons.close),
+                  label: const Text('MISSED'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.withValues(alpha: 0.2),
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _submitVote('landed'),
+                  icon: const Icon(Icons.check),
+                  label: const Text('LANDED'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: matrixGreen.withValues(alpha: 0.2),
+                    foregroundColor: matrixGreen,
+                    side: const BorderSide(color: matrixGreen),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitVote(String vote) async {
+    setState(() => _isLoading = true);
+    try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      await BattleService.submitVote(
+        battleId: _battle.id!,
+        userId: userId,
+        vote: vote,
+      );
+      
+      final updatedBattle = await BattleService.getBattle(_battle.id!);
+      if (updatedBattle != null && mounted) {
+        setState(() {
+          _battle = updatedBattle;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Failed to submit vote: $e');
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -453,7 +606,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                 value: 'forfeit',
                 child: Row(
                   children: [
-                    Icon(Icons.flag, color: Colors.red),
+                    Icon(Icons.flag, color: Colors.white),
                     SizedBox(width: 8),
                     Text('Forfeit Match', style: TextStyle(color: Colors.red)),
                   ],
@@ -512,7 +665,9 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '"$trickLabel"',
+                          _battle.trickName != null 
+                              ? '"${_battle.trickName}"' 
+                              : '"$trickLabel"',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
@@ -709,6 +864,10 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                         ],
                         Builder(
                           builder: (context) {
+                            if (_battle.verificationStatus == VerificationStatus.quickFireVoting) {
+                              return _buildVotingSection();
+                            }
+
                             final bool canUploadSet =
                                 _isMyTurn && _battle.setTrickVideoUrl == null;
                             final bool canUploadAttempt =

@@ -27,6 +27,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
   String _selectedCategory = 'Other';
   final List<String> _categories = ['Street', 'Park', 'DIY', 'Shop', 'Other'];
   bool _isLoading = false;
+  bool _isPickingImage = false;
   final List<File> _selectedImages = [];
   double _rating = 0.0; // Star rating (0-5)
 
@@ -39,29 +40,93 @@ class _AddPostDialogState extends State<AddPostDialog> {
   }
 
   Future<void> _pickImages() async {
+    print('DEBUG: _pickImages called, _isPickingImage: $_isPickingImage');
+    
+    if (_isPickingImage) {
+      print('DEBUG: Image picker already active, returning');
+      return;
+    }
+
+    setState(() {
+      _isPickingImage = true;
+    });
+
     try {
+      print('DEBUG: Creating ImagePicker instance');
       final ImagePicker picker = ImagePicker();
+      
+      print('DEBUG: Calling pickMultiImage');
       final List<XFile> images = await picker.pickMultiImage();
+      
+      print('DEBUG: Picked ${images.length} images');
       
       if (images.isNotEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Compressing images...')),
+            SnackBar(content: Text('Adding ${images.length} image(s)...')),
           );
         }
 
-        for (final image in images) {
-          final compressedImage = await ImageService.compressImage(File(image.path));
-          if (compressedImage != null) {
-            setState(() {
-              _selectedImages.add(compressedImage);
-            });
+        for (int i = 0; i < images.length; i++) {
+          final image = images[i];
+          print('DEBUG: Processing image $i: ${image.path}');
+          
+          try {
+            // Try compression first
+            final compressedImage = await ImageService.compressImage(File(image.path));
+            print('DEBUG: Compression result for image $i: ${compressedImage?.path ?? "null"}');
+            
+            if (compressedImage != null) {
+              if (mounted) {
+                setState(() {
+                  _selectedImages.add(compressedImage);
+                  print('DEBUG: Added compressed image $i. Total images: ${_selectedImages.length}');
+                });
+              }
+            } else {
+              print('DEBUG: Compression returned null for image $i, trying original');
+              // If compression fails, use original
+              if (mounted) {
+                setState(() {
+                  _selectedImages.add(File(image.path));
+                  print('DEBUG: Added original image $i. Total images: ${_selectedImages.length}');
+                });
+              }
+            }
+          } catch (imageError) {
+            print('DEBUG: Error processing image $i: $imageError');
+            // Try to add original as fallback
+            if (mounted) {
+              setState(() {
+                _selectedImages.add(File(image.path));
+                print('DEBUG: Added original image as fallback. Total images: ${_selectedImages.length}');
+              });
+            }
           }
         }
+        
+        print('DEBUG: Final image count: ${_selectedImages.length}');
+        
+        if (mounted && _selectedImages.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Added ${_selectedImages.length} image(s)')),
+          );
+        }
+      } else {
+        print('DEBUG: No images selected');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('DEBUG: Error in _pickImages: $e');
+      print('DEBUG: Stack trace: $stackTrace');
       if (mounted) {
         ErrorHelper.showError(context, 'Error picking images: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPickingImage = false;
+        });
+        print('DEBUG: _pickImages completed, _isPickingImage set to false');
       }
     }
   }
@@ -379,7 +444,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _pickImages,
+                onPressed: (_isLoading || _isPickingImage) ? null : _pickImages,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: matrixBlack,
                   foregroundColor: matrixGreen,

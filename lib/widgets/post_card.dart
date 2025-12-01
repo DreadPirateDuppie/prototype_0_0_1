@@ -226,25 +226,12 @@ class _PostCardState extends State<PostCard> {
             ),
           ),
 
-          // Image or Map Snapshot
+
+          // Image Carousel or Map Snapshot
           InkWell(
             onTap: _showDetails,
-            child: currentPost.photoUrl != null
-              ? Image.network(
-                  currentPost.photoUrl!,
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 220,
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: Icon(Icons.image_not_supported, size: 48),
-                      ),
-                    );
-                  },
-                )
+            child: currentPost.photoUrls.isNotEmpty
+              ? _buildImageCarousel()
               : SizedBox(
                   height: 180,
                   width: double.infinity,
@@ -372,6 +359,74 @@ class _PostCardState extends State<PostCard> {
     ),
   );
 }
+
+  Widget _buildImageCarousel() {
+    const matrixGreen = Color(0xFF00FF41);
+    
+    return Container(
+      height: 220,
+      width: double.infinity,
+      child: Stack(
+        children: [
+          // Main carousel
+          PageView.builder(
+            itemCount: currentPost.photoUrls.length,
+            itemBuilder: (context, index) {
+              return Image.network(
+                currentPost.photoUrls[index],
+                height: 220,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 220,
+                    color: Colors.grey[300],
+                    child: const Center(
+                      child: Icon(Icons.image_not_supported, size: 48),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          
+          // Image counter indicator
+          if (currentPost.photoUrls.length > 1)
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.photo_library,
+                      color: matrixGreen,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${currentPost.photoUrls.length} photos',
+                      style: const TextStyle(
+                        color: matrixGreen,
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildRatingChip(IconData icon, String label, double rating, Color color) {
     const matrixGreen = Color(0xFF00FF41);

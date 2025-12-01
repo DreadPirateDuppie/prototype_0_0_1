@@ -6,9 +6,13 @@ class ImageService {
   /// Compress image to reduce file size
   static Future<File?> compressImage(File imageFile) async {
     try {
+      print('ImageService: Starting compression for ${imageFile.path}');
+      
       // Get temporary directory
       final tempDir = await getTemporaryDirectory();
       final targetPath = '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}_compressed.jpg';
+      
+      print('ImageService: Target path: $targetPath');
 
       // Compress image
       final compressedFile = await FlutterImageCompress.compressAndGetFile(
@@ -21,10 +25,15 @@ class ImageService {
       );
 
       if (compressedFile != null) {
+        print('ImageService: Compression successful, path: ${compressedFile.path}');
         return File(compressedFile.path);
+      } else {
+        print('ImageService: Compression returned null, using original file');
+        return imageFile;
       }
-      return null;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('ImageService: Compression error: $e');
+      print('ImageService: Stack trace: $stackTrace');
       // Return original if compression fails
       return imageFile;
     }

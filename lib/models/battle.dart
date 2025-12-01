@@ -82,6 +82,7 @@ class Battle {
   }
 
   bool isComplete() {
+    if (winnerId != null) return true;
     final targetLetters = getGameLetters();
     return player1Letters == targetLetters || player2Letters == targetLetters;
   }
@@ -163,6 +164,11 @@ class Battle {
           ? DateTime.parse(map['turn_deadline'] as String)
           : null,
       betAccepted: map['bet_accepted'] as bool? ?? false,
+      setterId: map['setter_id'] as String?,
+      attempterId: map['attempter_id'] as String?,
+      setterVote: map['setter_vote'] as String?,
+      attempterVote: map['attempter_vote'] as String?,
+      trickName: map['trick_name'] as String?,
     );
   }
 
@@ -186,6 +192,11 @@ class Battle {
     bool? isQuickfire,
     DateTime? turnDeadline,
     bool? betAccepted,
+    String? setterId,
+    String? attempterId,
+    String? setterVote,
+    String? attempterVote,
+    String? trickName,
   }) {
     return Battle(
       id: id ?? this.id,
@@ -207,6 +218,11 @@ class Battle {
       isQuickfire: isQuickfire ?? this.isQuickfire,
       turnDeadline: turnDeadline ?? this.turnDeadline,
       betAccepted: betAccepted ?? this.betAccepted,
+      setterId: setterId ?? this.setterId,
+      attempterId: attempterId ?? this.attempterId,
+      setterVote: setterVote ?? this.setterVote,
+      attempterVote: attempterVote ?? this.attempterVote,
+      trickName: trickName ?? this.trickName,
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
+import 'dart:math';
 import '../models/battle.dart';
 import '../models/user_scores.dart';
 import 'supabase_service.dart';
@@ -42,19 +43,27 @@ class BattleService {
           : const Duration(hours: 24);
       final turnDeadline = DateTime.now().add(timerDuration);
 
-      final battle = Battle(
-        player1Id: player1Id,
-        player2Id: player2Id,
-        gameMode: gameMode,
-        customLetters: customLetters ?? '',
-        createdAt: DateTime.now(),
-        currentTurnPlayerId: player1Id,
-        wagerAmount: wagerAmount,
-        betAmount: betAmount,
-        isQuickfire: isQuickfire,
-        turnDeadline: turnDeadline,
-        betAccepted: betAmount == 0, // Auto-accept if no bet
-      );
+        // Randomly assign setter
+    final random = Random();
+    final isPlayer1Setter = random.nextBool();
+    final setterId = isPlayer1Setter ? player1Id : player2Id;
+    final attempterId = isPlayer1Setter ? player2Id : player1Id;
+
+    final battle = Battle(
+      player1Id: player1Id,
+      player2Id: player2Id,
+      gameMode: gameMode,
+      customLetters: customLetters ?? '',
+      createdAt: DateTime.now(),
+      currentTurnPlayerId: setterId, // Setter starts
+      wagerAmount: wagerAmount,
+      betAmount: betAmount,
+      isQuickfire: isQuickfire,
+      turnDeadline: turnDeadline,
+      betAccepted: betAmount == 0, // Auto-accept if no bet
+      setterId: setterId,
+      attempterId: attempterId,
+    );
 
       final response = await _client
           .from('battles')
@@ -226,11 +235,15 @@ class BattleService {
   static Future<Battle?> uploadSetTrick({
     required String battleId,
     required String videoUrl,
+    String? trickName,
   }) async {
     try {
       final response = await _client
           .from('battles')
-          .update({'set_trick_video_url': videoUrl})
+          .update({
+            'set_trick_video_url': videoUrl,
+            'trick_name': trickName,
+          })
           .eq('id', battleId)
           .select()
           .single();
@@ -242,41 +255,23 @@ class BattleService {
   }
 
   // Upload attempt
+  // Upload attempt
   static Future<Battle?> uploadAttempt({
     required String battleId,
     required String videoUrl,
   }) async {
     try {
-      // Get current battle state
-      final battle = await getBattle(battleId);
-      if (battle == null) return null;
-
-      // Determine who is attempting (the person who is NOT the current turn holder)
-      final attempterId = battle.currentTurnPlayerId == battle.player1Id
-          ? battle.player2Id
-          : battle.player1Id;
-
-      // Switch turn to the attempter (they set the next trick)
-      final nextPlayer = attempterId;
-
-      // Calculate new deadline
-      final Duration timerDuration = battle.isQuickfire
-          ? const Duration(minutes: 4, seconds: 20)
-          : const Duration(hours: 24);
-      final newDeadline = DateTime.now().add(timerDuration);
-
-      // Clear videos and switch turn (no letter assignment yet - only on timer expiry)
       final response = await _client
           .from('battles')
           .update({
-            'set_trick_video_url': null,
-            'attempt_video_url': null,
-            'current_turn_player_id': nextPlayer,
-            'verification_status': VerificationStatus.pending
+            'attempt_video_url': videoUrl,
+            'verification_status': VerificationStatus.quickFireVoting
                 .toString()
                 .split('.')
                 .last,
-            'turn_deadline': newDeadline.toIso8601String(),
+            // Reset votes for new round
+            'setter_vote': null,
+            'attempter_vote': null,
           })
           .eq('id', battleId)
           .select()
@@ -593,6 +588,95 @@ class BattleService {
       );
     } catch (e) {
       throw Exception('Failed to forfeit battle: $e');
+    }
+  }
+
+  // Submit vote
+  static Future<void> submitVote({
+    required String battleId,
+    required String userId,
+    required String vote, // 'landed' or 'missed'
+  }) async {
+    try {
+      final battle = await getBattle(battleId);
+      if (battle == null) return;
+
+      final isSetter = userId == battle.setterId;
+      final field = isSetter ? 'setter_vote' : 'attempter_vote';
+
+      await _client.from('battles').update({
+        field: vote,
+      }).eq('id', battleId);
+
+      await resolveVotes(battleId);
+    } catch (e) {
+      throw Exception('Failed to submit vote: $e');
+    }
+  }
+
+  // Resolve votes
+  static Future<void> resolveVotes(String battleId) async {
+    try {
+      final battle = await getBattle(battleId);
+      if (battle == null) return;
+
+      // Check if both voted
+      if (battle.setterVote == null || battle.attempterVote == null) return;
+
+      // Check consensus
+      if (battle.setterVote == battle.attempterVote) {
+        final isLanded = battle.setterVote == 'landed';
+        
+        // Calculate new deadline
+        final Duration timerDuration = battle.isQuickfire
+            ? const Duration(minutes: 4, seconds: 20)
+            : const Duration(hours: 24);
+        final newDeadline = DateTime.now().add(timerDuration);
+
+        if (isLanded) {
+          // Attempter landed it -> They become Setter
+          final newSetterId = battle.attempterId!;
+          final newAttempterId = battle.setterId!;
+
+          await _client.from('battles').update({
+            'set_trick_video_url': null,
+            'attempt_video_url': null,
+            'setter_vote': null,
+            'attempter_vote': null,
+            'trick_name': null, // Clear trick name
+            'verification_status': VerificationStatus.pending.toString().split('.').last,
+            'current_turn_player_id': newSetterId,
+            'setter_id': newSetterId,
+            'attempter_id': newAttempterId,
+            'turn_deadline': newDeadline.toIso8601String(),
+          }).eq('id', battleId);
+        } else {
+          // Attempter missed -> They get a letter, Setter stays Setter
+          await assignLetter(battleId: battleId, playerId: battle.attempterId!);
+          
+          // Check if battle ended from letter assignment
+          final updatedBattle = await getBattle(battleId);
+          if (updatedBattle != null && !updatedBattle.isComplete()) {
+             await _client.from('battles').update({
+              'set_trick_video_url': null,
+              'attempt_video_url': null,
+              'setter_vote': null,
+              'attempter_vote': null,
+              'trick_name': null, // Clear trick name
+              'verification_status': VerificationStatus.pending.toString().split('.').last,
+              'current_turn_player_id': battle.setterId, // Setter goes again
+              'turn_deadline': newDeadline.toIso8601String(),
+            }).eq('id', battleId);
+          }
+        }
+      } else {
+        // Disagreement -> Community Verification
+        await _client.from('battles').update({
+          'verification_status': VerificationStatus.communityVerification.toString().split('.').last,
+        }).eq('id', battleId);
+      }
+    } catch (e) {
+      throw Exception('Failed to resolve votes: $e');
     }
   }
 }

@@ -676,10 +676,18 @@ class SupabaseService {
   // Upload post image to Supabase storage
   static Future<String> uploadPostImage(File imageFile, String userId) async {
     try {
+      print('SupabaseService: Starting uploadPostImage for user $userId');
+      print('SupabaseService: Image path: ${imageFile.path}');
+      
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filename = 'post_${userId}_$timestamp.jpg';
+      print('SupabaseService: Target filename: $filename');
 
+      print('SupabaseService: Reading image bytes...');
       final bytes = await imageFile.readAsBytes();
+      print('SupabaseService: Read ${bytes.length} bytes');
+      
+      print('SupabaseService: Uploading to storage bucket "post_images"...');
       await _client.storage
           .from('post_images')
           .uploadBinary(
@@ -687,29 +695,37 @@ class SupabaseService {
             bytes,
             fileOptions: const FileOptions(contentType: 'image/jpeg'),
           );
-
+      
+      print('SupabaseService: Upload successful, getting public URL...');
       final publicUrl = _client.storage
           .from('post_images')
           .getPublicUrl(filename);
+      
+      print('SupabaseService: Public URL: $publicUrl');
       return publicUrl;
     } on SocketException catch (e) {
+      print('SupabaseService: SocketException: $e');
       throw AppNetworkException(
         'Network error during image upload',
         originalError: e,
       );
     } on async.TimeoutException catch (e) {
+      print('SupabaseService: TimeoutException: $e');
       throw AppTimeoutException(
         'Image upload timed out',
         userMessage: 'Upload is taking too long. Please check your connection and try again.',
         originalError: e,
       );
     } on FileSystemException catch (e) {
+      print('SupabaseService: FileSystemException: $e');
       throw AppStorageException(
         'File system error: $e',
         userMessage: 'Unable to read the image file. Please try selecting it again.',
         originalError: e,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('SupabaseService: Unknown error: $e');
+      print('SupabaseService: Stack trace: $stackTrace');
       throw AppStorageException(
         'Failed to upload image: $e',
         userMessage: 'Image upload failed. Please try again.',
