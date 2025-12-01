@@ -41,9 +41,13 @@ class _AddPostDialogState extends State<AddPostDialog> {
 
   Future<void> _pickImages() async {
     print('DEBUG: _pickImages called, _isPickingImage: $_isPickingImage');
-    
+
+    // Add extra check and force reset if needed
     if (_isPickingImage) {
-      print('DEBUG: Image picker already active, returning');
+      print('DEBUG: Image picker already active, forcing reset and ignoring');
+      setState(() {
+        _isPickingImage = false;
+      });
       return;
     }
 
@@ -54,12 +58,12 @@ class _AddPostDialogState extends State<AddPostDialog> {
     try {
       print('DEBUG: Creating ImagePicker instance');
       final ImagePicker picker = ImagePicker();
-      
+
       print('DEBUG: Calling pickMultiImage');
       final List<XFile> images = await picker.pickMultiImage();
-      
+
       print('DEBUG: Picked ${images.length} images');
-      
+
       if (images.isNotEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -70,12 +74,12 @@ class _AddPostDialogState extends State<AddPostDialog> {
         for (int i = 0; i < images.length; i++) {
           final image = images[i];
           print('DEBUG: Processing image $i: ${image.path}');
-          
+
           try {
             // Try compression first
             final compressedImage = await ImageService.compressImage(File(image.path));
             print('DEBUG: Compression result for image $i: ${compressedImage?.path ?? "null"}');
-            
+
             if (compressedImage != null) {
               if (mounted) {
                 setState(() {
@@ -104,9 +108,9 @@ class _AddPostDialogState extends State<AddPostDialog> {
             }
           }
         }
-        
+
         print('DEBUG: Final image count: ${_selectedImages.length}');
-        
+
         if (mounted && _selectedImages.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Added ${_selectedImages.length} image(s)')),
@@ -119,7 +123,10 @@ class _AddPostDialogState extends State<AddPostDialog> {
       print('DEBUG: Error in _pickImages: $e');
       print('DEBUG: Stack trace: $stackTrace');
       if (mounted) {
-        ErrorHelper.showError(context, 'Error picking images: $e');
+        // Don't show error for "already_active" - just silently handle it
+        if (!e.toString().contains('already_active')) {
+          ErrorHelper.showError(context, 'Error picking images: $e');
+        }
       }
     } finally {
       if (mounted) {
@@ -156,12 +163,27 @@ class _AddPostDialogState extends State<AddPostDialog> {
       final userName = await SupabaseService.getCurrentUserDisplayName();
 
       List<String> photoUrls = [];
-      for (final image in _selectedImages) {
-        final url = await SupabaseService.uploadPostImage(image, user.id);
-        if (url != null) {
-          photoUrls.add(url);
+      print('DEBUG: Starting image uploads for ${_selectedImages.length} images');
+      
+      for (int i = 0; i < _selectedImages.length; i++) {
+        final image = _selectedImages[i];
+        print('DEBUG: Uploading image $i: ${image.path}');
+        
+        try {
+          final url = await SupabaseService.uploadPostImage(image, user.id);
+          if (url != null && url.isNotEmpty) {
+            photoUrls.add(url);
+            print('DEBUG: Successfully uploaded image $i, URL: $url');
+          } else {
+            print('DEBUG: Failed to upload image $i: null or empty URL');
+          }
+        } catch (uploadError) {
+          print('DEBUG: Error uploading image $i: $uploadError');
+          // Continue with other images even if one fails
         }
       }
+      
+      print('DEBUG: Uploaded ${photoUrls.length} out of ${_selectedImages.length} images');
 
       final tags = _tagsController.text
           .split(',')
@@ -169,25 +191,30 @@ class _AddPostDialogState extends State<AddPostDialog> {
           .where((e) => e.isNotEmpty)
           .toList();
 
-      await SupabaseService.createMapPost(
+      print('DEBUG: Creating post with ${photoUrls.length} images');
+      final post = await SupabaseService.createMapPost(
         userId: user.id,
         userName: userName ?? 'Anonymous',
         userEmail: user.email ?? 'No Email',
         latitude: widget.location.latitude,
         longitude: widget.location.longitude,
-        title: _titleController.text,
-        description: _descriptionController.text,
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
         photoUrls: photoUrls,
         category: _selectedCategory,
         tags: tags,
         rating: _rating,
       );
 
+      print('DEBUG: Post created successfully: ${post?.id}');
+
       if (mounted) {
         widget.onPostAdded();
         Navigator.of(context).pop();
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('DEBUG: Error in _createPost: $e');
+      print('DEBUG: Stack trace: $stackTrace');
       if (mounted) {
         ErrorHelper.showError(context, 'Error creating post: $e');
       }
@@ -438,20 +465,27 @@ class _AddPostDialogState extends State<AddPostDialog> {
             
             const SizedBox(height: 12),
             
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: matrixGreen.withValues(alpha: 0.5)),
-                borderRadius: BorderRadius.circular(8),
-              ),
+
+            SizedBox(
+              width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: (_isLoading || _isPickingImage) ? null : _pickImages,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: matrixBlack,
                   foregroundColor: matrixGreen,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                 ),
-                icon: const Icon(Icons.add_photo_alternate),
+                icon: Icon(
+                  _selectedImages.isEmpty ? Icons.add_photo_alternate : Icons.photo_library,
+                  color: matrixGreen,
+                ),
                 label: Text(
-                  _selectedImages.isEmpty ? 'Add Photos' : 'Add More Photos',
+                  _selectedImages.isEmpty ? 'Add Multiple Photos' : 'Add More Photos (${_selectedImages.length} selected)',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ),
