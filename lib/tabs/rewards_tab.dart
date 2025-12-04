@@ -525,10 +525,6 @@ class _RewardsTabState extends State<RewardsTab> {
                 title: 'Win Battle',
                 points: 'Win Pot',
               ),
-              const SizedBox(width: 12),
-              _buildBettingCard(context),
-              const SizedBox(width: 12),
-              _buildWatchAdCard(),
             ],
           ),
         ),
@@ -636,127 +632,71 @@ class _RewardsTabState extends State<RewardsTab> {
     );
   }
 
-  Widget _buildBettingCard(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        // Navigate to VS tab (index 2 in bottom navigation)
-        DefaultTabController.of(context).animateTo(2);
-      },
-      child: Container(
-        width: 140,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF00FF41), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF00FF41).withValues(alpha: 0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.casino,
-              color: Color(0xFF00FF41),
-              size: 48,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Bet Points',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-              const Text(
-                'Win 2x',
-                style: TextStyle(
-                  color: Color(0xFF00FF41),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18,
-                  fontFamily: 'monospace',
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildCryptoTeaser() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.black,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.black,
+            const Color(0xFF001a00),
+          ],
+        ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF00FF41), width: 1),
+        border: Border.all(color: const Color(0xFF00FF41), width: 2),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00FF41).withValues(alpha: 0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+            color: const Color(0xFF00FF41).withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.currency_bitcoin, color: Color(0xFF00FF41), size: 32),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00FF41).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF00FF41)),
+                ),
+                child: const Icon(Icons.currency_bitcoin, color: Color(0xFF00FF41), size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'WEB3',
+                      'CRYPTO CONVERSION',
                       style: TextStyle(
                         color: Color(0xFF00FF41),
                         fontWeight: FontWeight.bold,
-                        fontSize: 10,
-                        letterSpacing: 1.5,
+                        fontSize: 16,
+                        letterSpacing: 1.2,
                         fontFamily: 'monospace',
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'READY',
-                      style: TextStyle(
-                        color: Color(0xFFFF0000),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
-                        letterSpacing: 1.5,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
+                    const SizedBox(height: 2),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: Colors.black,
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
+                        border: Border.all(color: const Color(0xFFFFD700)),
                       ),
                       child: const Text(
                         'COMING SOON',
                         style: TextStyle(
-                          color: Color(0xFF00FF41),
-                          fontSize: 8,
+                          color: Color(0xFFFFD700),
+                          fontSize: 9,
                           fontWeight: FontWeight.bold,
                           fontFamily: 'monospace',
                         ),
@@ -764,24 +704,16 @@ class _RewardsTabState extends State<RewardsTab> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Crypto Conversion',
-                  style: TextStyle(
-                    color: Color(0xFF00FF41),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Your points will be convertible to tokens for real value, rewards, and DAO governance.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Convert points to tokens for real value & DAO governance.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 13,
+              height: 1.4,
             ),
           ),
         ],

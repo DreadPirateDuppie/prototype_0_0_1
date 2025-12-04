@@ -42,6 +42,9 @@ class Battle {
   final String? setterVote; // 'landed' or 'missed'
   final String? attempterVote; // 'landed' or 'missed'
   final String? trickName;
+  final String? player1RpsMove;
+  final String? player2RpsMove;
+  final String? rpsWinnerId;
 
   Battle({
     this.id,
@@ -68,6 +71,9 @@ class Battle {
     this.setterVote,
     this.attempterVote,
     this.trickName,
+    this.player1RpsMove,
+    this.player2RpsMove,
+    this.rpsWinnerId,
   });
 
   String getGameLetters() {
@@ -130,6 +136,9 @@ class Battle {
       'setter_vote': setterVote,
       'attempter_vote': attempterVote,
       'trick_name': trickName,
+      'player1_rps_move': player1RpsMove,
+      'player2_rps_move': player2RpsMove,
+      'rps_winner_id': rpsWinnerId,
     };
   }
 
@@ -169,6 +178,9 @@ class Battle {
       setterVote: map['setter_vote'] as String?,
       attempterVote: map['attempter_vote'] as String?,
       trickName: map['trick_name'] as String?,
+      player1RpsMove: map['player1_rps_move'] as String?,
+      player2RpsMove: map['player2_rps_move'] as String?,
+      rpsWinnerId: map['rps_winner_id'] as String?,
     );
   }
 
@@ -197,6 +209,9 @@ class Battle {
     String? setterVote,
     String? attempterVote,
     String? trickName,
+    String? player1RpsMove,
+    String? player2RpsMove,
+    String? rpsWinnerId,
   }) {
     return Battle(
       id: id ?? this.id,
@@ -223,6 +238,9 @@ class Battle {
       setterVote: setterVote ?? this.setterVote,
       attempterVote: attempterVote ?? this.attempterVote,
       trickName: trickName ?? this.trickName,
+      player1RpsMove: player1RpsMove ?? this.player1RpsMove,
+      player2RpsMove: player2RpsMove ?? this.player2RpsMove,
+      rpsWinnerId: rpsWinnerId ?? this.rpsWinnerId,
     );
   }
 }

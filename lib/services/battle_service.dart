@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'dart:math';
 import '../models/battle.dart';
+import '../models/battle_trick.dart';
 import '../models/user_scores.dart';
 import 'supabase_service.dart';
 import 'error_types.dart';
@@ -44,26 +45,23 @@ class BattleService {
       final turnDeadline = DateTime.now().add(timerDuration);
 
         // Randomly assign setter
-    final random = Random();
-    final isPlayer1Setter = random.nextBool();
-    final setterId = isPlayer1Setter ? player1Id : player2Id;
-    final attempterId = isPlayer1Setter ? player2Id : player1Id;
-
-    final battle = Battle(
-      player1Id: player1Id,
-      player2Id: player2Id,
-      gameMode: gameMode,
-      customLetters: customLetters ?? '',
-      createdAt: DateTime.now(),
-      currentTurnPlayerId: setterId, // Setter starts
-      wagerAmount: wagerAmount,
-      betAmount: betAmount,
-      isQuickfire: isQuickfire,
-      turnDeadline: turnDeadline,
-      betAccepted: betAmount == 0, // Auto-accept if no bet
-      setterId: setterId,
-      attempterId: attempterId,
-    );
+      // Create battle record
+      // Start with no setter/attempter for RPS
+      final battle = Battle(
+        player1Id: player1Id,
+        player2Id: player2Id,
+        gameMode: gameMode,
+        customLetters: customLetters ?? '',
+        createdAt: DateTime.now(),
+        currentTurnPlayerId: '', // Empty string indicates waiting for RPS
+        wagerAmount: wagerAmount,
+        betAmount: betAmount,
+        isQuickfire: isQuickfire,
+        turnDeadline: DateTime.now().add(const Duration(hours: 24)), // Initial deadline for RPS
+        betAccepted: betAmount == 0, // Auto-accept if no bet
+        setterId: null, // No setter initially for RPS
+        attempterId: null, // No attempter initially for RPS
+      );
 
       final response = await _client
           .from('battles')
@@ -238,11 +236,26 @@ class BattleService {
     String? trickName,
   }) async {
     try {
+      final battle = await getBattle(battleId);
+      if (battle == null) return null;
+
+      // FIX: Do NOT swap roles here. The setter remains the setter until the trick is attempted.
+      // The turn passes to the attempter (opponent) to try the trick.
+      final nextTurnPlayerId = battle.attempterId;
+
+      // Calculate new deadline
+      final Duration timerDuration = battle.isQuickfire
+          ? const Duration(minutes: 4, seconds: 20)
+          : const Duration(hours: 24);
+      final newDeadline = DateTime.now().add(timerDuration);
+
       final response = await _client
           .from('battles')
           .update({
             'set_trick_video_url': videoUrl,
             'trick_name': trickName,
+            'current_turn_player_id': nextTurnPlayerId, // Pass turn to opponent
+            'turn_deadline': newDeadline.toIso8601String(),
           })
           .eq('id', battleId)
           .select()
@@ -532,33 +545,63 @@ class BattleService {
     try {
       final now = DateTime.now().toIso8601String();
       
-      // Find active battles where deadline has passed
+      // Find active battles where deadline has passed and NOT in voting
       final response = await _client
           .from('battles')
           .select()
           .or('player1_id.eq.$userId,player2_id.eq.$userId')
           .isFilter('winner_id', null)
-          .lt('turn_deadline', now);
+          .lt('turn_deadline', now)
+          .eq('verification_status', VerificationStatus.pending.toString().split('.').last);
 
       final expiredBattles = (response as List).map((b) => Battle.fromMap(b)).toList();
 
       for (final battle in expiredBattles) {
-        // Only process if it's THIS user's turn (or maybe any turn? 
-        // If I check for my own expired turns, I assign myself a letter.
-        // If I check for opponent's expired turns, I assign THEM a letter.
-        // Since we query all battles involving the user, we can handle both.)
+        // Calculate new deadline
+        final Duration timerDuration = battle.isQuickfire
+            ? const Duration(minutes: 4, seconds: 20)
+            : const Duration(hours: 24);
+        final newDeadline = DateTime.now().add(timerDuration);
+
+        // Check if timeout is for Setter or Attempter
+        final isSetter = battle.currentTurnPlayerId == battle.setterId;
         
-        // Assign letter to current turn player (who missed the deadline)
-        await assignLetter(
-          battleId: battle.id!,
-          playerId: battle.currentTurnPlayerId,
-        );
-        
-        // Switch turn to keep game moving (and reset timer)
-        // Note: assignLetter might have ended the game. Check if it's still active.
-        final updatedBattle = await getBattle(battle.id!);
-        if (updatedBattle != null && !updatedBattle.isComplete()) {
-           await switchTurn(battle.id!);
+        if (isSetter) {
+          // SETTER TIMEOUT: Failed to upload trick
+          // - No letter assigned (they just lose their turn)
+          // - Swap roles: Attempter becomes new Setter
+          final newSetterId = battle.attempterId!;
+          final newAttempterId = battle.setterId!;
+          
+          await _client.from('battles').update({
+            'setter_id': newSetterId,
+            'attempter_id': newAttempterId,
+            'current_turn_player_id': newSetterId,
+            'turn_deadline': newDeadline.toIso8601String(),
+            'set_trick_video_url': null,
+            'attempt_video_url': null,
+            'trick_name': null,
+          }).eq('id', battle.id!);
+        } else {
+          // ATTEMPTER TIMEOUT: Failed to upload attempt
+          // - Assign letter to Attempter
+          // - Setter keeps control
+          await assignLetter(
+            battleId: battle.id!,
+            playerId: battle.attempterId!,
+          );
+          
+          // Check if battle ended from letter assignment
+          final updatedBattle = await getBattle(battle.id!);
+          if (updatedBattle != null && !updatedBattle.isComplete()) {
+            await _client.from('battles').update({
+              'current_turn_player_id': battle.setterId,
+              'turn_deadline': newDeadline.toIso8601String(),
+              'set_trick_video_url': null,
+              'attempt_video_url': null,
+              'trick_name': null,
+            }).eq('id', battle.id!);
+          }
         }
       }
     } catch (e) {
@@ -614,6 +657,24 @@ class BattleService {
     }
   }
 
+  // Get battle tricks history
+  static Future<List<BattleTrick>> getBattleTricks(String battleId) async {
+    try {
+      final response = await _client
+          .from('battle_tricks')
+          .select()
+          .eq('battle_id', battleId)
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((trick) => BattleTrick.fromMap(trick))
+          .toList();
+    } catch (e) {
+      // If table doesn't exist or error, return empty list
+      return [];
+    }
+  }
+
   // Resolve votes
   static Future<void> resolveVotes(String battleId) async {
     try {
@@ -626,47 +687,108 @@ class BattleService {
       // Check consensus
       if (battle.setterVote == battle.attempterVote) {
         final isLanded = battle.setterVote == 'landed';
-        
+
+        // ARCHIVE TRICK
+        if (battle.setTrickVideoUrl != null && battle.attemptVideoUrl != null) {
+          try {
+            final trick = BattleTrick(
+              battleId: battleId,
+              setterId: battle.setterId!,
+              attempterId: battle.attempterId!,
+              trickName: battle.trickName ?? 'Unnamed Trick',
+              setTrickVideoUrl: battle.setTrickVideoUrl!,
+              attemptVideoUrl: battle.attemptVideoUrl!,
+              outcome: isLanded ? 'landed' : 'missed',
+              lettersGiven: !isLanded ? (battle.gameMode == GameMode.skate ? 'SKATE' : 'SK8') : '', // Simplified logic, ideally calculate actual letter
+              createdAt: DateTime.now(),
+            );
+            
+            await _client.from('battle_tricks').insert(trick.toMap());
+          } catch (e) {
+            // Silently fail archiving if table doesn't exist
+            debugPrint('Failed to archive trick: $e');
+          }
+        }
+
         // Calculate new deadline
         final Duration timerDuration = battle.isQuickfire
             ? const Duration(minutes: 4, seconds: 20)
             : const Duration(hours: 24);
         final newDeadline = DateTime.now().add(timerDuration);
 
-        if (isLanded) {
-          // Attempter landed it -> They become Setter
-          final newSetterId = battle.attempterId!;
-          final newAttempterId = battle.setterId!;
+        // For SKATE mode: Always switch roles after voting resolution
+        if (battle.gameMode == GameMode.skate) {
+          // Game of SKATE: Alternating roles
+          final newSetterId = battle.attempterId!; // Attempter becomes new setter
+          final newAttempterId = battle.setterId!; // Setter becomes new attempter
 
-          await _client.from('battles').update({
-            'set_trick_video_url': null,
-            'attempt_video_url': null,
-            'setter_vote': null,
-            'attempter_vote': null,
-            'trick_name': null, // Clear trick name
-            'verification_status': VerificationStatus.pending.toString().split('.').last,
-            'current_turn_player_id': newSetterId,
-            'setter_id': newSetterId,
-            'attempter_id': newAttempterId,
-            'turn_deadline': newDeadline.toIso8601String(),
-          }).eq('id', battleId);
-        } else {
-          // Attempter missed -> They get a letter, Setter stays Setter
-          await assignLetter(battleId: battleId, playerId: battle.attempterId!);
-          
-          // Check if battle ended from letter assignment
-          final updatedBattle = await getBattle(battleId);
-          if (updatedBattle != null && !updatedBattle.isComplete()) {
-             await _client.from('battles').update({
+          if (isLanded) {
+            // Attempter landed it - they become the new setter
+            await _client.from('battles').update({
+              'setter_id': newSetterId,
+              'attempter_id': newAttempterId,
               'set_trick_video_url': null,
               'attempt_video_url': null,
               'setter_vote': null,
               'attempter_vote': null,
               'trick_name': null, // Clear trick name
               'verification_status': VerificationStatus.pending.toString().split('.').last,
-              'current_turn_player_id': battle.setterId, // Setter goes again
+              'current_turn_player_id': newSetterId, // New setter sets the next trick
               'turn_deadline': newDeadline.toIso8601String(),
             }).eq('id', battleId);
+          } else {
+            // Attempter missed - they get a letter, and become new setter
+            await assignLetter(battleId: battleId, playerId: battle.attempterId!);
+
+            // Check if battle ended from letter assignment
+            final updatedBattle = await getBattle(battleId);
+            if (updatedBattle != null && !updatedBattle.isComplete()) {
+               await _client.from('battles').update({
+                'setter_id': newSetterId,
+                'attempter_id': newAttempterId,
+                'set_trick_video_url': null,
+                'attempt_video_url': null,
+                'setter_vote': null,
+                'attempter_vote': null,
+                'trick_name': null, // Clear trick name
+                'verification_status': VerificationStatus.pending.toString().split('.').last,
+                'current_turn_player_id': newSetterId, // New setter sets the next trick
+                'turn_deadline': newDeadline.toIso8601String(),
+              }).eq('id', battleId);
+            }
+          }
+        } else {
+          // Original logic for SK8 and Custom modes
+          if (isLanded) {
+            // Attempter landed it -> Setter KEEPS control (Standard: "Make it, Keep it")
+            await _client.from('battles').update({
+              'set_trick_video_url': null,
+              'attempt_video_url': null,
+              'setter_vote': null,
+              'attempter_vote': null,
+              'trick_name': null, // Clear trick name
+              'verification_status': VerificationStatus.pending.toString().split('.').last,
+              'current_turn_player_id': battle.setterId, // Setter keeps control
+              'turn_deadline': newDeadline.toIso8601String(),
+            }).eq('id', battleId);
+          } else {
+            // Attempter missed -> They get a letter, Setter stays Setter
+            await assignLetter(battleId: battleId, playerId: battle.attempterId!);
+
+            // Check if battle ended from letter assignment
+            final updatedBattle = await getBattle(battleId);
+            if (updatedBattle != null && !updatedBattle.isComplete()) {
+               await _client.from('battles').update({
+                'set_trick_video_url': null,
+                'attempt_video_url': null,
+                'setter_vote': null,
+                'attempter_vote': null,
+                'trick_name': null, // Clear trick name
+                'verification_status': VerificationStatus.pending.toString().split('.').last,
+                'current_turn_player_id': battle.setterId, // Setter goes again
+                'turn_deadline': newDeadline.toIso8601String(),
+              }).eq('id', battleId);
+            }
           }
         }
       } else {

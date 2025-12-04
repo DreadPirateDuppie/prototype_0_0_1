@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/battle.dart';
+import '../models/battle_trick.dart';
 import '../services/battle_service.dart';
 import '../utils/error_helper.dart';
+import '../widgets/video_player_widget.dart';
 
 class BattleDetailScreen extends StatefulWidget {
   final String? battleId;
@@ -90,38 +92,15 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
   Future<void> _uploadSetTrick() async {
     final picker = ImagePicker();
     final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
-    
+
     if (video == null) return;
 
-    // Ask for trick name
+    // Ask for trick name - Use StatefulBuilder for proper dialog state management
     String? trickName;
     if (mounted) {
       trickName = await showDialog<String>(
         context: context,
-        builder: (context) {
-          String name = '';
-          return AlertDialog(
-            title: const Text('Name your trick'),
-            content: TextField(
-              autofocus: true,
-              onChanged: (value) => name = value,
-              decoration: const InputDecoration(
-                hintText: 'e.g. Kickflip',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Skip'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, name),
-                child: const Text('Set Name'),
-              ),
-            ],
-          );
-        },
+        builder: (context) => _TrickNameDialog(),
       );
     }
 
@@ -145,6 +124,9 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       if (updatedBattle != null && mounted) {
         setState(() {
           _battle = updatedBattle;
+          final userId = Supabase.instance.client.auth.currentUser?.id;
+          _isPlayer1 = _battle.player1Id == userId;
+          _isMyTurn = _battle.currentTurnPlayerId == userId;
           _isLoading = false;
         });
       }
@@ -181,6 +163,9 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       if (updatedBattle != null && mounted) {
         setState(() {
           _battle = updatedBattle;
+          final userId = Supabase.instance.client.auth.currentUser?.id;
+          _isPlayer1 = _battle.player1Id == userId;
+          _isMyTurn = _battle.currentTurnPlayerId == userId;
           _isLoading = false;
         });
       }
@@ -539,6 +524,9 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       if (updatedBattle != null && mounted) {
         setState(() {
           _battle = updatedBattle;
+          final userId = Supabase.instance.client.auth.currentUser?.id;
+          _isPlayer1 = _battle.player1Id == userId;
+          _isMyTurn = _battle.currentTurnPlayerId == userId;
           _isLoading = false;
         });
       }
@@ -548,6 +536,147 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _submitRpsMove(String move) async {
+    setState(() => _isLoading = true);
+    try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      await BattleService.submitRpsMove(
+        battleId: _battle.id!,
+        userId: userId,
+        move: move,
+      );
+      
+      // Poll for update or just reload
+      final updatedBattle = await BattleService.getBattle(_battle.id!);
+      if (updatedBattle != null && mounted) {
+        setState(() {
+          _battle = updatedBattle;
+          final userId = Supabase.instance.client.auth.currentUser?.id;
+          _isPlayer1 = _battle.player1Id == userId;
+          _isMyTurn = _battle.currentTurnPlayerId == userId;
+          _isLoading = false;
+        });
+        
+        // If tie (moves reset), show snackbar
+        if (_battle.setterId == null && 
+            _battle.player1RpsMove == null && 
+            _battle.player2RpsMove == null) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tie! Go again.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Failed to submit RPS move: $e');
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Widget _buildRpsSection() {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return const SizedBox.shrink();
+
+    final isPlayer1 = userId == _battle.player1Id;
+    final myMove = isPlayer1 ? _battle.player1RpsMove : _battle.player2RpsMove;
+    final hasMoved = myMove != null;
+
+    if (hasMoved) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.timer, size: 48, color: Colors.white),
+            const SizedBox(height: 16),
+            const Text(
+              'Waiting for opponent...',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You picked ${myMove.toUpperCase()}',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: matrixGreen.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: matrixGreen.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'Rock Paper Scissors',
+            style: TextStyle(
+              color: matrixGreen,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Winner sets the first trick!',
+            style: TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildRpsButton('rock', Icons.landscape), // Rock icon proxy
+              _buildRpsButton('paper', Icons.note),
+              _buildRpsButton('scissors', Icons.content_cut),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRpsButton(String move, IconData icon) {
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: () => _submitRpsMove(move),
+          style: ElevatedButton.styleFrom(
+            shape: const CircleBorder(),
+            padding: const EdgeInsets.all(20),
+            backgroundColor: Colors.white.withValues(alpha: 0.1),
+            foregroundColor: matrixGreen,
+            side: const BorderSide(color: matrixGreen),
+          ),
+          child: Icon(icon, size: 32),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          move.toUpperCase(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -737,29 +866,26 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                         const SizedBox(height: 20),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            height: 190,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: _battle.setTrickVideoUrl != null
-                                    ? [
-                                        Colors.black.withValues(alpha: 0.9),
-                                        Colors.black.withValues(alpha: 0.7),
-                                      ]
-                                    : [
+                          child: _battle.setTrickVideoUrl != null
+                              ? VideoPlayerWidget(videoUrl: _battle.setTrickVideoUrl!)
+                              : Container(
+                                  height: 190,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
                                         Colors.black.withValues(alpha: 0.4),
                                         Colors.black.withValues(alpha: 0.2),
                                       ],
-                              ),
-                            ),
-                            child: Center(
-                              child: Icon(
-                                Icons.play_circle_fill,
-                                size: 72,
-                                color: Colors.white.withValues(alpha: 0.9),
-                              ),
-                            ),
-                          ),
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.play_circle_fill,
+                                      size: 72,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ),
                         ),
                         const SizedBox(height: 20),
                         Center(
@@ -864,6 +990,11 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                         ],
                         Builder(
                           builder: (context) {
+                            // RPS Check
+                            if (_battle.setterId == null) {
+                              return _buildRpsSection();
+                            }
+
                             if (_battle.verificationStatus == VerificationStatus.quickFireVoting) {
                               return _buildVotingSection();
                             }
@@ -925,6 +1056,9 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                     ),
                   ],
                   const SizedBox(height: 24),
+                  if (_battle.id != null)
+                    _BattleHistoryCarousel(battleId: _battle.id!),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -942,5 +1076,207 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     final m = duration.inMinutes;
     final s = duration.inSeconds % 60;
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+}
+
+class _TrickNameDialog extends StatefulWidget {
+  @override
+  State<_TrickNameDialog> createState() => _TrickNameDialogState();
+}
+
+class _TrickNameDialogState extends State<_TrickNameDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Name Your Trick'),
+      content: TextField(
+        controller: _controller,
+        decoration: const InputDecoration(
+          hintText: 'e.g., Kickflip, Tre Flip',
+          border: OutlineInputBorder(),
+        ),
+        autofocus: true,
+        textCapitalization: TextCapitalization.sentences,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Skip'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_controller.text.trim().isNotEmpty) {
+              Navigator.pop(context, _controller.text.trim());
+            }
+          },
+          child: const Text('Set Name'),
+        ),
+      ],
+    );
+  }
+}
+
+class _BattleHistoryCarousel extends StatelessWidget {
+  final String battleId;
+
+  const _BattleHistoryCarousel({required this.battleId});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<BattleTrick>>(
+      future: BattleService.getBattleTricks(battleId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final tricks = snapshot.data!;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                'Match History',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 160,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: tricks.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final trick = tricks[index];
+                  final isLanded = trick.outcome == 'landed';
+                  
+                  return Container(
+                    width: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isLanded ? Colors.green.withValues(alpha: 0.5) : Colors.red.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Container(color: Colors.black),
+                                Center(
+                                  child: Icon(
+                                    Icons.play_circle_outline,
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    size: 48,
+                                  ),
+                                ),
+                                Positioned.fill(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () {
+                                        // Show video dialog
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => Dialog(
+                                            backgroundColor: Colors.transparent,
+                                            insetPadding: EdgeInsets.zero,
+                                            child: Stack(
+                                              alignment: Alignment.center,
+                                              children: [
+                                                AspectRatio(
+                                                  aspectRatio: 9/16,
+                                                  child: VideoPlayerWidget(videoUrl: trick.attemptVideoUrl),
+                                                ),
+                                                Positioned(
+                                                  top: 40,
+                                                  right: 20,
+                                                  child: IconButton(
+                                                    icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                                                    onPressed: () => Navigator.pop(context),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                trick.trickName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    isLanded ? Icons.check_circle : Icons.cancel,
+                                    size: 14,
+                                    color: isLanded ? Colors.green : Colors.red,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    isLanded ? 'Landed' : 'Missed',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isLanded ? Colors.green : Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

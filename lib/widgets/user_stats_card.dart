@@ -29,6 +29,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
 
   @override
   Widget build(BuildContext context) {
+    const matrixGreen = Color(0xFF00FF41);
     final scores = widget.scores;
     
     return AnimatedContainer(
@@ -37,28 +38,24 @@ class _UserStatsCardState extends State<UserStatsCard> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Theme.of(context).brightness == Brightness.dark 
-                ? Colors.green.shade900.withValues(alpha: 0.2) 
-                : Colors.green.shade50,
-            Theme.of(context).brightness == Brightness.dark 
-                ? Colors.green.shade900.withValues(alpha: 0.1) 
-                : Colors.lightGreen.shade50,
+            Colors.black,
+            Color(0xFF001a00),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.green.withValues(alpha: 0.2),
-          width: 1,
+          color: matrixGreen,
+          width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: matrixGreen.withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -80,6 +77,8 @@ class _UserStatsCardState extends State<UserStatsCard> {
   }
 
   Widget _buildHeader() {
+    const matrixGreen = Color(0xFF00FF41);
+    
     return InkWell(
       onTap: () {
         setState(() {
@@ -90,25 +89,27 @@ class _UserStatsCardState extends State<UserStatsCard> {
         children: [
           Icon(
             Icons.analytics_outlined,
-            color: Colors.green.shade700,
+            color: matrixGreen,
             size: 20,
           ),
           const SizedBox(width: 8),
-          Text(
-            'Your Stats',
+          const Text(
+            'STATS',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.green.shade700,
+              color: matrixGreen,
+              fontFamily: 'monospace',
+              letterSpacing: 1.2,
             ),
           ),
           const SizedBox(width: 4),
           if (widget.onInfoPressed != null)
             IconButton(
-              icon: Icon(
+              icon: const Icon(
                 Icons.info_outline,
                 size: 18,
-                color: Colors.green.shade600,
+                color: matrixGreen,
               ),
               onPressed: widget.onInfoPressed,
               padding: EdgeInsets.zero,
@@ -119,22 +120,24 @@ class _UserStatsCardState extends State<UserStatsCard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.green.shade700,
+              color: matrixGreen.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: matrixGreen),
             ),
             child: const Text(
               'Private',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: matrixGreen,
+                fontFamily: 'monospace',
               ),
             ),
           ),
           const SizedBox(width: 8),
           Icon(
             _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-            color: Colors.green.shade700,
+            color: matrixGreen,
           ),
         ],
       ),
@@ -170,7 +173,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
         ScoreProgressBar(
           label: 'Ranking Score',
           score: scores.rankingScore,
-          color: Colors.orange.shade600,
+          color: Colors.orange.shade300,
           subtitle: 'Voting accuracy (500-1000)',
         ),
         const SizedBox(height: 16),
@@ -180,13 +183,14 @@ class _UserStatsCardState extends State<UserStatsCard> {
   }
 
   Widget _buildFinalScoreRow(UserScores scores) {
+    const matrixGreen = Color(0xFF00FF41);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor.withValues(alpha: 0.7),
+        color: Colors.black.withOpacity(0.7), // Adjusted for dark theme
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.green.withValues(alpha: 0.2),
+          color: matrixGreen.withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -200,7 +204,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
                 'Final Score',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).textTheme.bodySmall?.color,
+                  color: matrixGreen.withOpacity(0.8), // Adjusted color
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -210,7 +214,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.green.shade700,
+                  color: matrixGreen,
                 ),
               ),
             ],
@@ -218,7 +222,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
           Container(
             height: 40,
             width: 1,
-            color: Theme.of(context).dividerColor,
+            color: matrixGreen.withOpacity(0.3), // Adjusted color
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

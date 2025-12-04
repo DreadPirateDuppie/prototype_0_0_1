@@ -25,8 +25,12 @@ class _EditPostDialogState extends State<EditPostDialog> {
   late TextEditingController _tagsController;
   String _selectedCategory = 'Street';
   final List<String> _categories = ['Street', 'Park', 'DIY', 'Shop', 'Other'];
-  File? _selectedImage;
+  
+  // Multi-image support
+  final List<File> _newImages = []; // Newly selected images
+  List<String> _existingPhotoUrls = []; // Existing photos from the post
   bool _isLoading = false;
+  bool _isPickingImage = false;
   
   // Ratings
   late double _popularityRating;
@@ -44,6 +48,9 @@ class _EditPostDialogState extends State<EditPostDialog> {
       _selectedCategory = 'Other';
     }
     
+    // Initialize with existing photos
+    _existingPhotoUrls = List.from(widget.post.photoUrls);
+    
     _popularityRating = widget.post.popularityRating;
     _securityRating = widget.post.securityRating;
     _qualityRating = widget.post.qualityRating;
@@ -57,20 +64,51 @@ class _EditPostDialogState extends State<EditPostDialog> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImages() async {
+    if (_isPickingImage) return;
+    
+    setState(() {
+      _isPickingImage = true;
+    });
+    
     final picker = ImagePicker();
     try {
-      final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-      if (pickedFile != null) {
+      final pickedFiles = await picker.pickMultiImage();
+      if (pickedFiles.isNotEmpty) {
         setState(() {
-          _selectedImage = File(pickedFile.path);
+          for (var file in pickedFiles) {
+            _newImages.add(File(file.path));
+          }
         });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Added ${pickedFiles.length} image(s)')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        ErrorHelper.showError(context, 'Error picking image: $e');
+        ErrorHelper.showError(context, 'Error picking images: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPickingImage = false;
+        });
       }
     }
+  }
+  
+  void _removeExistingImage(int index) {
+    setState(() {
+      _existingPhotoUrls.removeAt(index);
+    });
+  }
+  
+  void _removeNewImage(int index) {
+    setState(() {
+      _newImages.removeAt(index);
+    });
   }
 
   Future<void> _updatePost() async {
@@ -84,14 +122,24 @@ class _EditPostDialogState extends State<EditPostDialog> {
     });
 
     try {
-      String? photoUrl = widget.post.photoUrl;
-      if (_selectedImage != null) {
-        // Upload new image
-        final user = SupabaseService.getCurrentUser();
-        if (user != null) {
-          photoUrl = await SupabaseService.uploadPostImage(_selectedImage!, user.id);
+      final user = SupabaseService.getCurrentUser();
+      if (user == null) throw Exception('User not logged in');
+      
+      // Upload new images
+      List<String> newPhotoUrls = [];
+      for (var image in _newImages) {
+        try {
+          final url = await SupabaseService.uploadPostImage(image, user.id);
+          if (url.isNotEmpty) {
+            newPhotoUrls.add(url);
+          }
+        } catch (e) {
+          print('DEBUG: Failed to upload image: $e');
         }
       }
+      
+      // Combine existing URLs with newly uploaded URLs
+      final allPhotoUrls = [..._existingPhotoUrls, ...newPhotoUrls];
 
       final tags = _tagsController.text
           .split(',')
@@ -103,7 +151,7 @@ class _EditPostDialogState extends State<EditPostDialog> {
         postId: widget.post.id!,
         title: _titleController.text,
         description: _descriptionController.text,
-        photoUrl: photoUrl,
+        photoUrls: allPhotoUrls,
         category: _selectedCategory,
         tags: tags,
         popularityRating: _popularityRating,
@@ -231,35 +279,74 @@ class _EditPostDialogState extends State<EditPostDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Photo',
+                    'Photos',
                     style: Theme.of(context).textTheme.labelLarge,
                   ),
                   const SizedBox(height: 8),
-                  if (_selectedImage != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        _selectedImage!,
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                  else if (widget.post.photoUrl != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        widget.post.photoUrl!,
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            height: 150,
-                            color: Colors.grey[300],
-                            child: const Center(
-                              child: Icon(Icons.image_not_supported),
-                            ),
+                  
+                  // Display existing and new images
+                  if (_existingPhotoUrls.isNotEmpty || _newImages.isNotEmpty)
+                    SizedBox(
+                      height: 120,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _existingPhotoUrls.length + _newImages.length,
+                        separatorBuilder: (context, index) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final isExisting = index < _existingPhotoUrls.length;
+                          
+                          return Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: isExisting
+                                    ? Image.network(
+                                        _existingPhotoUrls[index],
+                                        height: 120,
+                                        width: 120,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Container(
+                                            height: 120,
+                                            width: 120,
+                                            color: Colors.grey[300],
+                                            child: const Icon(Icons.image_not_supported),
+                                          );
+                                        },
+                                      )
+                                    : Image.file(
+                                        _newImages[index - _existingPhotoUrls.length],
+                                        height: 120,
+                                        width: 120,
+                                        fit: BoxFit.cover,
+                                      ),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    if (isExisting) {
+                                      _removeExistingImage(index);
+                                    } else {
+                                      _removeNewImage(index - _existingPhotoUrls.length);
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -272,14 +359,21 @@ class _EditPostDialogState extends State<EditPostDialog> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Center(
-                        child: Text('No image selected'),
+                        child: Text('No images selected'),
                       ),
                     ),
                   const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.image),
-                    label: const Text('Change Photo'),
-                    onPressed: _pickImage,
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.add_photo_alternate),
+                      label: Text(
+                        (_existingPhotoUrls.isEmpty && _newImages.isEmpty)
+                            ? 'Add Photos'
+                            : 'Add More Photos (${_existingPhotoUrls.length + _newImages.length} total)',
+                      ),
+                      onPressed: (_isLoading || _isPickingImage) ? null : _pickImages,
+                    ),
                   ),
                 ],
               ),

@@ -2,7 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'dart:developer' as developer;
 import 'dart:async' as async;
-import 'dart:math';
+import 'dart:math' as math;
 import '../models/post.dart';
 import 'error_types.dart';
 import 'admin_service.dart';
@@ -138,6 +138,21 @@ class SupabaseService {
       developer.log('Updated username for user $userId and all their posts', name: 'SupabaseService');
     } catch (e) {
       throw Exception('Failed to save username: $e');
+    }
+  }
+
+  // Get user profile by ID
+  static Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      developer.log('Error getting user profile: $e', name: 'SupabaseService');
+      return null;
     }
   }
 
@@ -489,6 +504,54 @@ class SupabaseService {
     }
   }
 
+  /// Get online users near a specific location
+  static Future<List<Map<String, dynamic>>> getNearbyOnlineUsers(
+    double latitude,
+    double longitude, {
+    double radiusInMeters = 100.0,
+  }) async {
+    try {
+      final allUsers = await getVisibleUserLocations();
+      final nearbyUsers = <Map<String, dynamic>>[];
+
+      for (final user in allUsers) {
+        final userLat = user['current_latitude'] as double?;
+        final userLon = user['current_longitude'] as double?;
+
+        if (userLat != null && userLon != null) {
+          final distance = _calculateDistance(latitude, longitude, userLat, userLon);
+          if (distance <= radiusInMeters) {
+            nearbyUsers.add(user);
+          }
+        }
+      }
+
+      return nearbyUsers;
+    } catch (e) {
+      developer.log('Error getting nearby users: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
+  /// Calculate distance between two coordinates in meters using Haversine formula
+  static double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371000; // meters
+    final double dLat = _toRadians(lat2 - lat1);
+    final double dLon = _toRadians(lon2 - lon1);
+    
+    final double a = 
+      math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.cos(_toRadians(lat1)) * math.cos(_toRadians(lat2)) *
+      math.sin(dLon / 2) * math.sin(dLon / 2);
+    
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  static double _toRadians(double degrees) {
+    return degrees * (math.pi / 180.0);
+  }
+
   /// Get top battle players with their win/loss statistics
   static Future<List<Map<String, dynamic>>> getTopBattlePlayers({int limit = 10}) async {
     try {
@@ -734,6 +797,149 @@ class SupabaseService {
     }
   }
 
+  // Upload post video to Supabase storage
+  static Future<String> uploadPostVideo(File videoFile, String userId) async {
+    try {
+      print('SupabaseService: Starting uploadPostVideo for user $userId');
+      print('SupabaseService: Video path: ${videoFile.path}');
+      
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filename = 'post_video_${userId}_$timestamp.mp4';
+      print('SupabaseService: Target filename: $filename');
+
+      print('SupabaseService: Reading video bytes...');
+      final bytes = await videoFile.readAsBytes();
+      print('SupabaseService: Read ${bytes.length} bytes');
+      
+      print('SupabaseService: Uploading to storage bucket "post_videos"...');
+      // Ensure bucket exists or use a shared bucket
+      await _client.storage
+          .from('post_images') // Reusing post_images bucket for now, or create post_videos
+          .uploadBinary(
+            filename,
+            bytes,
+            fileOptions: const FileOptions(contentType: 'video/mp4'),
+          );
+      
+      print('SupabaseService: Upload successful, getting public URL...');
+      final publicUrl = _client.storage
+          .from('post_images')
+          .getPublicUrl(filename);
+      
+      print('SupabaseService: Public URL: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      print('SupabaseService: Video upload error: $e');
+      throw AppStorageException(
+        'Failed to upload video: $e',
+        userMessage: 'Video upload failed. Please try again.',
+        originalError: e,
+      );
+    }
+  }
+
+  // ========== PROFILE MEDIA SYSTEM ==========
+
+  /// Upload media to user's profile gallery (no points awarded)
+  static Future<String> uploadProfileMedia(File mediaFile, String userId, String mediaType) async {
+    try {
+      print('SupabaseService: Starting uploadProfileMedia for user $userId, type: $mediaType');
+      
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final extension = mediaType == 'video' ? 'mp4' : 'jpg';
+      final filename = 'profile_media_${userId}_$timestamp.$extension';
+      
+      final bytes = await mediaFile.readAsBytes();
+      print('SupabaseService: Read ${bytes.length} bytes');
+      
+      final contentType = mediaType == 'video' ? 'video/mp4' : 'image/jpeg';
+      
+      await _client.storage
+          .from('post_images') // Reusing existing bucket
+          .uploadBinary(
+            filename,
+            bytes,
+            fileOptions: FileOptions(contentType: contentType),
+          );
+      
+      final publicUrl = _client.storage
+          .from('post_images')
+          .getPublicUrl(filename);
+      
+      print('SupabaseService: Uploaded profile media: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      print('SupabaseService: Profile media upload error: $e');
+      throw AppStorageException(
+        'Failed to upload media: $e',
+        userMessage: 'Media upload failed. Please try again.',
+        originalError: e,
+      );
+    }
+  }
+
+  /// Create profile media entry (no points awarded)
+  static Future<Map<String, dynamic>> createProfileMedia({
+    required String userId,
+    required String mediaUrl,
+    required String mediaType,
+    String? thumbnailUrl,
+    String? caption,
+  }) async {
+    try {
+      final response = await _client
+          .from('profile_media')
+          .insert({
+            'user_id': userId,
+            'media_url': mediaUrl,
+            'media_type': mediaType,
+            'thumbnail_url': thumbnailUrl,
+            'caption': caption,
+            'created_at': DateTime.now().toIso8601String(),
+          })
+          .select()
+          .single();
+
+      developer.log('Created profile media entry for user $userId', name: 'SupabaseService');
+      // NOTE: Intentionally NOT awarding points for profile media
+      return response;
+    } catch (e) {
+      developer.log('Error creating profile media: $e', name: 'SupabaseService');
+      throw Exception('Failed to create profile media: $e');
+    }
+  }
+
+  /// Get profile media for a user
+  static Future<List<Map<String, dynamic>>> getProfileMedia(String userId) async {
+    try {
+      final response = await _client
+          .from('profile_media')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error fetching profile media: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
+  /// Delete profile media
+  static Future<void> deleteProfileMedia(String mediaId) async {
+    try {
+      await _client
+          .from('profile_media')
+          .delete()
+          .eq('id', mediaId);
+      
+      developer.log('Deleted profile media: $mediaId', name: 'SupabaseService');
+    } catch (e) {
+      developer.log('Error deleting profile media: $e', name: 'SupabaseService');
+      throw Exception('Failed to delete media: $e');
+    }
+  }
+
   // Upload profile image
   // Upload profile image - delegates to UserService
   static Future<String> uploadProfileImage(File imageFile, String userId) async {
@@ -744,16 +950,19 @@ class SupabaseService {
   // Create a map post
   static Future<MapPost?> createMapPost({
     required String userId,
-    required double latitude,
-    required double longitude,
+    double? latitude,
+    double? longitude,
     required String title,
     required String description,
     List<String>? photoUrls,
+    String? videoUrl,
     String? userName,  // Deprecated - will fetch from user_profiles
     String? userEmail,  // Deprecated - will fetch from user
     String category = 'Other',
     List<String> tags = const [],
     double rating = 0.0,  // Quality rating (0-5)
+    double securityRating = 0.0,
+    double popularityRating = 0.0,
   }) async {
     try {
       // Fetch current username from user_profiles
@@ -771,13 +980,20 @@ class SupabaseService {
             'title': title,
             'description': description,
             'photo_urls': photoUrls,
+            'photo_url': (photoUrls != null && photoUrls.isNotEmpty) ? photoUrls.first : null, // Fallback for legacy support
+            'video_url': videoUrl,
             'category': category,
             'tags': tags,
             'quality_rating': rating,
+            'security_rating': securityRating,
+            'popularity_rating': popularityRating,
             'created_at': DateTime.now().toIso8601String(),
           })
           .select()
           .single();
+
+      print('DEBUG: SupabaseService.createMapPost - Payload sent. Photo URLs: $photoUrls');
+      print('DEBUG: SupabaseService.createMapPost - Response: $response');
 
       final post = MapPost.fromMap(response);
       
@@ -968,6 +1184,7 @@ class SupabaseService {
     required String title,
     required String description,
     String? photoUrl,
+    List<String>? photoUrls,
     double? popularityRating,
     double? securityRating,
     double? qualityRating,
@@ -978,7 +1195,11 @@ class SupabaseService {
       final updateData = {
         'title': title,
         'description': description,
-        if (photoUrl != null) 'photo_url': photoUrl,
+        if (photoUrls != null) 'photo_urls': photoUrls,
+        // Update legacy photo_url column
+        if (photoUrls != null && photoUrls.isNotEmpty) 'photo_url': photoUrls.first,
+        if (photoUrls != null && photoUrls.isEmpty) 'photo_url': null, // Clear legacy column when all photos removed
+        if (photoUrl != null && (photoUrls == null || photoUrls.isEmpty)) 'photo_url': photoUrl, // Fallback if only single photo provided
         if (popularityRating != null) 'popularity_rating': popularityRating,
         if (securityRating != null) 'security_rating': securityRating,
         if (qualityRating != null) 'quality_rating': qualityRating,
@@ -1856,7 +2077,7 @@ class SupabaseService {
       while (!isUnique && attempts < 5) {
         // Generate random 4-char alphanumeric code
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        final rnd = Random();
+        final rnd = math.Random();
         code = String.fromCharCodes(Iterable.generate(
             4, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
 

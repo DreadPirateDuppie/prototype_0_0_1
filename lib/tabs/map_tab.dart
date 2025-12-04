@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' hide Path;
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
+import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
@@ -10,15 +11,19 @@ import '../screens/spot_details_screen.dart';
 import '../screens/location_privacy_dialog.dart';
 import '../widgets/ad_banner.dart';
 import '../utils/error_helper.dart';
+import '../providers/navigation_provider.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
 
   @override
-  State<MapTab> createState() => _MapTabState();
+  State<MapTab> createState() => MapTabState();
 }
 
-class _MapTabState extends State<MapTab> {
+class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true; // Keep this tab alive in the background
+  
   late MapController mapController;
   List<Marker> markers = [];
   List<Marker> nonClusterMarkers = [];
@@ -32,6 +37,12 @@ class _MapTabState extends State<MapTab> {
   String _sharingMode = 'off';
 
   final String _selectedCategory = 'All';
+  bool _hasExplicitlyNavigated = false; // Track if user has manually navigated
+
+  void moveToLocation(LatLng location) {
+    _hasExplicitlyNavigated = true; // Mark that we've manually navigated
+    mapController.move(location, 17.0); // Increased zoom for better detail
+  }
 
   @override
   void initState() {
@@ -42,6 +53,15 @@ class _MapTabState extends State<MapTab> {
     // Automatically get location and privacy settings
     _getCurrentLocation();
     _loadPrivacySettings();
+    
+    // Check for target location from navigation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+      if (navProvider.targetLocation != null) {
+        moveToLocation(navProvider.targetLocation!);
+        navProvider.clearTargetLocation();
+      }
+    });
   }
 
   Future<void> _loadUserPosts() async {
@@ -50,12 +70,18 @@ class _MapTabState extends State<MapTab> {
       final posts = await SupabaseService.getAllMapPosts(
         category: _selectedCategory == 'All' ? null : _selectedCategory,
       );
+      
+      // Load online friends
+      final friends = await SupabaseService.getMutualFollowers();
+      final visibleLocations = await SupabaseService.getVisibleUserLocations();
+      final onlineFriends = visibleLocations.where((user) => friends.any((friend) => friend['id'] == user['id'])).toList();
+
       if (mounted) {
         setState(() {
           userPosts = posts;
           // Create new lists to ensure state update
           markers = []; // This will now hold only clusterable markers (posts)
-          nonClusterMarkers = []; // This will hold non-clusterable markers (user location)
+          nonClusterMarkers = []; // This will hold non-clusterable markers (user location + friends)
           markerPostMap.clear();
           
           _addSampleMarkers(); // Adds to markers (clusterable)
@@ -71,7 +97,47 @@ class _MapTabState extends State<MapTab> {
               addToNonCluster: true,
             );
           }
-          _addUserPostMarkers(); // Adds to markers (clusterable)
+          
+          // Calculate active pushers per spot
+          final Map<String, int> spotSessionCounts = {};
+          final List<Map<String, dynamic>> friendsAtSpots = [];
+          const distanceThreshold = 100.0; // meters
+
+          for (final friend in onlineFriends) {
+            if (friend['current_latitude'] != null && friend['current_longitude'] != null) {
+              final friendLoc = LatLng(friend['current_latitude'], friend['current_longitude']);
+              bool isAtSpot = false;
+
+              for (final post in posts) {
+                if (post.latitude == null || post.longitude == null) continue;
+                
+                final postLoc = LatLng(post.latitude!, post.longitude!);
+                final distance = const Distance().as(LengthUnit.Meter, friendLoc, postLoc);
+                
+                if (distance <= distanceThreshold && post.id != null) {
+                  spotSessionCounts[post.id!] = (spotSessionCounts[post.id!] ?? 0) + 1;
+                  isAtSpot = true;
+                  friendsAtSpots.add(friend);
+                  break; // Only count for the first matching spot
+                }
+              }
+
+              // If friend is NOT at a spot, show individual marker
+              if (!isAtSpot) {
+                _addMarkerToList(
+                  friendLoc,
+                  friend['display_name'] ?? friend['username'] ?? 'Friend',
+                  'Online now',
+                  Colors.red, // Red color for friend markers
+                  addToNonCluster: true, // Don't cluster friends
+                  isUserLocation: false, // Use pin style
+                  isFriend: true, // Use precise icon
+                );
+              }
+            }
+          }
+
+          _addUserPostMarkers(spotSessionCounts); // Adds to markers (clusterable)
           debugPrint('MapTab: Updated markers. Cluster: ${markers.length}, Non-Cluster: ${nonClusterMarkers.length}');
         });
       }
@@ -84,15 +150,18 @@ class _MapTabState extends State<MapTab> {
 
 
 
-  void _addUserPostMarkers() {
+  void _addUserPostMarkers(Map<String, int> spotSessionCounts) {
     for (final post in userPosts) {
+      if (post.id == null || post.latitude == null || post.longitude == null) continue;
+      final activePushers = spotSessionCounts[post.id!] ?? 0;
       _addMarkerToList(
-        LatLng(post.latitude, post.longitude),
+        LatLng(post.latitude!, post.longitude!),
         post.title,
         post.description,
         Colors.green,
         postId: post.id,
         post: post,
+        activePushers: activePushers,
       );
     }
   }
@@ -141,8 +210,10 @@ class _MapTabState extends State<MapTab> {
           _hasLocationPermission = true;
         });
 
-        // Animate to current location
-        mapController.move(newLocation, 14.0);
+        // Only animate to current location if user hasn't explicitly navigated elsewhere
+        if (!_hasExplicitlyNavigated) {
+          mapController.move(newLocation, 14.0);
+        }
 
         // Rebuild markers to include location
         _loadUserPosts();
@@ -257,7 +328,9 @@ class _MapTabState extends State<MapTab> {
     String? postId,
     MapPost? post,
     bool isUserLocation = false,
-    bool addToNonCluster = false, // New parameter
+    bool addToNonCluster = false,
+    bool isFriend = false,
+    int activePushers = 0,
   }) {
     final key = '${location.latitude},${location.longitude}';
     if (post != null) {
@@ -280,8 +353,13 @@ class _MapTabState extends State<MapTab> {
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('$title - $subtitle'),
+                content: Text(
+                  activePushers > 0 
+                      ? '$title - Active Pushers = $activePushers' 
+                      : '$title - $subtitle'
+                ),
                 duration: const Duration(seconds: 2),
+                backgroundColor: isFriend ? Colors.red : null,
               ),
             );
           }
@@ -289,7 +367,21 @@ class _MapTabState extends State<MapTab> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (!isUserLocation) ...[
+            if (isFriend)
+              // Friend Icon: Precise Pin
+              Icon(
+                Icons.person_pin_circle,
+                color: color,
+                size: 36,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              )
+            else if (!isUserLocation) ...[
               // Outer glow effect (only for pins, not user location)
               Container(
                 width: 40,
@@ -313,8 +405,8 @@ class _MapTabState extends State<MapTab> {
                   color: post != null ? const Color(0xFF00FF41) : color,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.black,
-                    width: 1.5,
+                    color: activePushers > 0 ? Colors.red : Colors.black, // Red highlight for active spots
+                    width: activePushers > 0 ? 2.5 : 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -331,10 +423,40 @@ class _MapTabState extends State<MapTab> {
                     ),
                   ],
                 ),
-                child: Icon(
-                  post != null ? Icons.location_on_rounded : Icons.location_on,
-                  color: Colors.black,
-                  size: 20,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      post != null ? Icons.location_on_rounded : Icons.location_on,
+                      color: Colors.black,
+                      size: 20,
+                    ),
+                    if (activePushers > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 12,
+                            minHeight: 12,
+                          ),
+                          child: Text(
+                            '$activePushers',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ] else
@@ -406,6 +528,8 @@ class _MapTabState extends State<MapTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     debugPrint('MapTab: Building with ${markers.length} markers');
     return Stack(
       children: [
@@ -627,36 +751,47 @@ class _MapTabState extends State<MapTab> {
                     ),
                   ),
                   // Pin placement button
+                  // Pin placement button - Centered above nav bar
                   Positioned(
-                    bottom: 16,
-                    right: 16,
-                    child: Material(
-                      elevation: 8,
-                      shadowColor: (_isPinMode ? Colors.red : const Color(0xFF00FF41)).withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
-                        onTap: _togglePinMode,
-                        borderRadius: BorderRadius.circular(16),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
+                    bottom: 45, // Adjusted for shorter triangle
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // PhysicalShape for shadow and clip
+                          PhysicalShape(
+                            clipper: TriangleClipper(),
                             color: _isPinMode ? Colors.red.shade600 : const Color(0xFF00FF41),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (_isPinMode ? Colors.red : const Color(0xFF00FF41)).withValues(alpha: 0.4),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
+                            elevation: 8,
+                            shadowColor: (_isPinMode ? Colors.red : const Color(0xFF00FF41)).withValues(alpha: 0.4),
+                            child: InkWell(
+                              onTap: _togglePinMode,
+                              child: Container(
+                                width: 120, // Fatter (was 100)
+                                height: 60, // Shorter (was 70)
+                                alignment: Alignment.center,
+                                padding: const EdgeInsets.only(top: 5), // Raised icon (was 10)
+                                child: Icon(
+                                  _isPinMode ? Icons.close_rounded : Icons.add_location_rounded,
+                                  color: _isPinMode ? Colors.white : Colors.black,
+                                  size: 32,
+                                ),
                               ),
-                            ],
+                            ),
                           ),
-                          child: Icon(
-                            _isPinMode ? Icons.close_rounded : Icons.add_location_rounded,
-                            color: _isPinMode ? Colors.white : Colors.black,
-                            size: 28,
+                          // Border
+                          IgnorePointer(
+                            child: CustomPaint(
+                              size: const Size(120, 60), // Fatter and shorter
+                              painter: TriangleBorderPainter(
+                                color: Colors.black,
+                                width: 2,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),
@@ -795,4 +930,45 @@ class PostSearchDelegate extends SearchDelegate<MapPost?> {
       },
     );
   }
+}
+
+class TriangleClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.moveTo(size.width / 2, 0); // Top center
+    path.lineTo(size.width, size.height); // Bottom right
+    path.lineTo(0, size.height); // Bottom left
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class TriangleBorderPainter extends CustomPainter {
+  final Color color;
+  final double width;
+
+  TriangleBorderPainter({required this.color, required this.width});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width;
+
+    final path = Path();
+    path.moveTo(size.width / 2, 0);
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

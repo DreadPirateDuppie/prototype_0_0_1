@@ -9,6 +9,7 @@ import 'providers/theme_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/battle_provider.dart';
 import 'providers/post_provider.dart';
+import 'providers/navigation_provider.dart';
 import 'services/error_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/rewarded_ad_service.dart';
@@ -29,9 +30,9 @@ Future<void> main() async {
 
   // Get Supabase configuration from dotenv or environment variables
   final supabaseUrl = dotenv.env['SUPABASE_URL'] ??
-                      const String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://vgcdednbyjdkyjysvctm.supabase.co');
+                      const String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://fsogspnecjsoltcmwveg.supabase.co');
   final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? 
-                          const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY2RlZG5ieWpka3lqeXN2Y3RtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMzI3NDUsImV4cCI6MjA3ODcwODc0NX0.A9y5TFwhUMKrpiYpQJr_VYfVyyHRH5lpiHLG30Yv4s8');
+                          const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzb2dzcG5lY2pzb2x0Y213dmVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1MzkxMDMsImV4cCI6MjA4MDExNTEwM30.waf9NjgeOacZmfrmnyaxnskrxuk0dZyHtqWFcuaGUFI');
 
   // Initialize Supabase with your project URL and anon key
   await Supabase.initialize(
@@ -58,6 +59,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => BattleProvider()),
         ChangeNotifierProvider(create: (_) => PostProvider()),
+        ChangeNotifierProvider(create: (_) => NavigationProvider()),
       ],
       child: const MyApp(),
     ),

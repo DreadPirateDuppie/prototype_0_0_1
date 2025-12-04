@@ -53,6 +53,7 @@ class _VoteButtonsState extends State<VoteButtons> {
 
   @override
   Widget build(BuildContext context) {
+    const matrixGreen = Color(0xFF00FF41);
     final isUpvoted = widget.userVote == 1;
     final isDownvoted = widget.userVote == -1;
 
@@ -66,7 +67,7 @@ class _VoteButtonsState extends State<VoteButtons> {
             isUpvoted ? Icons.arrow_drop_up : Icons.arrow_drop_up_outlined,
             size: 32,
           ),
-          color: isUpvoted ? Colors.orange : Colors.grey,
+          color: isUpvoted ? matrixGreen : matrixGreen.withOpacity(0.4),
           onPressed: _isVoting ? null : () => _vote(1),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
@@ -76,14 +77,10 @@ class _VoteButtonsState extends State<VoteButtons> {
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
           child: Text(
             widget.voteScore.toString(),
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: isUpvoted
-                  ? Colors.orange
-                  : isDownvoted
-                      ? Colors.blue
-                      : Colors.grey[700],
+              color: matrixGreen,
             ),
           ),
         ),
@@ -93,7 +90,7 @@ class _VoteButtonsState extends State<VoteButtons> {
             isDownvoted ? Icons.arrow_drop_down : Icons.arrow_drop_down_outlined,
             size: 32,
           ),
-          color: isDownvoted ? Colors.blue : Colors.grey,
+          color: isDownvoted ? matrixGreen : matrixGreen.withOpacity(0.4),
           onPressed: _isVoting ? null : () => _vote(-1),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),

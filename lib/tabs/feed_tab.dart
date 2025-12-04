@@ -1,13 +1,20 @@
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../models/post.dart';
 import '../services/supabase_service.dart';
 import '../widgets/post_card.dart';
 import '../widgets/ad_banner.dart';
 import '../utils/error_helper.dart';
+import '../screens/user_profile_screen.dart';
 
 class FeedTab extends StatefulWidget {
-  const FeedTab({super.key});
+  final Function(LatLng)? onNavigateToMap;
+
+  const FeedTab({
+    super.key,
+    this.onNavigateToMap,
+  });
 
   @override
   State<FeedTab> createState() => _FeedTabState();
@@ -215,87 +222,158 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
         ],
       ),
       child: ListTile(
-        leading: Stack(
-          children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: matrixGreen.withValues(alpha: 0.2),
-              backgroundImage: user['avatar_url'] != null
-                  ? NetworkImage(user['avatar_url'])
-                  : null,
-              child: user['avatar_url'] == null
-                  ? Text(
-                      (user['display_name'] ?? user['username'] ?? 'U')[0].toUpperCase(),
-                      style: const TextStyle(
-                        color: matrixGreen,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
-            ),
-            Positioned(
-              right: 0,
-              top: 0,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
+        leading: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UserProfileScreen(
+                  userId: user['id'],
+                  username: user['username'],
+                  avatarUrl: user['avatar_url'],
                 ),
               ),
-            ),
-          ],
-        ),
-        title: Row(
-          children: [
-            Text(
-              user['display_name'] ?? user['username'] ?? 'Unknown User',
-              style: const TextStyle(
-                color: matrixGreen,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'monospace',
+            );
+          },
+          child: Stack(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: matrixGreen.withValues(alpha: 0.2),
+                backgroundImage: user['avatar_url'] != null
+                    ? NetworkImage(user['avatar_url'])
+                    : null,
+                child: user['avatar_url'] == null
+                    ? Text(
+                        (user['display_name'] ?? user['username'] ?? 'U')[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: matrixGreen,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : null,
               ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Text(
-                'ONLINE',
-                style: TextStyle(
-                  color: Colors.green,
-                  fontSize: 10,
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        subtitle: Text(
-          '@${user['username'] ?? 'unknown'}',
-          style: TextStyle(
-            color: matrixGreen.withValues(alpha: 0.7),
-            fontFamily: 'monospace',
-            fontSize: 12,
+        title: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UserProfileScreen(
+                  userId: user['id'],
+                  username: user['username'],
+                  avatarUrl: user['avatar_url'],
+                ),
+              ),
+            );
+          },
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  user['display_name'] ?? user['username'] ?? 'Unknown User',
+                  style: const TextStyle(
+                    color: matrixGreen,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'ONLINE',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        subtitle: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UserProfileScreen(
+                  userId: user['id'],
+                  username: user['username'],
+                  avatarUrl: user['avatar_url'],
+                ),
+              ),
+            );
+          },
+          child: Text(
+            '@${user['username'] ?? 'unknown'}',
+            style: TextStyle(
+              color: matrixGreen.withValues(alpha: 0.7),
+              fontFamily: 'monospace',
+              fontSize: 12,
+            ),
           ),
         ),
         trailing: SizedBox(
           width: 80,
           child: ElevatedButton(
             onPressed: () {
-              // Navigate to map or user's location
-              // For now, just show location on map (could switch to map tab)
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${user['display_name'] ?? user['username']} is online and sharing location!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              // Navigate to map tab and center on friend's location
+              final lat = user['current_latitude'] as double?;
+              final lng = user['current_longitude'] as double?;
+              
+              if (lat != null && lng != null) {
+                final location = LatLng(lat, lng);
+                
+                if (widget.onNavigateToMap != null) {
+                  widget.onNavigateToMap!(location);
+                  
+                  // Show confirmation
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Showing ${user['display_name'] ?? user['username']}\'s location'),
+                      backgroundColor: const Color(0xFF00FF41),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                } else {
+                  // Fallback
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Navigation not available'),
+                    ),
+                  );
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Location not available'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: matrixGreen.withValues(alpha: 0.2),
@@ -339,36 +417,78 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
           final isFollowing = snapshot.data ?? false;
 
           return ListTile(
-            leading: CircleAvatar(
-              radius: 20,
-              backgroundColor: matrixGreen.withValues(alpha: 0.2),
-              backgroundImage: user['avatar_url'] != null
-                  ? NetworkImage(user['avatar_url'])
-                  : null,
-              child: user['avatar_url'] == null
-                  ? Text(
-                      (user['display_name'] ?? user['username'] ?? 'U')[0].toUpperCase(),
-                      style: const TextStyle(
-                        color: matrixGreen,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
-            ),
-            title: Text(
-              user['display_name'] ?? user['username'] ?? 'Unknown User',
-              style: const TextStyle(
-                color: matrixGreen,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'monospace',
+            leading: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileScreen(
+                      userId: user['id'],
+                      username: user['username'],
+                      avatarUrl: user['avatar_url'],
+                    ),
+                  ),
+                );
+              },
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: matrixGreen.withValues(alpha: 0.2),
+                backgroundImage: user['avatar_url'] != null
+                    ? NetworkImage(user['avatar_url'])
+                    : null,
+                child: user['avatar_url'] == null
+                    ? Text(
+                        (user['display_name'] ?? user['username'] ?? 'U')[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: matrixGreen,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : null,
               ),
             ),
-            subtitle: Text(
-              '@${user['username'] ?? 'unknown'}',
-              style: TextStyle(
-                color: matrixGreen.withValues(alpha: 0.7),
-                fontFamily: 'monospace',
-                fontSize: 12,
+            title: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileScreen(
+                      userId: user['id'],
+                      username: user['username'],
+                      avatarUrl: user['avatar_url'],
+                    ),
+                  ),
+                );
+              },
+              child: Text(
+                user['display_name'] ?? user['username'] ?? 'Unknown User',
+                style: const TextStyle(
+                  color: matrixGreen,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+            subtitle: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileScreen(
+                      userId: user['id'],
+                      username: user['username'],
+                      avatarUrl: user['avatar_url'],
+                    ),
+                  ),
+                );
+              },
+              child: Text(
+                '@${user['username'] ?? 'unknown'}',
+                style: TextStyle(
+                  color: matrixGreen.withValues(alpha: 0.7),
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
               ),
             ),
             trailing: SizedBox(

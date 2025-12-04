@@ -25,8 +25,13 @@ class ImageService {
       );
 
       if (compressedFile != null) {
+        final compressedFileObj = File(compressedFile.path);
+        if (await compressedFileObj.length() == 0) {
+          print('ImageService: Compressed file is 0 bytes, using original file');
+          return imageFile;
+        }
         print('ImageService: Compression successful, path: ${compressedFile.path}');
-        return File(compressedFile.path);
+        return compressedFileObj;
       } else {
         print('ImageService: Compression returned null, using original file');
         return imageFile;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:math' as math;
 import '../models/post.dart';
 import '../models/spot_video.dart';
 import '../services/supabase_service.dart';
@@ -8,6 +9,11 @@ import '../widgets/vote_buttons.dart';
 import '../utils/error_helper.dart';
 import 'edit_post_dialog.dart';
 import 'trick_submission_dialog.dart';
+import '../widgets/video_player_widget.dart';
+import '../widgets/mini_map_snapshot.dart';
+import '../providers/navigation_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:latlong2/latlong.dart';
 
 class SpotDetailsScreen extends StatefulWidget {
   final MapPost post;
@@ -24,6 +30,8 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
   List<SpotVideo> _tricks = [];
   bool _isLoadingTricks = true;
   String _sortBy = 'recent';
+  int _usersAtSpot = 0;
+  bool _isLoadingUsers = true;
 
   // Matrix theme colors
   static const Color matrixGreen = Color(0xFF00FF41);
@@ -36,6 +44,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
     currentPost = widget.post;
     _checkOwnership();
     _loadTricks();
+    _loadUsersAtSpot();
   }
 
   void _checkOwnership() {
@@ -68,6 +77,38 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
       if (mounted) {
         setState(() => _isLoadingTricks = false);
         // ErrorHelper.showError(context, 'Error loading tricks: $e');
+      }
+    }
+  }
+
+  Future<void> _loadUsersAtSpot() async {
+    if (currentPost.latitude == null || currentPost.longitude == null) {
+      setState(() {
+        _usersAtSpot = 0;
+        _isLoadingUsers = false;
+      });
+      return;
+    }
+
+    setState(() => _isLoadingUsers = true);
+    
+    try {
+      // Get users near this spot (within 100m)
+      final nearbyUsers = await SupabaseService.getNearbyOnlineUsers(
+        currentPost.latitude!,
+        currentPost.longitude!,
+        radiusInMeters: 100,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _usersAtSpot = nearbyUsers.length;
+          _isLoadingUsers = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingUsers = false);
       }
     }
   }
@@ -221,6 +262,14 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final matrixGreen = colorScheme.primary;
+    final matrixBlack = colorScheme.surface;
+    final textColor = theme.textTheme.bodyLarge?.color ?? matrixGreen;
+    final secondaryTextColor = theme.textTheme.bodySmall?.color ?? matrixGreen.withValues(alpha: 0.7);
+
     return Scaffold(
       backgroundColor: matrixBlack,
       body: CustomScrollView(
@@ -235,16 +284,18 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 currentPost.title,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
                   fontWeight: FontWeight.bold,
-                  shadows: [Shadow(color: Colors.black, blurRadius: 10)],
+                  shadows: [Shadow(color: isDark ? Colors.black : Colors.white, blurRadius: 10)],
                 ),
               ),
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (currentPost.photoUrls.isNotEmpty)
+                  if (currentPost.videoUrl != null)
+                    VideoPlayerWidget(videoUrl: currentPost.videoUrl!)
+                  else if (currentPost.photoUrls.isNotEmpty)
                     Stack(
                       children: [
                         PageView.builder(
@@ -309,7 +360,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                   else
                     Container(
                       color: matrixDark,
-                      child: const Center(
+                      child: Center(
                         child: Icon(Icons.skateboarding, color: matrixGreen, size: 80),
                       ),
                     ),
@@ -359,15 +410,20 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                       CircleAvatar(
                         radius: 20,
                         backgroundColor: matrixGreen,
-                        child: Text(
-                          (currentPost.userName?.isNotEmpty == true)
-                              ? currentPost.userName![0].toUpperCase()
-                              : 'U',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        backgroundImage: currentPost.avatarUrl != null
+                            ? NetworkImage(currentPost.avatarUrl!)
+                            : null,
+                        child: currentPost.avatarUrl == null
+                            ? Text(
+                                (currentPost.userName?.isNotEmpty == true)
+                                    ? currentPost.userName![0].toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
                       ),
                       const SizedBox(width: 12),
                       Column(
@@ -377,8 +433,8 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                             currentPost.userName?.isNotEmpty == true
                                 ? currentPost.userName!
                                 : 'Unknown Skater',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: textColor,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -386,7 +442,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                           Text(
                             currentPost.createdAt.toString().substring(0, 10),
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
+                              color: secondaryTextColor,
                               fontSize: 12,
                             ),
                           ),
@@ -401,7 +457,21 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                         isOwnPost: _isOwnPost,
                         orientation: Axis.horizontal,
                         onVoteChanged: () async {
-                          // Refresh logic could go here
+                          // Refresh post data to show updated vote count
+                          try {
+                            final allPosts = await SupabaseService.getAllMapPosts();
+                            final updatedPost = allPosts.firstWhere(
+                              (p) => p.id == currentPost.id,
+                              orElse: () => currentPost,
+                            );
+                            if (mounted) {
+                              setState(() {
+                                currentPost = updatedPost;
+                              });
+                            }
+                          } catch (e) {
+                            print('DEBUG: Error refreshing post after vote: $e');
+                          }
                         },
                       ),
                     ],
@@ -411,12 +481,86 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                   // Description
                   Text(
                     currentPost.description,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: textColor,
                       fontSize: 16,
                       height: 1.5,
                     ),
                   ),
+                  const SizedBox(height: 24),
+
+                  // Mini Map Preview - tappable to go to map tab (Only if location exists)
+                  if (currentPost.latitude != null && currentPost.longitude != null)
+                    GestureDetector(
+                      onTap: () {
+                        // Navigate to map tab and center on this spot
+                        final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+                        navProvider.setIndex(
+                          2, // Map tab is index 2
+                          targetLocation: LatLng(currentPost.latitude!, currentPost.longitude!),
+                        );
+                        Navigator.of(context).popUntil((route) => route.isFirst);
+                      },
+                      child: Container(
+                        height: 180,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: matrixGreen.withValues(alpha: 0.3), width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: matrixGreen.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Stack(
+                            children: [
+                              MiniMapSnapshot(
+                                latitude: currentPost.latitude!,
+                                longitude: currentPost.longitude!,
+                              ),
+                              // Overlay with "View on Map" label
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.7),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                       Icon(
+                                         Icons.map,
+                                         color: matrixGreen,
+                                         size: 18,
+                                       ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'TAP TO VIEW ON MAP',
+                                        style: TextStyle(
+                                          color: Color(0xFF00FF41),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'monospace',
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
                   const SizedBox(height: 24),
 
                   // Ratings
@@ -446,30 +590,147 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Location
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, color: matrixGreen, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${currentPost.latitude.toStringAsFixed(5)}, ${currentPost.longitude.toStringAsFixed(5)}',
-                        style: TextStyle(
-                          color: matrixGreen.withValues(alpha: 0.8),
-                          fontFamily: 'monospace',
+                  // Location with clickable coordinates (Only if location exists)
+                  if (currentPost.latitude != null && currentPost.longitude != null)
+                    GestureDetector(
+                      onTap: () async {
+                        // Open directions in native maps app
+                        final url = Uri.parse(
+                          'https://www.google.com/maps/dir/?api=1&destination=${currentPost.latitude},${currentPost.longitude}'
+                        );
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: matrixGreen.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: matrixGreen.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.location_on, color: matrixGreen, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${currentPost.latitude!.toStringAsFixed(5)}, ${currentPost.longitude!.toStringAsFixed(5)}',
+                              style: TextStyle(
+                                color: matrixGreen.withValues(alpha: 0.8),
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.directions,
+                              color: matrixGreen,
+                              size: 18,
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
+                  
+                  if (currentPost.latitude != null && currentPost.longitude != null)
+                    const SizedBox(height: 16),
+                  
+                  // Users at spot
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _usersAtSpot > 0 && !_isLoadingUsers
+                          ? Colors.red.withValues(alpha: 0.1)
+                          : matrixGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: matrixGreen,
+                        width: 2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: matrixGreen.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.people,
+                            color: matrixGreen,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'SKATERS AT THIS SPOT',
+                                style: TextStyle(
+                                  color: matrixGreen.withValues(alpha: 0.7),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              _isLoadingUsers
+                                  ? Text(
+                                      'Loading...',
+                                      style: TextStyle(
+                                        color: matrixGreen.withValues(alpha: 0.5),
+                                        fontSize: 12,
+                                      ),
+                                    )
+                                  : Text(
+                                      _usersAtSpot == 0
+                                          ? 'Nobody here right now'
+                                          : _usersAtSpot == 1
+                                              ? '1 person here now'
+                                              : '$_usersAtSpot people here now',
+                                      style: TextStyle(
+                                        color: matrixGreen,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ],
+                          ),
+                        ),
+                        if (_usersAtSpot > 0 && !_isLoadingUsers)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: matrixGreen,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '🔥 ACTIVE',
+                              style: TextStyle(
+                                color: isDark ? Colors.black : Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                   
-                  const SizedBox(height: 32),
-                  const Divider(color: Colors.white24),
+
+                  Divider(color: isDark ? Colors.white24 : Colors.black12),
                   const SizedBox(height: 16),
                   
                   // Trick History Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'TRICK HISTORY',
                         style: TextStyle(
                           color: matrixGreen,
@@ -481,7 +742,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                       ),
                       PopupMenuButton<String>(
                         initialValue: _sortBy,
-                        icon: const Icon(Icons.sort, color: matrixGreen),
+                        icon: Icon(Icons.sort, color: matrixGreen),
                         color: matrixDark,
                         onSelected: (value) {
                           setState(() => _sortBy = value);
@@ -490,11 +751,11 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                         itemBuilder: (context) => [
                           const PopupMenuItem(
                             value: 'recent',
-                            child: Text('Most Recent', style: TextStyle(color: Colors.white)),
+                            child: Text('Most Recent'),
                           ),
                           const PopupMenuItem(
                             value: 'popular',
-                            child: Text('Most Popular', style: TextStyle(color: Colors.white)),
+                            child: Text('Most Popular'),
                           ),
                         ],
                       ),
@@ -507,7 +768,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
 
           // Trick List
           if (_isLoadingTricks)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Center(
                 child: Padding(
                   padding: EdgeInsets.all(32.0),
@@ -525,12 +786,12 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'No tricks landed yet.',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                      style: TextStyle(color: secondaryTextColor),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Be the first to claim this spot!',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12),
+                      style: TextStyle(color: secondaryTextColor.withValues(alpha: 0.6), fontSize: 12),
                     ),
                   ],
                 ),

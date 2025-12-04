@@ -26,6 +26,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<void> _signUp() async {
+    // Validate all fields
+    if (_emailController.text.trim().isEmpty) {
+      ErrorHelper.showError(context, 'Please enter an email');
+      return;
+    }
+    
+    if (_displayNameController.text.trim().isEmpty) {
+      ErrorHelper.showError(context, 'Please enter a display name');
+      return;
+    }
+    
+    if (_passwordController.text.isEmpty) {
+      ErrorHelper.showError(context, 'Please enter a password');
+      return;
+    }
+    
+    if (_confirmPasswordController.text.isEmpty) {
+      ErrorHelper.showError(context, 'Please confirm your password');
+      return;
+    }
+    
+    // Check password length
+    if (_passwordController.text.length < 6) {
+      ErrorHelper.showError(context, 'Password must be at least 6 characters');
+      return;
+    }
+    
+    // Check if passwords match
     if (_passwordController.text != _confirmPasswordController.text) {
       ErrorHelper.showError(context, 'Passwords do not match');
       return;
@@ -37,9 +65,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     try {
       await SupabaseService.signUp(
-        _emailController.text,
+        _emailController.text.trim(),
         _passwordController.text,
-        displayName: _displayNameController.text,
+        displayName: _displayNameController.text.trim(),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

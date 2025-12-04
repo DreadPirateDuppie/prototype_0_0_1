@@ -1062,7 +1062,7 @@ class _VsTabState extends State<VsTab> {
             ],
           ),
           floatingActionButton: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 32),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

@@ -14,6 +14,9 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../utils/error_helper.dart';
 import '../config/theme_config.dart';
+import '../screens/spot_details_screen.dart';
+import '../screens/upload_media_dialog.dart';
+import '../screens/create_feed_post_dialog.dart';
 
 
 class ProfileTab extends StatefulWidget {
@@ -28,21 +31,24 @@ class ProfileTab extends StatefulWidget {
 class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateMixin {
   late Future<List<MapPost>> _userPostsFuture;
   late TabController _tabController;
-  final bool _isStatsExpanded = true;
+  final bool _isStatsExpanded = false;
   bool _isUploadingImage = false;
   int _followersCount = 0;
   int _followingCount = 0;
+  List<Map<String, dynamic>> _profileMedia = [];
+  bool _isLoadingMedia = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this); // Changed from 2 to 3
     
     // Initialize posts future
     final user = SupabaseService.getCurrentUser();
     if (user != null) {
       _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
       _loadFollowCounts(user.id);
+      _loadProfileMedia(user.id);
     } else {
       _userPostsFuture = Future.value([]);
     }
@@ -93,6 +99,37 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
     } catch (e) {
       // Silently fail - follow counts are not critical
     }
+  }
+
+  Future<void> _loadProfileMedia(String userId) async {
+    setState(() => _isLoadingMedia = true);
+    try {
+      final media = await SupabaseService.getProfileMedia(userId);
+      if (mounted) {
+        setState(() {
+          _profileMedia = media;
+          _isLoadingMedia = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMedia = false);
+      }
+    }
+  }
+
+  Future<void> _showUploadMediaDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) => UploadMediaDialog(
+        onMediaUploaded: () {
+          final user = SupabaseService.getCurrentUser();
+          if (user != null) {
+            _loadProfileMedia(user.id);
+          }
+        },
+      ),
+    );
   }
 
 
@@ -269,9 +306,18 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
     );
   }
 
+
+
   Widget _buildGridPost(MapPost post) {
     return GestureDetector(
-      onTap: () => _editPost(post), // Or show details
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SpotDetailsScreen(post: post),
+          ),
+        ).then((_) => _refreshAll()); // Refresh on return in case of changes
+      },
       child: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -283,10 +329,17 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
               : null,
         ),
         child: post.photoUrl == null
-            ? MiniMapSnapshot(
-                latitude: post.latitude,
-                longitude: post.longitude,
-              )
+            ? (post.latitude != null && post.longitude != null
+                ? MiniMapSnapshot(
+                    latitude: post.latitude!,
+                    longitude: post.longitude!,
+                  )
+                : Container(
+                    color: Colors.grey[900],
+                    child: const Center(
+                      child: Icon(Icons.article, color: Colors.white54),
+                    ),
+                  ))
             : null,
       ),
     );
@@ -299,40 +352,51 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         return Scaffold(
-          body: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                SliverAppBar(
-                  expandedHeight: 400.0,
-                  floating: false,
-                  pinned: true,
-                  backgroundColor: Colors.green,
-                  title: const Text(
-                    '> PUSHINN_',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  centerTitle: true,
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.refresh, color: Colors.white),
-                      onPressed: _refreshAll,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.settings, color: Colors.white),
+          body: RefreshIndicator(
+            onRefresh: _refreshAll,
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            child: NestedScrollView(
+              headerSliverBuilder: (context, innerBoxIsScrolled) {
+                return [
+                  SliverAppBar(
+                    expandedHeight: 400.0,
+                    floating: false,
+                    pinned: true,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    leading: IconButton(
+                      icon: const Icon(Icons.add_box_outlined, color: Colors.white),
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SettingsTab(),
+                        showDialog(
+                          context: context,
+                          builder: (context) => CreateFeedPostDialog(
+                            onPostAdded: _refreshAll,
                           ),
                         );
                       },
                     ),
-                  ],
+                    title: const Text(
+                      '> PUSHINN_',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    centerTitle: true,
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.settings, color: Colors.white),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SettingsTab(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   flexibleSpace: FlexibleSpaceBar(
                     background: Container(
                       decoration: BoxDecoration(
@@ -340,7 +404,7 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.green.shade700, 
+                            Theme.of(context).colorScheme.primary,
                             Theme.of(context).scaffoldBackgroundColor
                           ],
                           stops: const [0.0, 0.6],
@@ -424,26 +488,45 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                             ),
                             const SizedBox(height: 16),
                             // Username - now from UserProvider
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  userProvider.isLoading 
-                                      ? 'Loading...' 
-                                      : userProvider.displayName,
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
+                            // Username - now from UserProvider
+                            if (userProvider.username == null || userProvider.username!.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    _editUsername('');
+                                  },
+                                  icon: const Icon(Icons.alternate_email, size: 18),
+                                  label: const Text('Set Username'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: Colors.green.shade700,
+                                    elevation: 2,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                   ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 20, color: Colors.grey),
-                                  onPressed: () {
-                                    _editUsername(userProvider.username ?? '');
-                                  },
-                                ),
-                              ],
-                            ),
+                              )
+                            else
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    '@${userProvider.username}',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, size: 20, color: Colors.white70),
+                                    onPressed: () {
+                                      _editUsername(userProvider.username ?? '');
+                                    },
+                                    tooltip: 'Edit Username',
+                                  ),
+                                ],
+                              ),
                             // Bio / Email
                             Text(
                               user?.email ?? '',
@@ -531,12 +614,13 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                   delegate: _SliverAppBarDelegate(
                     TabBar(
                       controller: _tabController,
-                      indicatorColor: Colors.green,
-                      labelColor: Colors.green,
-                      unselectedLabelColor: Colors.grey,
+                      indicatorColor: Theme.of(context).colorScheme.primary,
+                      labelColor: Theme.of(context).colorScheme.primary,
+                      unselectedLabelColor: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
                       tabs: const [
                         Tab(text: 'My Posts', icon: Icon(Icons.grid_on)),
                         Tab(text: 'Saved', icon: Icon(Icons.bookmark)),
+                        Tab(text: 'Media', icon: Icon(Icons.perm_media)),
                       ],
                     ),
                   ),
@@ -644,10 +728,137 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                     );
                   },
                 ),
+                // Tab 3: Media Gallery
+                Stack(
+                  children: [
+                    _isLoadingMedia
+                        ? const Center(child: CircularProgressIndicator())
+                        : _profileMedia.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[400]),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No media yet',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Upload photos or videos to your profile',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[500],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : GridView.builder(
+                                padding: const EdgeInsets.all(2),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  crossAxisSpacing: 2,
+                                  mainAxisSpacing: 2,
+                                ),
+                                itemCount: _profileMedia.length,
+                                itemBuilder: (context, index) {
+                                  final media = _profileMedia[index];
+                                  final isVideo = media['media_type'] == 'video';
+                                  
+                                  return GestureDetector(
+                                    onTap: () {
+                                      // TODO: Show full screen media viewer
+                                    },
+                                    onLongPress: () async {
+                                      // Show delete option
+                                      final shouldDelete = await showDialog<bool>(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('Delete Media'),
+                                          content: const Text('Are you sure you want to delete this media?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context, false),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context, true),
+                                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      
+                                      if (shouldDelete == true) {
+                                        try {
+                                          await SupabaseService.deleteProfileMedia(media['id']);
+                                          final user = SupabaseService.getCurrentUser();
+                                          if (user != null) {
+                                            _loadProfileMedia(user.id);
+                                          }
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ErrorHelper.showError(context, 'Error deleting media: $e');
+                                          }
+                                        }
+                                      }
+                                    },
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        Image.network(
+                                          media['media_url'],
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              color: Colors.grey[300],
+                                              child: const Icon(Icons.broken_image, size: 32),
+                                            );
+                                          },
+                                        ),
+                                        if (isVideo)
+                                          Center(
+                                            child: Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black54,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.play_arrow,
+                                                color: Colors.white,
+                                                size: 32,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                    // Upload FAB
+                    Positioned(
+                      bottom: 16,
+                      right: 16,
+                      child: FloatingActionButton(
+                        onPressed: _showUploadMediaDialog,
+                        backgroundColor: const Color(0xFF00FF41),
+                        child: const Icon(Icons.add, color: Colors.black),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-        );
+        ),
+      );
       },
     );
   }
