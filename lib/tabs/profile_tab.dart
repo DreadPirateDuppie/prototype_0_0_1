@@ -77,12 +77,13 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       await userProvider.refreshScores();
       
-      // Refresh posts and follow counts
+      // Refresh posts, follow counts, and profile media
       if (mounted) {
         setState(() {
           _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
         });
         await _loadFollowCounts(user.id);
+        await _loadProfileMedia(user.id);
       }
     }
   }

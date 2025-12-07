@@ -21,8 +21,6 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _tagsController = TextEditingController();
-  String _selectedCategory = 'Other';
-  final List<String> _categories = ['Street', 'Park', 'DIY', 'Shop', 'Other'];
   bool _isLoading = false;
   bool _isPickingImage = false;
   final List<File> _selectedImages = [];
@@ -164,9 +162,8 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
         description: _descriptionController.text.trim(),
         photoUrls: photoUrls,
         videoUrl: videoUrl,
-        category: _selectedCategory,
         tags: tags,
-        // No location or ratings for feed posts
+        // No location, ratings, or category for feed posts
       );
 
       if (mounted) {
@@ -212,10 +209,12 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
           letterSpacing: 1.5,
         ),
       ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      content: SizedBox(
+        width: double.maxFinite, // Use full available width
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             TextField(
               controller: _titleController,
               style: TextStyle(color: textColor),
@@ -235,36 +234,6 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
                 ),
               ),
               enabled: !_isLoading,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedCategory,
-              dropdownColor: matrixBlack,
-              style: TextStyle(color: textColor),
-              decoration: InputDecoration(
-                labelText: 'Category',
-                labelStyle: TextStyle(color: textColor.withValues(alpha: 0.7)),
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: borderColor, width: 2),
-                ),
-              ),
-              items: _categories.map((category) {
-                return DropdownMenuItem(
-                  value: category,
-                  child: Text(category),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedCategory = value!;
-                });
-              },
             ),
             const SizedBox(height: 12),
             TextField(
@@ -460,6 +429,7 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
           ],
         ),
       ),
+    ), // Closing parenthesis for ConstrainedBox
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.of(context).pop(),

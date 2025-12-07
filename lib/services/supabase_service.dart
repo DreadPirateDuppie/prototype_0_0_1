@@ -997,6 +997,36 @@ class SupabaseService {
 
       final post = MapPost.fromMap(response);
       
+      // Create profile media entries for photos and videos
+      if (photoUrls != null && photoUrls.isNotEmpty) {
+        for (final photoUrl in photoUrls) {
+          try {
+            await createProfileMedia(
+              userId: userId,
+              mediaUrl: photoUrl,
+              mediaType: 'photo',
+              caption: title, // Use post title as caption
+            );
+          } catch (e) {
+            // Continue even if profile media creation fails
+            print('DEBUG: Failed to create profile media entry: $e');
+          }
+        }
+      }
+      
+      if (videoUrl != null) {
+        try {
+          await createProfileMedia(
+            userId: userId,
+            mediaUrl: videoUrl,
+            mediaType: 'video',
+            caption: title,
+          );
+        } catch (e) {
+          print('DEBUG: Failed to create profile media entry for video: $e');
+        }
+      }
+      
       // Award points for creating a post
       await awardPoints(userId, 5.0, 'create_post', description: 'Created a new spot: $title');
       
