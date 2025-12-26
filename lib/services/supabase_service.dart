@@ -17,6 +17,24 @@ class SupabaseService {
     return _client.auth.currentUser;
   }
 
+  static Future<Map<String, dynamic>?> getCurrentUserProfile() async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) return null;
+
+      final response = await _client
+          .from('user_profiles')
+          .select()
+          .eq('id', user.id)
+          .single();
+      
+      return response;
+    } catch (e) {
+      developer.log('Error fetching current user profile: $e', name: 'SupabaseService');
+      return null;
+    }
+  }
+
   // Get current session
   static Session? getCurrentSession() {
     return _client.auth.currentSession;
@@ -138,6 +156,66 @@ class SupabaseService {
       developer.log('Updated username for user $userId and all their posts', name: 'SupabaseService');
     } catch (e) {
       throw Exception('Failed to save username: $e');
+    }
+  }
+
+  // Get user bio
+  static Future<String?> getUserBio(String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('bio')
+          .eq('id', userId)
+          .maybeSingle();
+      
+      return response?['bio'] as String?;
+    } catch (e) {
+      developer.log('Error fetching user bio: $e', name: 'SupabaseService');
+      return null;
+    }
+  }
+
+  // Save user bio
+  static Future<void> saveUserBio(String userId, String bio) async {
+    try {
+      await _client.from('user_profiles').upsert({
+        'id': userId,
+        'bio': bio.trim(),
+      });
+      
+      developer.log('Updated bio for user $userId', name: 'SupabaseService');
+    } catch (e) {
+      throw Exception('Failed to save bio: $e');
+    }
+  }
+
+  // Get user age
+  static Future<int?> getUserAge(String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('age')
+          .eq('id', userId)
+          .maybeSingle();
+      
+      return response?['age'] as int?;
+    } catch (e) {
+      developer.log('Error fetching user age: $e', name: 'SupabaseService');
+      return null;
+    }
+  }
+
+  // Save user age
+  static Future<void> saveUserAge(String userId, int age) async {
+    try {
+      await _client.from('user_profiles').upsert({
+        'id': userId,
+        'age': age,
+      });
+      
+      developer.log('Updated age for user $userId', name: 'SupabaseService');
+    } catch (e) {
+      throw Exception('Failed to save age: $e');
     }
   }
 
@@ -367,18 +445,16 @@ class SupabaseService {
   static Future<void> updateUserLocation(double latitude, double longitude) async {
     try {
       final currentUser = getCurrentUser();
-      if (currentUser == null) throw Exception('User not logged in');
+      if (currentUser == null) return;
 
       await _client.from('user_profiles').update({
         'current_latitude': latitude,
         'current_longitude': longitude,
         'location_updated_at': DateTime.now().toIso8601String(),
       }).eq('id', currentUser.id);
-
-      developer.log('Updated location for user ${currentUser.id}', name: 'SupabaseService');
+      
     } catch (e) {
-      developer.log('Error updating location: $e', name: 'SupabaseService');
-      rethrow;
+      developer.log('Error updating user location: $e', name: 'SupabaseService');
     }
   }
 
@@ -548,6 +624,37 @@ class SupabaseService {
     return earthRadius * c;
   }
 
+  /// Delete a post
+  static Future<void> deletePost(String postId) async {
+    try {
+      final currentUser = getCurrentUser();
+      if (currentUser == null) throw Exception('User not logged in');
+
+      // Verify ownership before deletion (though RLS should handle this too)
+      final post = await _client
+          .from('map_posts')
+          .select('user_id')
+          .eq('id', postId)
+          .maybeSingle();
+      
+      if (post == null) {
+        // Post might already be deleted or not found
+        developer.log('Post $postId not found during deletion check', name: 'SupabaseService');
+        return;
+      }
+      
+      if (post['user_id'] != currentUser.id) {
+        throw Exception('You can only delete your own posts');
+      }
+
+      await _client.from('map_posts').delete().eq('id', postId);
+      
+      developer.log('Deleted post $postId', name: 'SupabaseService');
+    } catch (e) {
+      throw Exception('Failed to delete post: $e');
+    }
+  }
+
   static double _toRadians(double degrees) {
     return degrees * (math.pi / 180.0);
   }
@@ -662,14 +769,26 @@ class SupabaseService {
     String email,
     String password, {
     String? displayName,
+    String? username,
+    int? age,
   }) async {
     final response = await _client.auth.signUp(
       email: email,
       password: password,
     );
 
-    if (displayName != null && response.user != null) {
-      await saveUserDisplayName(response.user!.id, displayName);
+    if (response.user != null) {
+      if (username != null) {
+        await saveUserUsername(response.user!.id, username);
+      } else if (displayName != null) {
+        await saveUserDisplayName(response.user!.id, displayName);
+      }
+      
+      if (age != null) {
+        await _client.from('user_profiles').update({
+          'age': age,
+        }).eq('id', response.user!.id);
+      }
     }
 
     return response;
@@ -909,20 +1028,90 @@ class SupabaseService {
     }
   }
 
-  /// Get profile media for a user
+  /// Get profile media for a user (includes images from profile_media and map_posts)
   static Future<List<Map<String, dynamic>>> getProfileMedia(String userId) async {
+    List<Map<String, dynamic>> allMedia = [];
+    
+    // 1. Get media from profile_media table
     try {
-      final response = await _client
+      final profileMediaResponse = await _client
           .from('profile_media')
           .select()
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      return (response as List).cast<Map<String, dynamic>>();
+      final profileMedia = (profileMediaResponse as List).cast<Map<String, dynamic>>();
+      allMedia.addAll(profileMedia);
     } catch (e) {
-      developer.log('Error fetching profile media: $e', name: 'SupabaseService');
-      return [];
+      developer.log('Error fetching from profile_media table: $e', name: 'SupabaseService');
     }
+
+    // 2. Get media from user's "feed posts" (posts without coordinates)
+    // We exclude "spots" (posts with coordinates) to avoid redundancy with the "My Posts" tab
+    try {
+      final postsResponse = await _client
+          .from('map_posts')
+          .select('id, photo_urls, photo_url, video_url, created_at, latitude')
+          .eq('user_id', userId)
+          .filter('latitude', 'is', null) // Only fetch posts without coordinates
+          .order('created_at', ascending: false);
+
+      final posts = (postsResponse as List).cast<Map<String, dynamic>>();
+
+      for (var post in posts) {
+        final photoUrls = post['photo_urls'] as List?;
+        final videoUrl = post['video_url'] as String?;
+        final legacyPhotoUrl = post['photo_url'] as String?;
+        
+        if (photoUrls != null && photoUrls.isNotEmpty) {
+          for (var photoUrl in photoUrls) {
+            allMedia.add({
+              'id': '${post['id']}_${photoUrls.indexOf(photoUrl)}',
+              'user_id': userId,
+              'media_url': photoUrl,
+              'media_type': 'image',
+              'created_at': post['created_at'],
+              'source': 'post',
+            });
+          }
+        } else if (legacyPhotoUrl != null && legacyPhotoUrl.isNotEmpty) {
+          allMedia.add({
+            'id': '${post['id']}_0',
+            'user_id': userId,
+            'media_url': legacyPhotoUrl,
+            'media_type': 'image',
+            'created_at': post['created_at'],
+            'source': 'post',
+          });
+        }
+        
+        if (videoUrl != null && videoUrl.isNotEmpty) {
+          allMedia.add({
+            'id': '${post['id']}_video',
+            'user_id': userId,
+            'media_url': videoUrl,
+            'media_type': 'video',
+            'created_at': post['created_at'],
+            'source': 'post',
+          });
+        }
+      }
+    } catch (e) {
+      developer.log('Error fetching media from map_posts: $e', name: 'SupabaseService');
+    }
+    
+    // Sort combined results by date
+    try {
+      allMedia.sort((a, b) {
+        final dateA = DateTime.parse(a['created_at']);
+        final dateB = DateTime.parse(b['created_at']);
+        return dateB.compareTo(dateA);
+      });
+    } catch (e) {
+      developer.log('Error sorting media: $e', name: 'SupabaseService');
+    }
+
+    return allMedia;
   }
 
   /// Delete profile media
@@ -1330,7 +1519,7 @@ class SupabaseService {
     try {
       final response = await _client
           .from('post_reports')
-          .select('*, map_posts(*)')
+          .select('*, map_posts(*), user_profiles(*)')
           .order('created_at', ascending: false);
 
       return (response as List).cast<Map<String, dynamic>>();
@@ -1338,6 +1527,69 @@ class SupabaseService {
       return [];
     }
   }
+
+  /// Dismiss a report without deleting the post
+  static Future<void> dismissReport(String reportId) async {
+    try {
+      await _client
+          .from('post_reports')
+          .delete()
+          .eq('id', reportId);
+      
+      developer.log('Report $reportId dismissed', name: 'SupabaseService');
+    } catch (e) {
+      throw Exception('Failed to dismiss report: $e');
+    }
+  }
+
+  // ========== ERROR LOGGING ==========
+
+  /// Log an error to the database for admin monitoring
+  /// This is automatically called by ErrorHelper
+  static Future<void> logError({
+    required String message,
+    String? stack,
+    String? screenName,
+  }) async {
+    try {
+      final user = getCurrentUser();
+      final logData = {
+        'user_id': user?.id,
+        'error_message': message,
+        'error_stack': stack,
+        'screen_name': screenName,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      
+      developer.log('Attempting to log error: $message', name: 'SupabaseService');
+      
+      final response = await _client.from('error_logs').insert(logData).select();
+      
+      if (response.isNotEmpty) {
+        developer.log('Error successfully logged to database. ID: ${response[0]['id']}', name: 'SupabaseService');
+      }
+    } catch (e) {
+      // Silently fail in production, but log to console for debugging
+      developer.log('CRITICAL: Failed to log error to database: $e', name: 'SupabaseService', error: e);
+    }
+  }
+
+  /// Get all error logs (admin only)
+  static Future<List<Map<String, dynamic>>> getErrorLogs({int limit = 100}) async {
+    try {
+      final response = await _client
+          .from('error_logs')
+          .select('*, user_profiles(username, display_name)')
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error fetching error logs: $e', name: 'SupabaseService');
+      return [];
+    }
+  }
+
 
   // ========== VOTING SYSTEM ==========
 
@@ -1397,8 +1649,6 @@ class SupabaseService {
         // Award XP only for upvotes
       if (voteType == 1) {
         await _updatePosterXP(postUserId, 1);
-        // Award Points to poster for receiving an upvote (e.g., 5 Points)
-        await awardPoints(postUserId, 5, 'upvote_reward', referenceId: postId, description: 'Received an upvote');
       }
       } // Close else
     } catch (e) {
@@ -1490,7 +1740,7 @@ class SupabaseService {
     try {
       final user = getCurrentUser();
       
-      // Get all posts with vote counts
+      // Get all posts
       dynamic query = _client
           .from('map_posts')
           .select();
@@ -1506,8 +1756,21 @@ class SupabaseService {
       }
 
       final postsResponse = await query;
-
       final posts = (postsResponse as List).cast<Map<String, dynamic>>();
+      
+      // Fetch all votes to calculate vote_score manually (since DB column might not be calculated)
+      final allVotesResponse = await _client
+          .from('post_votes')
+          .select('post_id, vote_type');
+      final allVotes = (allVotesResponse as List).cast<Map<String, dynamic>>();
+      
+      // Calculate vote scores for each post
+      Map<String, int> voteScores = {};
+      for (var vote in allVotes) {
+        final postId = vote['post_id'] as String;
+        final voteType = vote['vote_type'] as int;
+        voteScores[postId] = (voteScores[postId] ?? 0) + voteType;
+      }
       
       // Fetch user profiles for these posts to get up-to-date display names and avatars
       final userIds = posts.map((p) => p['user_id'] as String).toSet().toList();
@@ -1536,7 +1799,7 @@ class SupabaseService {
       }
 
       // Get user's votes for all posts if logged in
-      Map<String, int> voteMap = {};
+      Map<String, int> userVoteMap = {};
       if (user != null) {
         final votesResponse = await _client
             .from('post_votes')
@@ -1544,7 +1807,7 @@ class SupabaseService {
             .eq('user_id', user.id);
 
         final votes = (votesResponse as List).cast<Map<String, dynamic>>();
-        voteMap = {for (var v in votes) v['post_id']: v['vote_type']};
+        userVoteMap = {for (var v in votes) v['post_id']: v['vote_type']};
       }
 
       // Combine posts with vote info and user names
@@ -1552,7 +1815,9 @@ class SupabaseService {
         final postId = post['id'] as String;
         final userId = post['user_id'] as String;
         
-        post['user_vote'] = voteMap[postId];
+        // Set calculated vote_score (overriding DB value which might be 0)
+        post['vote_score'] = voteScores[postId] ?? 0;
+        post['user_vote'] = userVoteMap[postId];
         
         // Use fetched profile name and avatar if available
         if (userProfiles.containsKey(userId)) {
@@ -1570,6 +1835,112 @@ class SupabaseService {
       developer.log('Error getting posts with votes: $e', name: 'SupabaseService');
       // Fallback to regular posts
       return getAllMapPosts();
+    }
+  }
+
+  // Get map posts from followed users with user's vote status
+  static Future<List<MapPost>> getFollowingMapPostsWithVotes({String sortBy = 'newest'}) async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) return [];
+
+      // Get following IDs
+      final following = await getFollowing(user.id);
+      if (following.isEmpty) return [];
+      
+      final followingIds = following.map((f) => f['id'] as String).toList();
+      // Also include own posts
+      followingIds.add(user.id);
+
+      // Get posts from following
+      dynamic query = _client
+          .from('map_posts')
+          .select()
+          .filter('user_id', 'in', followingIds);
+
+      // Apply sorting
+      if (sortBy == 'popularity') {
+        query = query.order('vote_score', ascending: false);
+      } else if (sortBy == 'oldest') {
+        query = query.order('created_at', ascending: true);
+      } else {
+        // Default to newest
+        query = query.order('created_at', ascending: false);
+      }
+
+      final postsResponse = await query;
+      final posts = (postsResponse as List).cast<Map<String, dynamic>>();
+      
+      // Fetch all votes to calculate vote_score manually
+      final allVotesResponse = await _client
+          .from('post_votes')
+          .select('post_id, vote_type');
+      final allVotes = (allVotesResponse as List).cast<Map<String, dynamic>>();
+      
+      // Calculate vote scores for each post
+      Map<String, int> voteScores = {};
+      for (var vote in allVotes) {
+        final postId = vote['post_id'] as String;
+        final voteType = vote['vote_type'] as int;
+        voteScores[postId] = (voteScores[postId] ?? 0) + voteType;
+      }
+      
+      // Fetch user profiles
+      final userIds = posts.map((p) => p['user_id'] as String).toSet().toList();
+      Map<String, Map<String, String?>> userProfiles = {};
+      
+      if (userIds.isNotEmpty) {
+        try {
+          final profilesResponse = await _client
+              .from('user_profiles')
+              .select('id, display_name, username, avatar_url')
+              .filter('id', 'in', userIds);
+              
+          for (final profile in (profilesResponse as List)) {
+            final id = profile['id'] as String;
+            final name = profile['display_name'] as String? ?? profile['username'] as String?;
+            final avatarUrl = profile['avatar_url'] as String?;
+            userProfiles[id] = {
+              'name': name,
+              'avatar_url': avatarUrl,
+            };
+          }
+        } catch (e) {
+          developer.log('Error fetching profiles: $e', name: 'SupabaseService');
+        }
+      }
+
+      // Get user's votes for all posts
+      final votesResponse = await _client
+          .from('post_votes')
+          .select('post_id, vote_type')
+          .eq('user_id', user.id);
+
+      final votes = (votesResponse as List).cast<Map<String, dynamic>>();
+      final userVoteMap = {for (var v in votes) v['post_id']: v['vote_type']};
+
+      // Map to MapPost objects
+      return posts.map((post) {
+        final postId = post['id'] as String;
+        final userId = post['user_id'] as String;
+        
+        // Set calculated vote_score
+        post['vote_score'] = voteScores[postId] ?? 0;
+        post['user_vote'] = userVoteMap[postId];
+        
+        // Use fetched profile name and avatar if available
+        if (userProfiles.containsKey(userId)) {
+          post['user_name'] = userProfiles[userId]!['name'];
+          post['avatar_url'] = userProfiles[userId]!['avatar_url'];
+        } else {
+          post['user_name'] = null;
+        }
+        
+        return MapPost.fromMap(post);
+      }).toList();
+    } catch (e) {
+      developer.log('Error fetching following map posts: $e', name: 'SupabaseService');
+      return [];
     }
   }
   // --- Rewards & Points System ---

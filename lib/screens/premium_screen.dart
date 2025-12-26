@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../services/now_payments_service.dart';
+import '../services/supabase_service.dart';
 
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
@@ -45,6 +49,103 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 Navigator.of(context).pop(); // Close screen
               },
               child: const Text('Awesome!'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleXMRPurchase() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final user = SupabaseService.getCurrentUser();
+    final userId = user?.id ?? 'anonymous';
+    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+    final callbackUrl = supabaseUrl.isNotEmpty 
+        ? '$supabaseUrl/functions/v1/nowpayments-ipn'
+        : null;
+
+    // Create a real payment request via NOWPayments
+    final invoiceUrl = await NowPaymentsService.createPayment(
+      amount: 4.99,
+      currency: 'xmr',
+      orderId: 'premium_${userId}_${DateTime.now().millisecondsSinceEpoch}',
+      orderDescription: 'Pushinn Premium Subscription',
+      callbackUrl: callbackUrl,
+    );
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (invoiceUrl == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to create payment. Please try again later.')),
+        );
+      }
+      return;
+    }
+
+    // Open the invoice URL in the browser
+    final uri = Uri.parse(invoiceUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: Row(
+            children: [
+              Image.network(
+                'https://www.getmonero.org/press-kit/symbols/monero-symbol-480.png',
+                height: 32,
+                errorBuilder: (context, error, stackTrace) => const Icon(Icons.currency_bitcoin, color: Colors.orange),
+              ),
+              const SizedBox(width: 12),
+              const Text('Payment Sent?', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'We have opened the NOWPayments invoice in your browser.',
+                style: TextStyle(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16),
+              CircularProgressIndicator(color: Colors.orange),
+              SizedBox(height: 16),
+              Text(
+                'Waiting for blockchain confirmation...\n(This usually takes 2-10 minutes)',
+                style: TextStyle(color: Colors.white38, fontSize: 12, fontStyle: FontStyle.italic),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // In a real app, this would call getPaymentStatus
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Checking status... (Simulation)')),
+                );
+                Navigator.pop(context);
+                _handlePurchase(); // Simulate success for the prototype
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.black),
+              child: const Text('Check Status'),
             ),
           ],
         ),
@@ -142,12 +243,6 @@ class _PremiumScreenState extends State<PremiumScreen> {
                         ),
                         const SizedBox(height: 24),
                         _buildBenefitRow(
-                          icon: Icons.map,
-                          title: 'Exclusive Map Filters',
-                          description: 'Find secret spots with advanced filtering options.',
-                        ),
-                        const SizedBox(height: 24),
-                        _buildBenefitRow(
                           icon: Icons.favorite,
                           title: 'Support Development',
                           description: 'Help us keep the servers running and build new features.',
@@ -196,6 +291,40 @@ class _PremiumScreenState extends State<PremiumScreen> {
                                     ),
                                   ],
                                 ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // XMR Payment Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: OutlinedButton(
+                          onPressed: _isLoading ? null : _handleXMRPurchase,
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.orange, width: 2),
+                            foregroundColor: Colors.orange,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.network(
+                                'https://www.getmonero.org/press-kit/symbols/monero-symbol-480.png',
+                                height: 24,
+                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.currency_bitcoin, size: 24),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Pay with XMR',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),

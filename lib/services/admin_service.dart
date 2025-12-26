@@ -174,43 +174,143 @@ class AdminService {
   }
 
   /// Get all users (for admin management)
-  /// Joins with auth.users to include email addresses
-  Future<List<Map<String, dynamic>>> getAllUsers({int limit = 1000, int offset = 0}) async {
+  Future<List<Map<String, dynamic>>> getAllUsers({int limit = 1000}) async {
     try {
-      // Use RPC to query auth.users via a custom function, or query user_profiles and fetch emails separately
-      // Since we can't directly join auth.users in Supabase client, we fetch profiles first
-      final profiles = await _client
+      // Level 1: Try to get all columns including points from user_wallets
+      final response = await _client
           .from('user_profiles')
-          .select('id, username, display_name, avatar_url, bio, is_admin, is_banned, ban_reason, banned_at, points, created_at, updated_at')
-          .order('created_at', ascending: false);
-          // Removed .range() to get all users
+          .select('id, username, display_name, email, avatar_url, bio, is_admin, is_banned, ban_reason, banned_at, created_at, updated_at, can_post, user_wallets(balance)')
+          .order('created_at', ascending: false)
+          .limit(limit);
 
-      // Now fetch emails from auth.users for each user
-      final List<Map<String, dynamic>> usersWithEmails = [];
-      for (var profile in profiles as List) {
+      final users = (response as List).cast<Map<String, dynamic>>();
+      
+      // Map user_wallets balance to points field for UI consistency
+      return users.map((u) {
+        final wallet = u['user_wallets'] as Map<String, dynamic>?;
+        return {
+          ...u,
+          'points': wallet?['balance'] ?? 0.0,
+        };
+      }).toList();
+    } catch (e) {
+      developer.log('Level 1 fetch failed, trying Level 2 (No email/can_post): $e', name: 'AdminService');
+      
+      try {
+        // Level 2: Fallback to a set of columns that are likely to exist, still trying to get points
+        final response = await _client
+            .from('user_profiles')
+            .select('id, username, display_name, is_admin, is_banned, created_at, user_wallets(balance)')
+            .order('created_at', ascending: false)
+            .limit(limit);
+
+        final users = (response as List).cast<Map<String, dynamic>>();
+        return users.map((u) {
+          final wallet = u['user_wallets'] as Map<String, dynamic>?;
+          return {
+            ...u,
+            'points': wallet?['balance'] ?? 0.0,
+          };
+        }).toList();
+      } catch (e2) {
+        developer.log('Level 2 fetch failed, trying Level 3 (Bare Minimum, no points): $e2', name: 'AdminService');
+        
         try {
-          // Fetch email from auth.users using admin API
-          final userResponse = await _client.auth.admin.getUserById(profile['id']);
-          final email = userResponse.user?.email ?? 'No email';
-          
-          usersWithEmails.add({
-            ...profile,
-            'email': email,
-          });
-        } catch (e) {
-          // If we can't fetch email, add profile without email
-          developer.log('Error fetching email for user ${profile['id']}: $e', name: 'AdminService');
-          usersWithEmails.add({
-            ...profile,
-            'email': 'No email',
-          });
+          // Level 3: Bare minimum columns that should always exist in user_profiles
+          final response = await _client
+              .from('user_profiles')
+              .select('id, username, display_name, is_admin, created_at')
+              .order('created_at', ascending: false)
+              .limit(limit);
+
+          return (response as List).cast<Map<String, dynamic>>();
+        } catch (e3) {
+          developer.log('Critical error getting users: $e3', name: 'AdminService');
+          throw Exception('Failed to load users even with bare minimum columns: $e3');
         }
       }
+    }
+  }
 
-      return usersWithEmails;
+  /// Get point transactions for a specific user
+  Future<List<Map<String, dynamic>>> getPointTransactions(String userId) async {
+    try {
+      final response = await _client
+          .from('point_transactions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting all users: $e', name: 'AdminService');
+      developer.log('Error getting point transactions: $e', name: 'AdminService');
       return [];
+    }
+  }
+
+  /// Add a point transaction (Add/Remove points)
+  Future<void> addPointTransaction({
+    required String userId,
+    required double amount,
+    required String type,
+    String? description,
+    String? referenceId,
+  }) async {
+    try {
+      // 1. Insert the transaction
+      await _client.from('point_transactions').insert({
+        'user_id': userId,
+        'amount': amount,
+        'transaction_type': type,
+        'description': description,
+        'reference_id': referenceId,
+      });
+
+      // 2. Update the user's points in user_wallets
+      final walletResponse = await _client
+          .from('user_wallets')
+          .select('balance')
+          .eq('user_id', userId)
+          .maybeSingle();
+      
+      final currentBalance = (walletResponse?['balance'] as num?)?.toDouble() ?? 0.0;
+      await _client.from('user_wallets').upsert({
+        'user_id': userId,
+        'balance': currentBalance + amount,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+
+      developer.log('Added transaction of $amount for user $userId', name: 'AdminService');
+    } catch (e) {
+      developer.log('Error adding point transaction: $e', name: 'AdminService');
+      throw Exception('Failed to add point transaction: $e');
+    }
+  }
+
+  /// Delete a point transaction
+  Future<void> deletePointTransaction(String transactionId, String userId, double amount) async {
+    try {
+      // 1. Delete the transaction
+      await _client.from('point_transactions').delete().eq('id', transactionId);
+
+      // 2. Reverse the points in user_wallets
+      final walletResponse = await _client
+          .from('user_wallets')
+          .select('balance')
+          .eq('user_id', userId)
+          .maybeSingle();
+      
+      final currentBalance = (walletResponse?['balance'] as num?)?.toDouble() ?? 0.0;
+      await _client.from('user_wallets').upsert({
+        'user_id': userId,
+        'balance': currentBalance - amount,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+
+      developer.log('Deleted transaction $transactionId and reversed $amount points', name: 'AdminService');
+    } catch (e) {
+      developer.log('Error deleting point transaction: $e', name: 'AdminService');
+      throw Exception('Failed to delete point transaction: $e');
     }
   }
 

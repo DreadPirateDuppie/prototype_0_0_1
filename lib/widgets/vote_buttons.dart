@@ -26,6 +26,32 @@ class VoteButtons extends StatefulWidget {
 
 class _VoteButtonsState extends State<VoteButtons> {
   bool _isVoting = false;
+  late int _currentVoteScore;
+  late int? _currentUserVote;
+  bool _hasLocalChanges = false; // Track if we've made optimistic updates
+
+  @override
+  void initState() {
+    super.initState();
+    _currentVoteScore = widget.voteScore;
+    _currentUserVote = widget.userVote;
+  }
+
+  @override
+  void didUpdateWidget(VoteButtons oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only sync from parent if:
+    // 1. We're not currently voting
+    // 2. We haven't made local changes, OR the server data is different from what we have
+    if (!_isVoting && !_hasLocalChanges) {
+      if (widget.voteScore != _currentVoteScore) {
+        _currentVoteScore = widget.voteScore;
+      }
+      if (widget.userVote != _currentUserVote) {
+        _currentUserVote = widget.userVote;
+      }
+    }
+  }
 
   Future<void> _vote(int voteType) async {
     if (widget.isOwnPost) {
@@ -35,13 +61,49 @@ class _VoteButtonsState extends State<VoteButtons> {
 
     if (_isVoting) return;
 
-    setState(() => _isVoting = true);
+    // Optimistic update - update UI immediately
+    setState(() {
+      _isVoting = true;
+      _hasLocalChanges = true; // Mark that we've made changes
+      // Treat 0 as null (no vote)
+      final oldVote = _currentUserVote == 0 ? null : _currentUserVote;
+      
+      if (oldVote == voteType) {
+        // Removing vote (clicking same button again)
+        _currentUserVote = null;
+        _currentVoteScore = _currentVoteScore - voteType;
+      } else if (oldVote != null) {
+        // Changing vote (from upvote to downvote or vice versa)
+        _currentUserVote = voteType;
+        _currentVoteScore = _currentVoteScore - oldVote + voteType;
+      } else {
+        // New vote (first time voting)
+        _currentUserVote = voteType;
+        _currentVoteScore = _currentVoteScore + voteType;
+      }
+    });
 
     try {
+      // Sync with server in background
       await SupabaseService.votePost(widget.postId, voteType);
+      
+      // Success - trigger refresh to get real vote count from database
       widget.onVoteChanged();
+      
+      // Clear local changes flag quickly so we can sync with server
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() => _hasLocalChanges = false);
+        }
+      });
     } catch (e) {
+      // Revert optimistic update on error
       if (mounted) {
+        setState(() {
+          _currentVoteScore = widget.voteScore;
+          _currentUserVote = widget.userVote;
+          _hasLocalChanges = false;
+        });
         ErrorHelper.showError(context, 'Failed to vote: $e');
       }
     } finally {
@@ -54,8 +116,8 @@ class _VoteButtonsState extends State<VoteButtons> {
   @override
   Widget build(BuildContext context) {
     const matrixGreen = Color(0xFF00FF41);
-    final isUpvoted = widget.userVote == 1;
-    final isDownvoted = widget.userVote == -1;
+    final isUpvoted = _currentUserVote == 1;
+    final isDownvoted = _currentUserVote == -1;
 
     return Flex(
       direction: widget.orientation,
@@ -67,7 +129,7 @@ class _VoteButtonsState extends State<VoteButtons> {
             isUpvoted ? Icons.arrow_drop_up : Icons.arrow_drop_up_outlined,
             size: 32,
           ),
-          color: isUpvoted ? matrixGreen : matrixGreen.withOpacity(0.4),
+          color: isUpvoted ? matrixGreen : matrixGreen.withValues(alpha: 0.4),
           onPressed: _isVoting ? null : () => _vote(1),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
@@ -76,7 +138,7 @@ class _VoteButtonsState extends State<VoteButtons> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
           child: Text(
-            widget.voteScore.toString(),
+            _currentVoteScore.toString(),
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -90,7 +152,7 @@ class _VoteButtonsState extends State<VoteButtons> {
             isDownvoted ? Icons.arrow_drop_down : Icons.arrow_drop_down_outlined,
             size: 32,
           ),
-          color: isDownvoted ? matrixGreen : matrixGreen.withOpacity(0.4),
+          color: isDownvoted ? matrixGreen : matrixGreen.withValues(alpha: 0.4),
           onPressed: _isVoting ? null : () => _vote(-1),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),

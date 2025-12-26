@@ -89,7 +89,7 @@ void main() {
         category: 'Street',
         tags: ['smooth', 'ledge'],
         likes: 10,
-        photoUrl: 'https://example.com/photo.jpg',
+        photoUrls: ['https://example.com/photo.jpg'],
         popularityRating: 4.5,
         securityRating: 3.0,
         qualityRating: 4.0,

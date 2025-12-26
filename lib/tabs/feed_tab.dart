@@ -1,12 +1,16 @@
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geocoding/geocoding.dart';
 import '../models/post.dart';
 import '../services/supabase_service.dart';
 import '../widgets/post_card.dart';
 import '../widgets/ad_banner.dart';
 import '../utils/error_helper.dart';
 import '../screens/user_profile_screen.dart';
+import '../screens/create_feed_post_dialog.dart';
+import '../screens/messaging_screen.dart';
+import '../screens/notifications_screen.dart';
 
 class FeedTab extends StatefulWidget {
   final Function(LatLng)? onNavigateToMap;
@@ -25,9 +29,12 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _onlineFriends = [];
   bool _isLoading = false;
+  bool _isFriendsExpanded = false;
   String _searchQuery = '';
   String _selectedCategory = 'All';
   String _selectedSort = 'newest'; // 'newest', 'popularity', 'oldest'
+  String _selectedFeed = 'global'; // 'global', 'following'
+  String _selectedPostType = 'all'; // 'all', 'map', 'feed'
   final List<String> _categories = ['All', 'Street', 'Park', 'DIY', 'Shop', 'Other'];
   final TextEditingController _searchController = TextEditingController();
 
@@ -50,11 +57,23 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
     });
 
     try {
-      List<MapPost> posts = await SupabaseService.getAllMapPostsWithVotes(sortBy: _selectedSort);
+      List<MapPost> posts;
+      if (_selectedFeed == 'following') {
+        posts = await SupabaseService.getFollowingMapPostsWithVotes(sortBy: _selectedSort);
+      } else {
+        posts = await SupabaseService.getAllMapPostsWithVotes(sortBy: _selectedSort);
+      }
       
       // Apply filters
       if (_selectedCategory != 'All') {
         posts = posts.where((post) => post.category == _selectedCategory).toList();
+      }
+
+      // Apply post type filter
+      if (_selectedPostType == 'map') {
+        posts = posts.where((post) => post.latitude != null && post.longitude != null).toList();
+      } else if (_selectedPostType == 'feed') {
+        posts = posts.where((post) => post.latitude == null || post.longitude == null).toList();
       }
       
       if (_searchQuery.isNotEmpty) {
@@ -121,6 +140,15 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
     _searchUsers();
   }
 
+  void _onPostTypeChanged(String? type) {
+    if (type != null) {
+      setState(() {
+        _selectedPostType = type;
+      });
+      _loadPosts();
+    }
+  }
+
   void _onCategoryChanged(String? category) {
     if (category != null) {
       setState(() {
@@ -145,6 +173,8 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
       final visibleLocations = await SupabaseService.getVisibleUserLocations();
 
       final onlineFriends = visibleLocations.where((user) => friends.any((friend) => friend['id'] == user['id'])).toList();
+
+
 
       if (mounted) {
         setState(() {
@@ -314,27 +344,20 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
             ],
           ),
         ),
-        subtitle: GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => UserProfileScreen(
-                  userId: user['id'],
-                  username: user['username'],
-                  avatarUrl: user['avatar_url'],
-                ),
+        subtitle: FutureBuilder<String>(
+          future: _getLocationContext(user),
+          builder: (context, snapshot) {
+            final locationText = snapshot.data ?? '@${user['username'] ?? 'unknown'}';
+            return Text(
+              locationText,
+              style: TextStyle(
+                color: matrixGreen.withValues(alpha: 0.7),
+                fontFamily: 'monospace',
+                fontSize: 12,
               ),
+              overflow: TextOverflow.ellipsis,
             );
           },
-          child: Text(
-            '@${user['username'] ?? 'unknown'}',
-            style: TextStyle(
-              color: matrixGreen.withValues(alpha: 0.7),
-              fontFamily: 'monospace',
-              fontSize: 12,
-            ),
-          ),
         ),
         trailing: SizedBox(
           width: 80,
@@ -392,6 +415,43 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  Future<String> _getLocationContext(Map<String, dynamic> user) async {
+    final lat = user['current_latitude'] as double?;
+    final lng = user['current_longitude'] as double?;
+
+    if (lat == null || lng == null) {
+      return '@${user['username'] ?? 'unknown'}';
+    }
+
+    // Check if near any spot
+    const distance = Distance();
+    for (final post in _posts) {
+      if (post.latitude != null && post.longitude != null) {
+        final d = distance.as(LengthUnit.Meter, LatLng(lat, lng), LatLng(post.latitude!, post.longitude!));
+        if (d < 50) { // 50 meters threshold
+          return 'At ${post.title}';
+        }
+      }
+    }
+
+    // If not near a spot, get road name
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        if (place.thoroughfare != null && place.thoroughfare!.isNotEmpty) {
+          return 'On ${place.thoroughfare}';
+        } else if (place.name != null && place.name!.isNotEmpty) {
+           return 'Near ${place.name}';
+        }
+      }
+    } catch (e) {
+      // Ignore geocoding errors
+    }
+
+    return '@${user['username'] ?? 'unknown'}';
   }
 
   Widget _buildUserCard(Map<String, dynamic> user) {
@@ -523,12 +583,54 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
     );
   }
 
+  Widget _buildFeedToggleOption(String label, bool isSelected) {
+    const matrixGreen = Color(0xFF00FF41);
+    
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          if (_selectedFeed != label.toLowerCase()) {
+            setState(() {
+              _selectedFeed = label.toLowerCase();
+            });
+            _loadPosts();
+          }
+        },
+        child: Container(
+          color: isSelected ? matrixGreen.withValues(alpha: 0.2) : Colors.transparent,
+          alignment: Alignment.center,
+          child: Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: isSelected ? matrixGreen : matrixGreen.withValues(alpha: 0.5),
+              fontFamily: 'monospace',
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontSize: 12,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const matrixGreen = Color(0xFF00FF41);
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.add_box_outlined, color: matrixGreen),
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => CreateFeedPostDialog(
+                onPostAdded: _loadPosts,
+              ),
+            );
+          },
+        ),
         title: const Text(
           '> PUSHINN_',
           style: TextStyle(
@@ -538,96 +640,106 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.favorite_border, color: matrixGreen),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NotificationsScreen(),
+                ),
+              );
+            },
+            tooltip: 'Notifications',
+          ),
+          IconButton(
+            icon: const Icon(Icons.mail_outline, color: matrixGreen),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MessagingScreen(),
+                ),
+              );
+            },
+            tooltip: 'Messages',
+          ),
+        ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
+          preferredSize: const Size.fromHeight(100),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Column(
               children: [
+                // Search Bar
+                Container(
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: matrixGreen.withValues(alpha: 0.2),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(
+                      color: matrixGreen,
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                    ),
+                    cursorColor: matrixGreen,
+                    maxLines: 1,
+                    decoration: InputDecoration(
+                      hintText: 'Search posts and users...',
+                      hintStyle: TextStyle(
+                        color: matrixGreen.withValues(alpha: 0.5),
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: matrixGreen,
+                        size: 18,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      isDense: true,
+                    ),
+                    onChanged: _onSearchChanged,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Feed Toggle and Filter
                 Row(
                   children: [
+                    // Feed Toggle
                     Expanded(
                       child: Container(
-                        height: 36,
+                        height: 32,
                         decoration: BoxDecoration(
                           color: Colors.black,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: matrixGreen.withValues(alpha: 0.2),
-                              blurRadius: 4,
-                            ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: matrixGreen.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            _buildFeedToggleOption('Global', _selectedFeed == 'global'),
+                            Container(width: 1, color: matrixGreen.withValues(alpha: 0.3)),
+                            _buildFeedToggleOption('Following', _selectedFeed == 'following'),
                           ],
                         ),
-                        child: TextField(
-                          controller: _searchController,
-                          style: const TextStyle(
-                            color: matrixGreen,
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                          ),
-                          cursorColor: matrixGreen,
-                          maxLines: 1,
-                          decoration: InputDecoration(
-                            hintText: 'Search posts and users...',
-                            hintStyle: TextStyle(
-                              color: matrixGreen.withValues(alpha: 0.5),
-                              fontFamily: 'monospace',
-                              fontSize: 13,
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.search,
-                              color: matrixGreen,
-                              size: 18,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            isDense: true,
-                          ),
-                          onChanged: _onSearchChanged,
-                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // Filter Button
                     Container(
                       height: 36,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: matrixGreen, width: 1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: matrixGreen.withValues(alpha: 0.2),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedCategory,
-                          icon: const Icon(Icons.filter_list, color: matrixGreen, size: 18),
-                          dropdownColor: Colors.black,
-                          isDense: true,
-                          style: const TextStyle(
-                            color: matrixGreen,
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                          ),
-                          items: _categories.map((String category) {
-                            return DropdownMenuItem<String>(
-                              value: category,
-                              child: Text(category),
-                            );
-                          }).toList(),
-                          onChanged: _onCategoryChanged,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      height: 36,
-                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: Colors.black,
                         borderRadius: BorderRadius.circular(18),
@@ -640,26 +752,193 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
                         ],
                       ),
                       child: PopupMenuButton<String>(
-                        icon: const Icon(Icons.sort, color: matrixGreen, size: 18),
+                        icon: const Icon(Icons.tune, color: matrixGreen, size: 18),
                         color: Colors.black,
                         offset: const Offset(0, 40),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
                         ),
-                        onSelected: _onSortChanged,
+                        onSelected: (value) {
+                          if (value.startsWith('cat_')) {
+                            _onCategoryChanged(value.replaceFirst('cat_', ''));
+                          } else if (value.startsWith('type_')) {
+                            _onPostTypeChanged(value.replaceFirst('type_', ''));
+                          } else {
+                            _onSortChanged(value);
+                          }
+                        },
                         itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
                           const PopupMenuItem<String>(
+                            enabled: false,
+                            child: Text(
+                              'CONTENT TYPE',
+                              style: TextStyle(
+                                color: Color(0xFF00FF41),
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'type_all',
+                            child: Row(
+                              children: [
+                                if (_selectedPostType == 'all')
+                                  const Icon(Icons.check, color: Color(0xFF00FF41), size: 16)
+                                else
+                                  const SizedBox(width: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'All Content',
+                                  style: TextStyle(
+                                    color: _selectedPostType == 'all' ? const Color(0xFF00FF41) : Colors.white70,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'type_map',
+                            child: Row(
+                              children: [
+                                if (_selectedPostType == 'map')
+                                  const Icon(Icons.check, color: Color(0xFF00FF41), size: 16)
+                                else
+                                  const SizedBox(width: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Map Spots Only',
+                                  style: TextStyle(
+                                    color: _selectedPostType == 'map' ? const Color(0xFF00FF41) : Colors.white70,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'type_feed',
+                            child: Row(
+                              children: [
+                                if (_selectedPostType == 'feed')
+                                  const Icon(Icons.check, color: Color(0xFF00FF41), size: 16)
+                                else
+                                  const SizedBox(width: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Feed Posts Only',
+                                  style: TextStyle(
+                                    color: _selectedPostType == 'feed' ? const Color(0xFF00FF41) : Colors.white70,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          const PopupMenuItem<String>(
+                            enabled: false,
+                            child: Text(
+                              'CATEGORY',
+                              style: TextStyle(
+                                color: matrixGreen,
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          ..._categories.map((category) => PopupMenuItem<String>(
+                            value: 'cat_$category',
+                            child: Row(
+                              children: [
+                                if (category == _selectedCategory)
+                                  const Icon(Icons.check, color: matrixGreen, size: 16)
+                                else
+                                  const SizedBox(width: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  category,
+                                  style: TextStyle(
+                                    color: category == _selectedCategory ? matrixGreen : Colors.white70,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )),
+                          const PopupMenuDivider(),
+                          const PopupMenuItem<String>(
+                            enabled: false,
+                            child: Text(
+                              'SORT BY',
+                              style: TextStyle(
+                                color: matrixGreen,
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          PopupMenuItem<String>(
                             value: 'newest',
-                            child: Text('Newest', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
+                            child: Row(
+                              children: [
+                                if (_selectedSort == 'newest')
+                                  const Icon(Icons.check, color: matrixGreen, size: 16)
+                                else
+                                  const SizedBox(width: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Newest',
+                                  style: TextStyle(
+                                    color: _selectedSort == 'newest' ? matrixGreen : Colors.white70,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const PopupMenuItem<String>(
+                          PopupMenuItem<String>(
                             value: 'popularity',
-                            child: Text('Popularity', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
+                            child: Row(
+                              children: [
+                                if (_selectedSort == 'popularity')
+                                  const Icon(Icons.check, color: matrixGreen, size: 16)
+                                else
+                                  const SizedBox(width: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Popularity',
+                                  style: TextStyle(
+                                    color: _selectedSort == 'popularity' ? matrixGreen : Colors.white70,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const PopupMenuItem<String>(
+                          PopupMenuItem<String>(
                             value: 'oldest',
-                            child: Text('Oldest', style: TextStyle(color: matrixGreen, fontFamily: 'monospace')),
+                            child: Row(
+                              children: [
+                                if (_selectedSort == 'oldest')
+                                  const Icon(Icons.check, color: matrixGreen, size: 16)
+                                else
+                                  const SizedBox(width: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Oldest',
+                                  style: TextStyle(
+                                    color: _selectedSort == 'oldest' ? matrixGreen : Colors.white70,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -708,10 +987,50 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
 
       // Add online friends if any
       if (_onlineFriends.isNotEmpty) {
-        items.add(_buildSectionHeader('FRIENDS ONLINE'));
-        for (final friend in _onlineFriends) {
-          items.add(_buildOnlineFriendCard(friend));
+        items.add(
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isFriendsExpanded = !_isFriendsExpanded;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'FRIENDS ONLINE (${_onlineFriends.length})',
+                    style: const TextStyle(
+                      color: Color(0xFF00FF41),
+                      fontFamily: 'monospace',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Icon(
+                    _isFriendsExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: const Color(0xFF00FF41),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        if (_isFriendsExpanded) {
+          for (final friend in _onlineFriends) {
+            items.add(_buildOnlineFriendCard(friend));
+          }
         }
+
+        items.add(
+          Divider(
+            color: const Color(0xFF00FF41).withValues(alpha: 0.3),
+            thickness: 1,
+            height: 16,
+          ),
+        );
       }
 
       // Add posts

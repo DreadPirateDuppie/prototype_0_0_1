@@ -289,6 +289,80 @@ class _CreateBattleDialogState extends State<CreateBattleDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Quick Match Button
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 16),
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : () async {
+                    // Find random opponent and auto-fill
+                    setState(() => _isLoading = true);
+                    try {
+                      final opponentId = await SupabaseService.getRandomOpponent(mutualOnly: false);
+                      if (opponentId == null) {
+                        if (mounted) {
+                          ErrorHelper.showError(context, 'No opponents found. Try again later!');
+                        }
+                        return;
+                      }
+                      // Auto-fill opponent
+                      setState(() {
+                        _selectedUserId = opponentId;
+                        _opponentIdController.text = opponentId;
+                        _isQuickfire = true; // Default to quickfire for faster games
+                      });
+                      _loadOpponentPoints(opponentId);
+                    } catch (e) {
+                      if (mounted) {
+                        ErrorHelper.showError(context, 'Error finding match: $e');
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() => _isLoading = false);
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.withValues(alpha: 0.15),
+                    foregroundColor: Colors.red,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.red.withValues(alpha: 0.5), width: 1.5),
+                    ),
+                  ),
+                  icon: const Icon(Icons.flash_on, size: 20),
+                  label: const Text(
+                    'QUICK MATCH',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Divider
+              Row(
+                children: [
+                  Expanded(child: Divider(color: matrixGreen.withValues(alpha: 0.3))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'OR CREATE CUSTOM',
+                      style: TextStyle(
+                        color: matrixGreen.withValues(alpha: 0.5),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: matrixGreen.withValues(alpha: 0.3))),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
               // Local Game Toggle (only if not quick match)
               if (!widget.isQuickMatch) ...[
                 Container(

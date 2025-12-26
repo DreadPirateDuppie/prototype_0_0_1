@@ -13,15 +13,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _displayNameController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _ageController = TextEditingController();
   bool _isLoading = false;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _ageController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _displayNameController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
@@ -32,8 +34,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
     
-    if (_displayNameController.text.trim().isEmpty) {
-      ErrorHelper.showError(context, 'Please enter a display name');
+    if (_usernameController.text.trim().isEmpty) {
+      ErrorHelper.showError(context, 'Please enter a username');
+      return;
+    }
+
+    if (_ageController.text.trim().isEmpty) {
+      ErrorHelper.showError(context, 'Please enter your age');
+      return;
+    }
+    
+    final age = int.tryParse(_ageController.text.trim());
+    if (age == null || age < 13) {
+      ErrorHelper.showError(context, 'You must be at least 13 years old');
       return;
     }
     
@@ -67,7 +80,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
       await SupabaseService.signUp(
         _emailController.text.trim(),
         _passwordController.text,
-        displayName: _displayNameController.text.trim(),
+        username: _usernameController.text.trim(),
+        displayName: _usernameController.text.trim(), // Use username as display name initially
+        age: age,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -108,11 +123,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: _displayNameController,
+              controller: _usernameController,
               decoration: const InputDecoration(
-                labelText: 'Display Name',
+                labelText: 'Username',
                 border: OutlineInputBorder(),
               ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _ageController,
+              decoration: const InputDecoration(
+                labelText: 'Age',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 16),
             TextField(

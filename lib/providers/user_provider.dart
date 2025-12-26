@@ -9,6 +9,8 @@ class UserProvider extends ChangeNotifier {
   User? _currentUser;
   String? _username;
   String? _avatarUrl;
+  String? _bio;
+  int? _age;
   UserScores? _userScores;
   bool _isLoading = false;
   bool _isAdmin = false;
@@ -18,6 +20,8 @@ class UserProvider extends ChangeNotifier {
   User? get currentUser => _currentUser;
   String? get username => _username;
   String? get avatarUrl => _avatarUrl;
+  String? get bio => _bio;
+  int? get age => _age;
   UserScores? get userScores => _userScores;
   bool get isLoading => _isLoading;
   bool get isAdmin => _isAdmin;
@@ -49,6 +53,12 @@ class UserProvider extends ChangeNotifier {
       
       // Load avatar
       _avatarUrl = await SupabaseService.getUserAvatarUrl(_currentUser!.id);
+      
+      // Load bio
+      _bio = await SupabaseService.getUserBio(_currentUser!.id);
+      
+      // Load age
+      _age = await SupabaseService.getUserAge(_currentUser!.id);
       
       // Load scores
       _userScores = await BattleService.getUserScores(_currentUser!.id);
@@ -93,6 +103,50 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Update bio
+  Future<bool> updateBio(String newBio) async {
+    if (_currentUser == null) return false;
+    
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await SupabaseService.saveUserBio(_currentUser!.id, newBio);
+      _bio = newBio;
+      _error = null;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to update bio: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Update age
+  Future<bool> updateAge(int newAge) async {
+    if (_currentUser == null) return false;
+    
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await SupabaseService.saveUserAge(_currentUser!.id, newAge);
+      _age = newAge;
+      _error = null;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to update age: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Refresh user scores
   Future<void> refreshScores() async {
     if (_currentUser == null) return;
@@ -122,6 +176,7 @@ class UserProvider extends ChangeNotifier {
     _currentUser = null;
     _username = null;
     _avatarUrl = null;
+    _bio = null;
     _userScores = null;
     _isAdmin = false;
     _error = null;

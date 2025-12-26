@@ -62,7 +62,7 @@ class _SkateLobbyScreenState extends State<SkateLobbyScreen> {
       // Wait, we need usernames.
       
       // Let's do a quick fetch of profiles
-      final userIds = data.map((p) => p['user_id'] as String).toList();
+      // Let's do a quick fetch of profiles
       // We need a way to get profiles by IDs. 
       // SupabaseService doesn't have a direct method exposed for bulk fetch by IDs easily accessible here without custom query
       // Let's add a helper or just use what we have.
@@ -194,7 +194,6 @@ class _SkateLobbyScreenState extends State<SkateLobbyScreen> {
       );
     }
 
-    final isHost = _lobby!['host_id'] == _currentUserId;
     final code = _lobby!['code'];
 
     return Scaffold(

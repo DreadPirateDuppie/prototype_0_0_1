@@ -8,6 +8,7 @@ import '../tabs/vs_tab.dart';
 import '../services/connectivity_service.dart';
 import 'package:provider/provider.dart';
 import '../providers/navigation_provider.dart';
+import '../providers/battle_provider.dart';
 import '../services/supabase_service.dart';
 import 'dart:ui';
 
@@ -18,7 +19,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   String? _avatarUrl;
   late List<AnimationController> _controllers;
   late List<Animation<double>> _scaleAnimations;
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUserProfile();
     
     // Create animation controllers for each nav item
@@ -53,10 +55,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (var controller in _controllers) {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh battles when app resumes to check for expired timers
+      context.read<BattleProvider>().refresh();
+    }
   }
 
   Future<void> _loadUserProfile() async {
@@ -148,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     return SafeArea(
       child: Container(
-        height: 75, // Increased height to accommodate overlap
+        height: 85, // Increased height to accommodate overlap
         margin: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
         child: Stack(
           alignment: Alignment.bottomCenter,
@@ -156,9 +167,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           children: [
             // Main Navigation Bar Background
             Container(
-              height: 60,
+              height: 70,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(35),
                 boxShadow: [
                   // Drop shadow for the nav bar
                   BoxShadow(
@@ -176,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(35),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                   child: Container(
@@ -194,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               const Color(0xFFF5F5F5).withValues(alpha: 0.95),
                             ],
                       ),
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(35),
                       border: Border.all(
                         width: 1.5,
                         color: matrixGreen.withValues(alpha: 0.6), // Neon green outline
@@ -217,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             
             // Floating Map Button (Diamond)
             Positioned(
-              bottom: 5, // Raised from 0 to 5
+              bottom: 10, // Raised from 5 to 10
               child: _buildCenterNavItem(Icons.location_on, 'Map', 2, currentIndex),
             ),
           ],
@@ -292,11 +303,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   backgroundColor: Colors.transparent,
                                 ),
                               )
-                            : Icon(
-                                icon,
-                                color: isSelected ? matrixGreen : Colors.grey[600],
-                                size: 24,
-                              ),
+                            : index == 1 // VS Tab
+                                ? Text(
+                                    'VS',
+                                    style: TextStyle(
+                                      color: isSelected ? matrixGreen : Colors.grey[600],
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16,
+                                      fontFamily: 'monospace',
+                                      letterSpacing: -1,
+                                    ),
+                                  )
+                                : Icon(
+                                    icon,
+                                    color: isSelected ? matrixGreen : Colors.grey[600],
+                                    size: 24,
+                                  ),
                       );
                     },
                   ),

@@ -409,7 +409,6 @@ class _RewardsTabState extends State<RewardsTab> {
               
               // Is this the specific day we just checked in for?
               // (Only relevant if we want to animate or highlight the "current" one differently)
-              final isToday = index == (activeCount - 1) && _streak > 0;
               
               const matrixGreen = Color(0xFF00FF41);
               

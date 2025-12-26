@@ -34,10 +34,15 @@ Future<void> main() async {
   final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? 
                           const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzb2dzcG5lY2pzb2x0Y213dmVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1MzkxMDMsImV4cCI6MjA4MDExNTEwM30.waf9NjgeOacZmfrmnyaxnskrxuk0dZyHtqWFcuaGUFI');
 
-  // Initialize Supabase with your project URL and anon key
+  // Initialize Supabase with session persistence (enabled by default)
   await Supabase.initialize(
     url: supabaseUrl,
     anonKey: supabaseAnonKey,
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce, // Recommended for mobile apps
+    ),
+    // Note: Session persistence is enabled by default in Supabase Flutter
+    // Sessions are stored in SharedPreferences automatically
   );
 
   // Set up service locator for dependency injection
@@ -78,6 +83,7 @@ class MyApp extends StatelessWidget {
           theme: themeProvider.getLightTheme(),
           darkTheme: themeProvider.getDarkTheme(),
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          debugShowCheckedModeBanner: false,
           home: const AuthWrapper(),
         );
       },

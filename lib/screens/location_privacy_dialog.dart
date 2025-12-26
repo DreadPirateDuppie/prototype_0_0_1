@@ -96,12 +96,12 @@ class _LocationPrivacyDialogState extends State<LocationPrivacyDialog> {
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: const Color(0xFF00FF41).withOpacity(0.4),
+            color: const Color(0xFF00FF41).withValues(alpha: 0.4),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF00FF41).withOpacity(0.2),
+              color: const Color(0xFF00FF41).withValues(alpha: 0.2),
               blurRadius: 20,
               spreadRadius: 2,
             ),
@@ -124,7 +124,7 @@ class _LocationPrivacyDialogState extends State<LocationPrivacyDialog> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00FF41).withOpacity(0.1),
+                          color: const Color(0xFF00FF41).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -199,7 +199,7 @@ class _LocationPrivacyDialogState extends State<LocationPrivacyDialog> {
                       gradient: LinearGradient(
                         colors: [
                           Colors.transparent,
-                          const Color(0xFF00FF41).withOpacity(0.3),
+                          const Color(0xFF00FF41).withValues(alpha: 0.3),
                           Colors.transparent,
                         ],
                       ),
@@ -225,10 +225,10 @@ class _LocationPrivacyDialogState extends State<LocationPrivacyDialog> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00FF41).withOpacity(0.1),
+                          color: const Color(0xFF00FF41).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: const Color(0xFF00FF41).withOpacity(0.3),
+                            color: const Color(0xFF00FF41).withValues(alpha: 0.3),
                           ),
                         ),
                         child: Text(
@@ -248,10 +248,10 @@ class _LocationPrivacyDialogState extends State<LocationPrivacyDialog> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.grey.withOpacity(0.2),
+                          color: Colors.grey.withValues(alpha: 0.2),
                         ),
                       ),
                       child: _friends.isEmpty
@@ -284,7 +284,7 @@ class _LocationPrivacyDialogState extends State<LocationPrivacyDialog> {
                                   margin: const EdgeInsets.only(bottom: 4),
                                   decoration: BoxDecoration(
                                     color: isBlacklisted
-                                        ? Colors.red.withOpacity(0.1)
+                                        ? Colors.red.withValues(alpha: 0.1)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -324,10 +324,10 @@ class _LocationPrivacyDialogState extends State<LocationPrivacyDialog> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         elevation: 0,
-                        shadowColor: const Color(0xFF00FF41).withOpacity(0.5),
+                        shadowColor: const Color(0xFF00FF41).withValues(alpha: 0.5),
                       ).copyWith(
                         overlayColor: WidgetStateProperty.all(
-                          Colors.black.withOpacity(0.1),
+                          Colors.black.withValues(alpha: 0.1),
                         ),
                       ),
                       child: _isSaving
@@ -378,19 +378,19 @@ class _LocationPrivacyDialogState extends State<LocationPrivacyDialog> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF00FF41).withOpacity(0.1)
-              : Colors.black.withOpacity(0.3),
+              ? const Color(0xFF00FF41).withValues(alpha: 0.1)
+              : Colors.black.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF00FF41)
-                : Colors.grey.withOpacity(0.2),
+                : Colors.grey.withValues(alpha: 0.2),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF00FF41).withOpacity(0.2),
+                    color: const Color(0xFF00FF41).withValues(alpha: 0.2),
                     blurRadius: 8,
                     spreadRadius: 1,
                   ),

@@ -5,6 +5,10 @@ import '../providers/theme_provider.dart';
 import '../screens/admin_dashboard.dart';
 import '../utils/error_helper.dart';
 import '../screens/premium_screen.dart';
+import '../services/now_payments_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:flutter/services.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -175,6 +179,105 @@ class _SettingsTabState extends State<SettingsTab> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _showDonationDialog() async {
+    const String walletAddress = '8ALU6TcNWshAK9Ah6vYN6TKfTV8U5Dj9UEgGq78UUeZ9LD5AiN5Gu9D8Q15dMKDo1p5aKkSRTtypaiN17bKrgnbVTV5gmjw';
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF000000),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF00FF41), width: 2),
+        ),
+        title: const Text(
+          'Donate Crypto',
+          style: TextStyle(
+            color: Color(0xFF00FF41),
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Support the project with a Solana donation!',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: QrImageView(
+                  data: walletAddress,
+                  version: QrVersions.auto,
+                  size: 200.0,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Wallet Address:',
+                style: TextStyle(color: Color(0xFF00FF41), fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF00FF41).withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      walletAddress,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(const ClipboardData(text: walletAddress));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Address copied to clipboard'),
+                            backgroundColor: Color(0xFF00FF41),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy, size: 16, color: Color(0xFF00FF41)),
+                      label: const Text(
+                        'Copy Address',
+                        style: TextStyle(color: Color(0xFF00FF41), fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: Colors.white70)),
+          ),
+        ],
       ),
     );
   }
@@ -435,6 +538,12 @@ class _SettingsTabState extends State<SettingsTab> {
             title: const Text('Send Feedback'),
             subtitle: const Text('Report bugs or suggest features'),
             onTap: _showFeedbackDialog,
+          ),
+          ListTile(
+            leading: const Icon(Icons.currency_bitcoin, color: Color(0xFF00FF41)),
+            title: const Text('Donate Crypto'),
+            subtitle: const Text('Support the developer'),
+            onTap: _showDonationDialog,
           ),
           if (_isAdmin && !_isLoadingAdminStatus) ...[
             const Divider(),

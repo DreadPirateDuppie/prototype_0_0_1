@@ -536,7 +536,6 @@ class _BattleDetailPopupState extends State<BattleDetailPopup> {
 
   Widget _buildActionButton() {
     final userId = Supabase.instance.client.auth.currentUser?.id;
-    final isPlayer1 = _battle.player1Id == userId;
     final isMyTurn = _battle.currentTurnPlayerId == userId;
     
     final bool canUploadSet = isMyTurn && _battle.setTrickVideoUrl == null;

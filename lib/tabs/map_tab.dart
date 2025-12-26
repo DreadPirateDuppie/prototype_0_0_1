@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
@@ -5,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_screen.dart';
@@ -20,9 +22,17 @@ class MapTab extends StatefulWidget {
   State<MapTab> createState() => MapTabState();
 }
 
-class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
+class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   @override
   bool get wantKeepAlive => true; // Keep this tab alive in the background
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _locationSubscription?.cancel();
+    _autoDisableTimer?.cancel();
+    super.dispose();
+  }
   
   late MapController mapController;
   List<Marker> markers = [];
@@ -31,28 +41,63 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
   Map<String, MapPost> markerPostMap = {}; // Map marker location to post
   LatLng currentLocation = const LatLng(37.7749, -122.4194); // Default: SF
   bool _isLoadingLocation = false;
+  bool _isMapReady = false; // Flag to track if map is rendered
   bool _isPinMode = false;
   bool _isSharingLocation = false; // Slider: Others can see you
   bool _hasLocationPermission = false; // User's location is visible to self
   String _sharingMode = 'off';
+  DateTime? _lastLocationUpdate;
+  StreamSubscription<Position>? _locationSubscription;
+  Timer? _autoDisableTimer;
+
+  List<Map<String, dynamic>> _onlineFriendsFeed = []; // All online friends for feed
+
 
   final String _selectedCategory = 'All';
   bool _hasExplicitlyNavigated = false; // Track if user has manually navigated
 
   void moveToLocation(LatLng location) {
     _hasExplicitlyNavigated = true; // Mark that we've manually navigated
-    mapController.move(location, 17.0); // Increased zoom for better detail
+    if (_isMapReady) {
+      mapController.move(location, 17.0); // Increased zoom for better detail
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // User returned to app: Reset the auto-disable timer if sharing is active
+      if (_isSharingLocation) {
+        _resetAutoDisableTimer();
+      }
+      // Check if we need to auto-disable (in case it expired while backgrounded)
+      _checkAutoDisable();
+    }
+  }
+
+  void _resetAutoDisableTimer() {
+    _autoDisableTimer?.cancel();
+    // Restart the 1-hour timer
+    _autoDisableTimer = Timer(const Duration(minutes: 60), _autoDisableLocationSharing);
+    
+    // Reschedule notification (cancel old one first)
+    NotificationService.cancelLocationSharingReminder(); 
+    NotificationService.scheduleLocationSharingReminder();
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     mapController = MapController();
     _addSampleMarkers();
     _loadUserPosts();
     // Automatically get location and privacy settings
     _getCurrentLocation();
     _loadPrivacySettings();
+    
+    // Initialize notifications
+    NotificationService.initialize();
     
     // Check for target location from navigation
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -74,7 +119,18 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
       // Load online friends
       final friends = await SupabaseService.getMutualFollowers();
       final visibleLocations = await SupabaseService.getVisibleUserLocations();
-      final onlineFriends = visibleLocations.where((user) => friends.any((friend) => friend['id'] == user['id'])).toList();
+      
+      // Filter by mutual friends AND distance (10 miles)
+      // Filter by mutual friends AND distance (10 miles)
+      final onlineFriends = visibleLocations.where((user) {
+        final isFriend = friends.any((friend) => friend['id'] == user['id']);
+        // debugPrint('DEBUG: User ${user['username']} is visible but not a mutual friend');
+        return isFriend;
+      }).toList();
+
+
+      
+      debugPrint('DEBUG: Final online friends count: ${onlineFriends.length}');
 
       if (mounted) {
         setState(() {
@@ -100,13 +156,17 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
           
           // Calculate active pushers per spot
           final Map<String, int> spotSessionCounts = {};
-          final List<Map<String, dynamic>> friendsAtSpots = [];
           const distanceThreshold = 100.0; // meters
+
+          // Prepare feed data
+          final List<Map<String, dynamic>> feedItems = [];
 
           for (final friend in onlineFriends) {
             if (friend['current_latitude'] != null && friend['current_longitude'] != null) {
               final friendLoc = LatLng(friend['current_latitude'], friend['current_longitude']);
               bool isAtSpot = false;
+              String statusText = 'Online';
+              String? spotName;
 
               for (final post in posts) {
                 if (post.latitude == null || post.longitude == null) continue;
@@ -117,10 +177,18 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
                 if (distance <= distanceThreshold && post.id != null) {
                   spotSessionCounts[post.id!] = (spotSessionCounts[post.id!] ?? 0) + 1;
                   isAtSpot = true;
-                  friendsAtSpots.add(friend);
+                  statusText = 'At ${post.title}';
+                  spotName = post.title;
                   break; // Only count for the first matching spot
                 }
               }
+
+              // Add to feed regardless of spot status
+              final feedItem = Map<String, dynamic>.from(friend);
+              feedItem['status_text'] = statusText;
+              feedItem['spot_name'] = spotName;
+              feedItem['location'] = friendLoc;
+              feedItems.add(feedItem);
 
               // If friend is NOT at a spot, show individual marker
               if (!isAtSpot) {
@@ -138,7 +206,8 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
           }
 
           _addUserPostMarkers(spotSessionCounts); // Adds to markers (clusterable)
-          debugPrint('MapTab: Updated markers. Cluster: ${markers.length}, Non-Cluster: ${nonClusterMarkers.length}');
+          _onlineFriendsFeed = feedItems; // Update state
+          debugPrint('MapTab: Updated markers. Friends in feed: ${_onlineFriendsFeed.length}');
         });
       }
     } catch (e) {
@@ -211,8 +280,13 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
         });
 
         // Only animate to current location if user hasn't explicitly navigated elsewhere
-        if (!_hasExplicitlyNavigated) {
+        if (!_hasExplicitlyNavigated && _isMapReady) {
           mapController.move(newLocation, 14.0);
+        }
+
+        // If sharing is enabled, force update now that we have permission
+        if (_isSharingLocation) {
+          _forceLocationUpdate();
         }
 
         // Rebuild markers to include location
@@ -237,10 +311,167 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
           _sharingMode = settings['sharing_mode'] as String;
           _isSharingLocation = _sharingMode != 'off';
         });
+        
+        // Check if sharing was enabled and check elapsed time
+        if (_isSharingLocation) {
+          _checkSharingElapsedTime();
+          _startLocationTracking(); // Resume tracking if sharing is on
+          _forceLocationUpdate(); // Force immediate update on app start
+        }
+        _loadUserPosts(); // Refresh feed based on new settings
       }
     } catch (e) {
       debugPrint('Error loading privacy settings: $e');
     }
+  }
+
+  /// Check if location sharing has been on for more than 1 hour
+  Future<void> _checkSharingElapsedTime() async {
+    // Get last location update time from database
+    try {
+      final profile = await SupabaseService.getCurrentUserProfile();
+      final lastUpdate = profile?['location_updated_at'] as String?;
+      
+      if (lastUpdate != null) {
+        final lastUpdateTime = DateTime.parse(lastUpdate);
+        final elapsed = DateTime.now().difference(lastUpdateTime);
+        
+        // If more than 1 hour, auto-disable
+        if (elapsed.inHours >= 1) {
+          await _autoDisableLocationSharing();
+        } else {
+          // Re-start timer for remaining time
+          final remaining = const Duration(hours: 1) - elapsed;
+          _startAutoDisableTimer(remaining);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking sharing elapsed time: $e');
+    }
+  }
+
+  // Alias for _checkSharingElapsedTime to match the call in didChangeAppLifecycleState
+  Future<void> _checkAutoDisable() => _checkSharingElapsedTime();
+
+  void _startAutoDisableTimer([Duration? customDuration]) {
+    _autoDisableTimer?.cancel();
+    
+    final duration = customDuration ?? const Duration(hours: 1);
+    
+    // Schedule reminder notification (5 min before disable) 
+    if (duration.inMinutes >= 5) {
+      NotificationService.scheduleLocationSharingReminder();
+    }
+    
+    // Start auto-disable timer
+    _autoDisableTimer = Timer(duration, () async {
+      await _autoDisableLocationSharing();
+    });
+    
+    debugPrint('Auto-disable timer started for ${duration.inMinutes} minutes');
+  }
+
+  Future<void> _autoDisableLocationSharing() async {
+    if (!_isSharingLocation) return; // Already disabled
+    
+    try {
+      // Turn OFF sharing
+      await SupabaseService.updateLocationSharingMode('off');
+      
+      // Stop tracking
+      _stopLocationTracking();
+      _autoDisableTimer?.cancel();
+      
+      // Show notification
+      await NotificationService.showLocationSharingDisabled();
+      
+      if (mounted) {
+        setState(() {
+          _isSharingLocation = false;
+          _sharingMode = 'off';
+        });
+      }
+      
+      debugPrint('Location sharing auto-disabled after 1 hour');
+    } catch (e) {
+      debugPrint('Error auto-disabling location sharing: $e');
+    }
+  }
+
+  void _startLocationTracking() {
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10, // Update every 10 meters
+    );
+
+    _locationSubscription = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen((Position position) async {
+      final newLocation = LatLng(position.latitude, position.longitude);
+      
+      setState(() {
+        currentLocation = newLocation;
+      });
+
+      // Update database if sharing is enabled (Throttled to every 5 minutes)
+      if (_isSharingLocation) {
+        final now = DateTime.now();
+        if (_lastLocationUpdate == null || 
+            now.difference(_lastLocationUpdate!) >= const Duration(minutes: 5)) {
+          try {
+            await SupabaseService.updateUserLocation(
+              position.latitude,
+              position.longitude,
+            );
+            _lastLocationUpdate = now;
+          } catch (e) {
+            debugPrint('Error updating location: $e');
+          }
+        }
+      }
+
+      // Refresh markers to show updated position
+      _loadUserPosts();
+    });
+
+  }
+
+  Future<void> _forceLocationUpdate() async {
+    try {
+      // Ensure we have permission
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        debugPrint('Cannot force location update: Permission denied');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      if (mounted) {
+        setState(() {
+          currentLocation = LatLng(position.latitude, position.longitude);
+        });
+      }
+
+      await SupabaseService.updateUserLocation(
+        position.latitude,
+        position.longitude,
+      );
+      
+      _lastLocationUpdate = DateTime.now();
+      debugPrint('Forced location update successful: ${position.latitude}, ${position.longitude}');
+    } catch (e) {
+      debugPrint('Error forcing location update: $e');
+    }
+  }
+
+  void _stopLocationTracking() {
+    _locationSubscription?.cancel();
+    _locationSubscription = null;
   }
 
   Future<void> _toggleLocationSharing(bool value) async {
@@ -257,21 +488,29 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
         await SupabaseService.updateLocationSharingMode(mode);
         setState(() => _sharingMode = mode);
         
-        // Update location in database
+        // Update initial location in database
         if (_hasLocationPermission) {
-          await SupabaseService.updateUserLocation(
-            currentLocation.latitude,
-            currentLocation.longitude,
-          );
+          await _forceLocationUpdate();
+          // Start continuous tracking
+          _startLocationTracking();
+          // Start auto-disable timer (1 hour)
+          _startAutoDisableTimer();
         }
+        _loadUserPosts(); // Refresh feed to show self card
       } else {
         // Turn OFF
         await SupabaseService.updateLocationSharingMode('off');
         setState(() => _sharingMode = 'off');
+        // Stop continuous tracking
+        _stopLocationTracking();
+        // Cancel auto-disable timer and notifications
+        _autoDisableTimer?.cancel();
+        await NotificationService.cancelAllLocationNotifications();
+        _loadUserPosts(); // Refresh feed to remove self card
       }
     } catch (e) {
       if (mounted) {
-        ErrorHelper.showError(context, 'Error updating sharing: $e');
+        ErrorHelper.showError(context, 'Error updating sharing: $e', screenName: 'MapTab');
         // Revert slider on error
         setState(() => _isSharingLocation = !value);
       }
@@ -578,6 +817,13 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
                       minZoom: 5.0,
                       maxZoom: 18.0,
                       onTap: (tapPosition, point) => _handleMapTap(point),
+                      onMapReady: () {
+                        if (mounted) {
+                          setState(() {
+                            _isMapReady = true;
+                          });
+                        }
+                      },
                     ),
                     children: [
                       TileLayer(
@@ -637,123 +883,169 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
                       ),
                     ),
                   
-                  // Location Share Slider (Top Center)
+                  // Search Bar & Notch Layout (Custom Painted)
                   Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 0),
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(30),
-                              border: Border.all(
-                                color: const Color(0xFF00FF41).withValues(alpha: 0.3),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _isSharingLocation ? Icons.visibility : Icons.visibility_off,
-                                  size: 16,
-                                  color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey,
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  _isSharingLocation ? 'Visible to Others' : 'Hidden',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey.shade400,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                SizedBox(
-                                  height: 16,
-                                  width: 28,
-                                  child: FittedBox(
-                                    fit: BoxFit.contain,
-                                    child: Switch(
-                                      value: _isSharingLocation,
-                                      onChanged: _toggleLocationSharing,
-                                      activeThumbColor: const Color(0xFF00FF41),
-                                      activeTrackColor: const Color(0xFF00FF41).withValues(alpha: 0.3),
-                                      inactiveThumbColor: Colors.grey.shade600,
-                                      inactiveTrackColor: Colors.grey.shade800,
-                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    top: 12,
+                    left: 16,
+                    right: 16,
+                    child: CustomPaint(
+                      painter: SearchNotchPainter(),
+                      child: SizedBox(
+                        height: 86, // 50 (bar) + 36 (notch)
+                        child: Stack(
+                          children: [
+                            // 1. Search Bar Content (Top)
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: 50,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    showSearch(
+                                      context: context,
+                                      delegate: PostSearchDelegate(userPosts),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(25),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.search_rounded,
+                                          color: const Color(0xFF00FF41).withValues(alpha: 0.8),
+                                          size: 24,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'Search spots...',
+                                          style: TextStyle(
+                                            color: const Color(0xFF00FF41).withValues(alpha: 0.5),
+                                            fontSize: 16,
+                                            fontFamily: 'monospace',
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                                IconButton(
-                                  icon: const Icon(Icons.settings, size: 18),
-                                  color: const Color(0xFF00FF41),
-                                  onPressed: _openPrivacySettings,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  tooltip: 'Privacy Settings',
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
+                            
+                            // 2. Notch Content (Location Slider)
+                            Positioned(
+                              top: 50,
+                              left: 0,
+                              right: 0,
+                              height: 36,
+                              child: Center(
+                                child: SizedBox(
+                                  width: 200, // Matches painter notch width
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        _isSharingLocation ? Icons.visibility : Icons.visibility_off,
+                                        size: 16,
+                                        color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey.shade500,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _isSharingLocation ? 'Visible' : 'Hidden',
+                                        style: TextStyle(
+                                          color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey.shade500,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      SizedBox(
+                                        height: 20,
+                                        width: 36,
+                                        child: FittedBox(
+                                          fit: BoxFit.contain,
+                                          child: Switch(
+                                            value: _isSharingLocation,
+                                            onChanged: _toggleLocationSharing,
+                                            activeThumbColor: const Color(0xFF00FF41),
+                                            activeTrackColor: const Color(0xFF00FF41).withValues(alpha: 0.3),
+                                            inactiveThumbColor: Colors.grey.shade600,
+                                            inactiveTrackColor: Colors.grey.shade800,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      GestureDetector(
+                                        onTap: _openPrivacySettings,
+                                        child: Icon(
+                                          Icons.settings_outlined,
+                                          size: 16,
+                                          color: const Color(0xFF00FF41).withValues(alpha: 0.7),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                  
-                  // Action buttons (Zoom & Search)
+
+                  // My Location Button (Bottom Left)
                   Positioned(
-                    bottom: 100,
+                    bottom: 80, // Lowered from 100
+                    left: 16,
+                    child: _buildVerticalMapButton(
+                      icon: Icons.my_location,
+                      onPressed: () {
+                        mapController.move(currentLocation, 15.0);
+                      },
+                    ),
+                  ),
+
+                  // Zoom Controls (Bottom Right)
+                  Positioned(
+                    bottom: 80, // Lowered from 100
                     right: 16,
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildMapButton(
-                          icon: Icons.search_rounded,
-                          onPressed: () {
-                            showSearch(
-                              context: context,
-                              delegate: PostSearchDelegate(userPosts),
-                            );
-                          },
-                          backgroundColor: Colors.black.withValues(alpha: 0.8),
-                          iconColor: const Color(0xFF00FF41),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildMapButton(
-                          icon: Icons.add_rounded,
+                        _buildVerticalMapButton(
+                          icon: Icons.add,
                           onPressed: () {
                             mapController.move(
                               mapController.camera.center,
                               mapController.camera.zoom + 1,
                             );
                           },
-                          backgroundColor: const Color(0xFF00FF41),
-                          iconColor: Colors.black,
                         ),
                         const SizedBox(height: 12),
-                        _buildMapButton(
-                          icon: Icons.remove_rounded,
+                        _buildVerticalMapButton(
+                          icon: Icons.remove,
                           onPressed: () {
                             mapController.move(
                               mapController.camera.center,
                               mapController.camera.zoom - 1,
                             );
                           },
-                          backgroundColor: const Color(0xFF00FF41),
-                          iconColor: Colors.black,
                         ),
                       ],
                     ),
                   ),
+                  
+                  // Online Friends Cards (Bottom)
+
+
                   // Pin placement button
                   // Pin placement button - Centered above nav bar
                   Positioned(
-                    bottom: 45, // Adjusted for shorter triangle
+                    bottom: 40, // Raised from 30
                     left: 0,
                     right: 0,
                     child: Center(
@@ -762,17 +1054,17 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
                         children: [
                           // PhysicalShape for shadow and clip
                           PhysicalShape(
-                            clipper: TriangleClipper(),
+                            clipper: PinClipper(),
                             color: _isPinMode ? Colors.red.shade600 : const Color(0xFF00FF41),
                             elevation: 8,
                             shadowColor: (_isPinMode ? Colors.red : const Color(0xFF00FF41)).withValues(alpha: 0.4),
                             child: InkWell(
                               onTap: _togglePinMode,
                               child: Container(
-                                width: 120, // Fatter (was 100)
-                                height: 60, // Shorter (was 70)
+                                width: 90, // Wider (was 70)
+                                height: 90, // Taller for pin
                                 alignment: Alignment.center,
-                                padding: const EdgeInsets.only(top: 5), // Raised icon (was 10)
+                                padding: const EdgeInsets.only(bottom: 25), // Center icon in the round part
                                 child: Icon(
                                   _isPinMode ? Icons.close_rounded : Icons.add_location_rounded,
                                   color: _isPinMode ? Colors.white : Colors.black,
@@ -784,8 +1076,8 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
                           // Border
                           IgnorePointer(
                             child: CustomPaint(
-                              size: const Size(120, 60), // Fatter and shorter
-                              painter: TriangleBorderPainter(
+                              size: const Size(90, 90), // Wider (was 70)
+                              painter: PinBorderPainter(
                                 color: Colors.black,
                                 width: 2,
                               ),
@@ -804,32 +1096,30 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
     );
   }
 
-  Widget _buildMapButton({
+
+  Widget _buildVerticalMapButton({
     required IconData icon,
     required VoidCallback onPressed,
-    required Color backgroundColor,
-    required Color iconColor,
   }) {
+    const matrixGreen = Color(0xFF00FF41);
     return Material(
-      elevation: 6,
-      shadowColor: backgroundColor == Colors.white 
-          ? Colors.black.withValues(alpha: 0.2)
-          : backgroundColor.withValues(alpha: 0.4),
-      borderRadius: BorderRadius.circular(12),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: 48,
-          height: 48,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            color: backgroundColor,
+            color: Colors.black.withValues(alpha: 0.85),
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: matrixGreen.withValues(alpha: 0.3),
+              width: 1,
+            ),
             boxShadow: [
               BoxShadow(
-                color: backgroundColor == Colors.white
-                    ? Colors.black.withValues(alpha: 0.1)
-                    : backgroundColor.withValues(alpha: 0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -837,19 +1127,129 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin {
           ),
           child: Icon(
             icon,
-            color: iconColor,
+            color: matrixGreen,
             size: 24,
           ),
         ),
       ),
     );
   }
+}
+
+class SearchNotchPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.9)
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = const Color(0xFF00FF41).withValues(alpha: 0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    final path = Path();
+    
+    // Dimensions
+    final searchBarHeight = 50.0;
+    final notchWidth = 180.0; // Width of the notch area
+    final notchHeight = 36.0; // Height of the notch hanging down
+    final cornerRadius = 25.0; // Radius for search bar ends
+    final smoothRadius = 12.0; // Radius for the smooth transition
+    
+    // Start top-left of search bar
+    path.moveTo(cornerRadius, 0);
+    
+    // Top line
+    path.lineTo(size.width - cornerRadius, 0);
+    
+    // Top-right corner
+    path.arcToPoint(
+      Offset(size.width, cornerRadius),
+      radius: Radius.circular(cornerRadius),
+    );
+    
+    // Right side of search bar
+    path.lineTo(size.width, searchBarHeight - cornerRadius);
+    
+    // Bottom-right corner of search bar
+    path.arcToPoint(
+      Offset(size.width - cornerRadius, searchBarHeight),
+      radius: Radius.circular(cornerRadius),
+    );
+    
+    // Bottom line to notch start (Right side)
+    final notchRightStart = (size.width + notchWidth) / 2;
+    path.lineTo(notchRightStart + smoothRadius, searchBarHeight);
+    
+    // Smooth transition to notch (Right)
+    path.cubicTo(
+      notchRightStart, searchBarHeight, // Control point 1
+      notchRightStart, searchBarHeight, // Control point 2
+      notchRightStart, searchBarHeight + smoothRadius, // End point
+    );
+    
+    // Right side of notch
+    path.lineTo(notchRightStart, searchBarHeight + notchHeight - smoothRadius);
+    
+    // Bottom-right corner of notch
+    path.arcToPoint(
+      Offset(notchRightStart - smoothRadius, searchBarHeight + notchHeight),
+      radius: Radius.circular(smoothRadius),
+    );
+    
+    // Bottom of notch
+    final notchLeftStart = (size.width - notchWidth) / 2;
+    path.lineTo(notchLeftStart + smoothRadius, searchBarHeight + notchHeight);
+    
+    // Bottom-left corner of notch
+    path.arcToPoint(
+      Offset(notchLeftStart, searchBarHeight + notchHeight - smoothRadius),
+      radius: Radius.circular(smoothRadius),
+    );
+    
+    // Left side of notch
+    path.lineTo(notchLeftStart, searchBarHeight + smoothRadius);
+    
+    // Smooth transition from notch (Left)
+    path.cubicTo(
+      notchLeftStart, searchBarHeight, // Control point 1
+      notchLeftStart, searchBarHeight, // Control point 2
+      notchLeftStart - smoothRadius, searchBarHeight, // End point
+    );
+    
+    // Bottom line to start (Left side)
+    path.lineTo(cornerRadius, searchBarHeight);
+    
+    // Bottom-left corner of search bar
+    path.arcToPoint(
+      Offset(0, searchBarHeight - cornerRadius),
+      radius: Radius.circular(cornerRadius),
+    );
+    
+    // Left side of search bar
+    path.lineTo(0, cornerRadius);
+    
+    // Top-left corner
+    path.arcToPoint(
+      Offset(cornerRadius, 0),
+      radius: Radius.circular(cornerRadius),
+    );
+    
+    path.close();
+    
+    // Draw shadow
+    canvas.drawShadow(path, Colors.black, 8.0, true);
+    
+    // Draw fill
+    canvas.drawPath(path, paint);
+    
+    // Draw border
+    canvas.drawPath(path, borderPaint);
+  }
 
   @override
-  void dispose() {
-    mapController.dispose();
-    super.dispose();
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class PostSearchDelegate extends SearchDelegate<MapPost?> {
@@ -932,13 +1332,21 @@ class PostSearchDelegate extends SearchDelegate<MapPost?> {
   }
 }
 
-class TriangleClipper extends CustomClipper<Path> {
+class PinClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     final path = Path();
-    path.moveTo(size.width / 2, 0); // Top center
-    path.lineTo(size.width, size.height); // Bottom right
-    path.lineTo(0, size.height); // Bottom left
+    path.moveTo(size.width / 2, size.height);
+    path.cubicTo(
+      size.width, size.height * 0.6,
+      size.width, 0,
+      size.width / 2, 0,
+    );
+    path.cubicTo(
+      0, 0,
+      0, size.height * 0.6,
+      size.width / 2, size.height,
+    );
     path.close();
     return path;
   }
@@ -947,11 +1355,11 @@ class TriangleClipper extends CustomClipper<Path> {
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
-class TriangleBorderPainter extends CustomPainter {
+class PinBorderPainter extends CustomPainter {
   final Color color;
   final double width;
 
-  TriangleBorderPainter({required this.color, required this.width});
+  PinBorderPainter({required this.color, required this.width});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -961,9 +1369,17 @@ class TriangleBorderPainter extends CustomPainter {
       ..strokeWidth = width;
 
     final path = Path();
-    path.moveTo(size.width / 2, 0);
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
+    path.moveTo(size.width / 2, size.height);
+    path.cubicTo(
+      size.width, size.height * 0.6,
+      size.width, 0,
+      size.width / 2, 0,
+    );
+    path.cubicTo(
+      0, 0,
+      0, size.height * 0.6,
+      size.width / 2, size.height,
+    );
     path.close();
 
     canvas.drawPath(path, paint);

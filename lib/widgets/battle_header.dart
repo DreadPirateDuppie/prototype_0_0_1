@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/battle.dart';
 import '../utils/duration_utils.dart';
+import '../config/theme_config.dart';
 
 /// A reusable battle header widget showing players, scores, and turn info
 class BattleHeader extends StatelessWidget {
@@ -26,29 +27,29 @@ class BattleHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.black,
-            matrixGreen.withValues(alpha: 0.1),
-          ],
-        ),
+        color: ThemeColors.backgroundDark,
         border: Border(
           bottom: BorderSide(
-            color: matrixGreen.withValues(alpha: 0.3),
-            width: 1,
+            color: matrixGreen.withValues(alpha: 0.1),
+            width: 0.5,
           ),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
           _buildPlayersRow(context),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           _buildLettersRow(context),
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
           _buildTurnIndicator(context),
         ],
       ),
@@ -59,34 +60,42 @@ class BattleHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildPlayerInfo(
-          context,
-          player1Name ?? 'Player 1',
-          isPlayer1,
-          battle.currentTurnPlayerId == battle.player1Id,
+        Expanded(
+          child: _buildPlayerInfo(
+            context,
+            player1Name ?? 'PLAYER 1',
+            isPlayer1,
+            battle.currentTurnPlayerId == battle.player1Id,
+          ),
         ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: matrixGreen.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: matrixGreen, width: 1),
+            color: matrixGreen.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(AppBorderRadius.sm),
+            border: Border.all(
+              color: matrixGreen.withValues(alpha: 0.2),
+              width: 1,
+            ),
           ),
           child: Text(
             'VS',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: matrixGreen,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: matrixGreen.withValues(alpha: 0.8),
               fontFamily: 'monospace',
+              letterSpacing: 2,
             ),
           ),
         ),
-        _buildPlayerInfo(
-          context,
-          player2Name ?? 'Player 2',
-          !isPlayer1,
-          battle.currentTurnPlayerId == battle.player2Id,
+        Expanded(
+          child: _buildPlayerInfo(
+            context,
+            player2Name ?? 'PLAYER 2',
+            !isPlayer1,
+            battle.currentTurnPlayerId == battle.player2Id,
+          ),
         ),
       ],
     );
@@ -104,33 +113,39 @@ class BattleHeader extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             Container(
+              padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isCurrentTurn ? matrixGreen : Colors.grey,
-                  width: isCurrentTurn ? 3 : 1,
+                  color: isCurrentTurn ? matrixGreen : Colors.grey.withValues(alpha: 0.15),
+                  width: isCurrentTurn ? 1.5 : 1,
                 ),
                 boxShadow: isCurrentTurn
                     ? [
                         BoxShadow(
-                          color: matrixGreen.withValues(alpha: 0.5),
-                          blurRadius: 8,
-                          spreadRadius: 2,
+                          color: matrixGreen.withValues(alpha: 0.2),
+                          blurRadius: 10,
+                          spreadRadius: 1,
                         ),
                       ]
                     : null,
               ),
               child: CircleAvatar(
-                radius: 24,
-                backgroundColor: isCurrentUser 
-                    ? matrixGreen.withValues(alpha: 0.2) 
-                    : Colors.grey.withValues(alpha: 0.2),
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : 'P',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isCurrentUser ? matrixGreen : Colors.grey,
+                radius: 28,
+                backgroundColor: ThemeColors.surfaceDark,
+                child: CircleAvatar(
+                  radius: 26,
+                  backgroundColor: isCurrentUser 
+                      ? matrixGreen.withValues(alpha: 0.05) 
+                      : Colors.grey.withValues(alpha: 0.05),
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : 'P',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: isCurrentUser ? matrixGreen : Colors.grey.withValues(alpha: 0.5),
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 ),
               ),
@@ -139,33 +154,42 @@ class BattleHeader extends StatelessWidget {
               Positioned(
                 bottom: -2,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: matrixGreen,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(AppBorderRadius.xs),
+                    boxShadow: [
+                      BoxShadow(
+                        color: matrixGreen.withValues(alpha: 0.4),
+                        blurRadius: 6,
+                      ),
+                    ],
                   ),
                   child: const Text(
                     'YOU',
                     style: TextStyle(
                       fontSize: 8,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w900,
                       color: Colors.black,
+                      letterSpacing: 1.5,
                     ),
                   ),
                 ),
               ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Text(
-          name,
+          name.toUpperCase(),
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: isCurrentUser ? matrixGreen : Colors.grey,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            color: isCurrentUser ? matrixGreen : ThemeColors.textSecondary.withValues(alpha: 0.6),
             fontFamily: 'monospace',
+            letterSpacing: 1.5,
           ),
           overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -178,7 +202,12 @@ class BattleHeader extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _buildLetterDisplay(battle.player1Letters, gameLetters, true),
-        const SizedBox(width: 24),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          height: 12,
+          width: 1,
+          color: ThemeColors.textSecondary.withValues(alpha: 0.1),
+        ),
         _buildLetterDisplay(battle.player2Letters, gameLetters, false),
       ],
     );
@@ -192,25 +221,32 @@ class BattleHeader extends StatelessWidget {
         final letter = gameLetters[index];
         
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: const EdgeInsets.all(6),
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: hasLetter 
-                ? Colors.red.withValues(alpha: 0.8) 
-                : Colors.grey.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(4),
+                ? Colors.red.withValues(alpha: 0.1) 
+                : ThemeColors.surfaceDark.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(AppBorderRadius.sm),
             border: Border.all(
-              color: hasLetter ? Colors.red : Colors.grey.withValues(alpha: 0.3),
+              color: hasLetter ? Colors.red.withValues(alpha: 0.6) : matrixGreen.withValues(alpha: 0.05),
               width: 1,
             ),
+            boxShadow: hasLetter ? [
+              BoxShadow(
+                color: Colors.red.withValues(alpha: 0.1),
+                blurRadius: 4,
+              ),
+            ] : null,
           ),
           child: Text(
             letter,
             style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: hasLetter ? Colors.white : Colors.grey,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              color: hasLetter ? Colors.red : matrixGreen.withValues(alpha: 0.1),
               fontFamily: 'monospace',
+              letterSpacing: 1,
             ),
           ),
         );
@@ -222,63 +258,69 @@ class BattleHeader extends StatelessWidget {
     final remainingTime = battle.getRemainingTime();
     final timeText = remainingTime != null 
         ? DurationUtils.formatShort(remainingTime) 
-        : 'No deadline';
+        : 'NO DEADLINE';
+    
+    final Color turnColor = isMyTurn ? matrixGreen : Colors.orange;
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       decoration: BoxDecoration(
-        color: isMyTurn 
-            ? matrixGreen.withValues(alpha: 0.2) 
-            : Colors.grey.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
+        color: turnColor.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(AppBorderRadius.round),
         border: Border.all(
-          color: isMyTurn ? matrixGreen : Colors.grey,
+          color: turnColor.withValues(alpha: 0.15),
           width: 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            isMyTurn ? Icons.play_arrow : Icons.hourglass_empty,
-            size: 16,
-            color: isMyTurn ? matrixGreen : Colors.grey,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            isMyTurn ? 'Your Turn' : 'Waiting for opponent',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: isMyTurn ? matrixGreen : Colors.grey,
-              fontFamily: 'monospace',
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: turnColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: turnColor.withValues(alpha: 0.5),
+                  blurRadius: 4,
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(10),
+          Text(
+            (isMyTurn ? 'YOUR TURN' : 'OPPONENT\'S TURN').toUpperCase(),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              color: turnColor,
+              fontFamily: 'monospace',
+              letterSpacing: 1.5,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.timer,
-                  size: 12,
-                  color: matrixGreen,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  timeText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: matrixGreen,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ],
+          ),
+          const SizedBox(width: 16),
+          Container(
+            height: 12,
+            width: 1,
+            color: turnColor.withValues(alpha: 0.1),
+          ),
+          const SizedBox(width: 16),
+          Icon(
+            Icons.timer_outlined,
+            size: 12,
+            color: turnColor.withValues(alpha: 0.6),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            timeText.toUpperCase(),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              color: turnColor.withValues(alpha: 0.8),
+              fontFamily: 'monospace',
+              letterSpacing: 1,
             ),
           ),
         ],

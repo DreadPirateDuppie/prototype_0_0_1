@@ -31,6 +31,9 @@ class BattleProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Check for expired turns first
+      await BattleService.checkExpiredTurns(userId);
+      
       final battles = await BattleService.getUserBattles(userId);
       
       _activeBattles = battles

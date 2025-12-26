@@ -37,7 +37,7 @@ class _PostCardState extends State<PostCard> {
   void initState() {
     super.initState();
     currentPost = widget.post;
-    print('DEBUG: PostCard initialized for post ${currentPost.id}. Photos: ${currentPost.photoUrls}');
+    // Debug logging removed
     _checkOwnership();
   }
 
@@ -136,6 +136,176 @@ class _PostCardState extends State<PostCard> {
     ).then((_) => widget.onPostUpdated?.call());
   }
 
+  Future<void> _showReportDialog() async {
+    const matrixGreen = Color(0xFF00FF41);
+    String? selectedReason;
+    final reasons = [
+      'Spam or misleading',
+      'Inappropriate content',
+      'Harassment or hate speech',
+      'Violence or dangerous behavior',
+      'False information',
+      'Other',
+    ];
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: const Color(0xFF000000),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: matrixGreen, width: 2),
+          ),
+          title: const Text(
+            'Report Post',
+            style: TextStyle(
+              color: matrixGreen,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Why are you reporting this post?',
+                style: TextStyle(
+                  color: matrixGreen.withValues(alpha: 0.7),
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...reasons.map((reason) => RadioListTile<String>(
+                    title: Text(
+                      reason,
+                      style: const TextStyle(color: matrixGreen, fontSize: 14),
+                    ),
+                    value: reason,
+                    groupValue: selectedReason,
+                    activeColor: matrixGreen,
+                    onChanged: (value) {
+                      setState(() {
+                        selectedReason = value;
+                      });
+                    },
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  )),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'CANCEL',
+                style: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: selectedReason == null
+                  ? null
+                  : () async {
+                      Navigator.of(context).pop();
+                      try {
+                        await SupabaseService.reportPost(
+                          postId: currentPost.id!,
+                          reason: selectedReason!,
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Report submitted. Thank you for keeping our community safe.'),
+                              backgroundColor: matrixGreen,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ErrorHelper.showError(context, 'Error submitting report: $e');
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.red.withValues(alpha: 0.3),
+              ),
+              child: const Text('REPORT'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deletePost() async {
+    const matrixGreen = Color(0xFF00FF41);
+    
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF000000),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: matrixGreen, width: 2),
+        ),
+        title: const Text(
+          'DELETE POST',
+          style: TextStyle(
+            color: Colors.red,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete this post? This action cannot be undone.',
+          style: TextStyle(
+            color: matrixGreen.withValues(alpha: 0.7),
+            fontSize: 14,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'CANCEL',
+              style: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('DELETE'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await SupabaseService.deletePost(currentPost.id!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Post deleted successfully'),
+              backgroundColor: matrixGreen,
+            ),
+          );
+          widget.onPostUpdated?.call();
+        }
+      } catch (e) {
+        if (mounted) {
+          ErrorHelper.showError(context, 'Error deleting post: $e');
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const matrixGreen = Color(0xFF00FF41);
@@ -174,12 +344,12 @@ class _PostCardState extends State<PostCard> {
                           // Navigate to Profile Tab (Index 4)
                           Navigator.of(context).popUntil((route) => route.isFirst);
                           Provider.of<NavigationProvider>(context, listen: false).setIndex(4);
-                        } else if (currentPost.userId != null) {
+                        } else {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => UserProfileScreen(
-                                userId: currentPost.userId!,
+                                userId: currentPost.userId,
                                 username: currentPost.userName,
                                 avatarUrl: currentPost.avatarUrl,
                               ),
@@ -242,6 +412,24 @@ class _PostCardState extends State<PostCard> {
                                     color: Color(0xFF00FF41), // Matrix Green
                                   ),
                                 ),
+                                const SizedBox(height: 4),
+                                if (currentPost.latitude != null && currentPost.longitude != null)
+                                  Text(
+                                    'Location: ${currentPost.latitude!.toStringAsFixed(4)}, ${currentPost.longitude!.toStringAsFixed(4)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Theme.of(context).textTheme.bodySmall?.color,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                Text(
+                                  'Posted: ${currentPost.createdAt.toString().substring(0, 16)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Theme.of(context).textTheme.bodySmall?.color,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -249,11 +437,53 @@ class _PostCardState extends State<PostCard> {
                       ),
                     ),
                   ),
-                  if (_isOwnPost)
-                    IconButton(
-                      icon: const Icon(Icons.more_vert),
-                      onPressed: _showEditDialog,
-                    ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    color: const Color(0xFF0A0A0A),
+                    onSelected: (value) async {
+                      if (value == 'edit') {
+                        _showEditDialog();
+                      } else if (value == 'delete') {
+                        _deletePost();
+                      } else if (value == 'report') {
+                        _showReportDialog();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (_isOwnPost) ...[
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, size: 20, color: Color(0xFF00FF41)),
+                              SizedBox(width: 12),
+                              Text('Edit Post', style: TextStyle(color: Color(0xFF00FF41))),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, size: 20, color: Colors.red),
+                              SizedBox(width: 12),
+                              Text('Delete Post', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const PopupMenuItem(
+                        value: 'report',
+                        child: Row(
+                          children: [
+                            Icon(Icons.flag, size: 20, color: Colors.red),
+                            SizedBox(width: 12),
+                            Text('Report Post', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -279,41 +509,19 @@ class _PostCardState extends State<PostCard> {
           ),
           
           // Description
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Text(
-              currentPost.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-
-          // Location & Date
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (currentPost.latitude != null && currentPost.longitude != null)
-                  Text(
-                    'Location: ${currentPost.latitude!.toStringAsFixed(4)}, ${currentPost.longitude!.toStringAsFixed(4)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).textTheme.bodySmall?.color,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                const SizedBox(height: 2),
-                Text(
-                  'Posted: ${currentPost.createdAt.toString().substring(0, 16)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                    fontFamily: 'monospace',
-                  ),
+          InkWell(
+            onTap: _showDetails,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: Text(
+                  currentPost.description,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14),
                 ),
-              ],
+              ),
             ),
           ),
 
@@ -359,20 +567,24 @@ class _PostCardState extends State<PostCard> {
                   isOwnPost: _isOwnPost,
                   orientation: Axis.horizontal,
                   onVoteChanged: () async {
-                    // Refresh post data to show updated vote count
+                    // Refresh this specific post from database to get updated vote_score
                     try {
-                      final allPosts = await SupabaseService.getAllMapPosts();
-                      final updatedPost = allPosts.firstWhere(
-                        (p) => p.id == currentPost.id,
-                        orElse: () => currentPost,
-                      );
-                      if (mounted) {
-                        setState(() {
-                          currentPost = updatedPost;
-                        });
+                      final userId = SupabaseService.getCurrentUser()?.id;
+                      if (userId != null) {
+                        // Fetch all posts and find this one (updated with real vote counts)
+                        final allPosts = await SupabaseService.getAllMapPostsWithVotes();
+                        final updatedPost = allPosts.firstWhere(
+                          (p) => p.id == currentPost.id,
+                          orElse: () => currentPost,
+                        );
+                        if (mounted) {
+                          setState(() {
+                            currentPost = updatedPost;
+                          });
+                        }
                       }
                     } catch (e) {
-                      print('DEBUG: Error refreshing post after vote: $e');
+                      // Silently fail - optimistic update already shown
                     }
                   },
                 ),
@@ -406,7 +618,7 @@ class _PostCardState extends State<PostCard> {
   Widget _buildImageCarousel() {
     const matrixGreen = Color(0xFF00FF41);
     
-    return Container(
+    return SizedBox(
       height: 220,
       width: double.infinity,
       child: Stack(

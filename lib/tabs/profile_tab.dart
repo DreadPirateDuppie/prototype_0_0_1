@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../models/user_scores.dart';
-import '../screens/edit_post_dialog.dart';
 import '../screens/edit_username_dialog.dart';
 import '../screens/followers_list_screen.dart';
 import '../widgets/mini_map_snapshot.dart';
@@ -76,6 +75,7 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
       // Refresh user provider (handles XP recalculation)
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       await userProvider.refreshScores();
+      await userProvider.loadUserProfile(); // Reload profile data (username, avatar, etc.)
       
       // Refresh posts, follow counts, and profile media
       if (mounted) {
@@ -182,19 +182,85 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
     );
   }
 
-
-
-  Future<void> _editPost(MapPost post) async {
+  void _editAge(int? currentAge) {
+    final ageController = TextEditingController(text: currentAge?.toString() ?? '');
+    
     showDialog(
       context: context,
-      builder: (context) => EditPostDialog(
-        post: post,
-        onPostUpdated: () {
-          _refreshAll();
-        },
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Age'),
+        content: TextField(
+          controller: ageController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            hintText: 'Enter your age',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final age = int.tryParse(ageController.text);
+              if (age != null) {
+                final userProvider = Provider.of<UserProvider>(context, listen: false);
+                await userProvider.updateAge(age);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  widget.onProfileUpdated?.call();
+                }
+              } else {
+                ErrorHelper.showError(context, 'Please enter a valid age');
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
       ),
     );
   }
+
+  void _editBio(String currentBio) {
+    final bioController = TextEditingController(text: currentBio);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Bio'),
+        content: TextField(
+          controller: bioController,
+          maxLines: 5,
+          maxLength: 150,
+          decoration: const InputDecoration(
+            hintText: 'Tell us about yourself...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final userProvider = Provider.of<UserProvider>(context, listen: false);
+              await userProvider.updateBio(bioController.text);
+              if (context.mounted) {
+                Navigator.pop(context);
+                widget.onProfileUpdated?.call();
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+
 
   Widget _buildStatColumn(String label, String count) {
     return Column(
@@ -489,7 +555,6 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                             ),
                             const SizedBox(height: 16),
                             // Username - now from UserProvider
-                            // Username - now from UserProvider
                             if (userProvider.username == null || userProvider.username!.isEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8.0),
@@ -512,7 +577,7 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    '@${userProvider.username}',
+                                    '@${userProvider.username}${userProvider.age != null ? " • ${userProvider.age}" : ""}',
                                     style: const TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
@@ -522,18 +587,75 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                                   IconButton(
                                     icon: const Icon(Icons.edit, size: 20, color: Colors.white70),
                                     onPressed: () {
-                                      _editUsername(userProvider.username ?? '');
+                                      // Show a menu to edit username or age
+                                      showModalBottomSheet(
+                                        context: context,
+                                        builder: (context) => SafeArea(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              ListTile(
+                                                leading: const Icon(Icons.alternate_email),
+                                                title: const Text('Edit Username'),
+                                                onTap: () {
+                                                  Navigator.pop(context);
+                                                  _editUsername(userProvider.username ?? '');
+                                                },
+                                              ),
+                                              ListTile(
+                                                leading: const Icon(Icons.cake),
+                                                title: const Text('Edit Age'),
+                                                onTap: () {
+                                                  Navigator.pop(context);
+                                                  _editAge(userProvider.age);
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
                                     },
-                                    tooltip: 'Edit Username',
+                                    tooltip: 'Edit Profile Info',
                                   ),
                                 ],
                               ),
-                            // Bio / Email
-                            Text(
-                              user?.email ?? '',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Theme.of(context).textTheme.bodySmall?.color,
+                            const SizedBox(height: 8),
+                            // Bio section
+                            GestureDetector(
+                              onTap: () => _editBio(userProvider.bio ?? ''),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        userProvider.bio != null && userProvider.bio!.isNotEmpty
+                                            ? userProvider.bio!
+                                            : 'Add a bio...',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: userProvider.bio != null && userProvider.bio!.isNotEmpty
+                                              ? Colors.white.withValues(alpha: 0.9)
+                                              : Colors.white.withValues(alpha: 0.5),
+                                          fontStyle: userProvider.bio == null || userProvider.bio!.isEmpty
+                                              ? FontStyle.italic
+                                              : FontStyle.normal,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.edit,
+                                      size: 16,
+                                      color: Colors.white.withValues(alpha: 0.5),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                             const SizedBox(height: 20),
@@ -617,7 +739,7 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                       controller: _tabController,
                       indicatorColor: Theme.of(context).colorScheme.primary,
                       labelColor: Theme.of(context).colorScheme.primary,
-                      unselectedLabelColor: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
+                      unselectedLabelColor: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
                       tabs: const [
                         Tab(text: 'My Posts', icon: Icon(Icons.grid_on)),
                         Tab(text: 'Saved', icon: Icon(Icons.bookmark)),
@@ -643,26 +765,34 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                     final posts = snapshot.data ?? [];
                     
                     if (posts.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No posts yet',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.bold,
+                      return CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          SliverFillRemaining(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[400]),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No posts yet',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       );
                     }
 
                     return GridView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(2),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 3,
@@ -688,34 +818,42 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                     final posts = snapshot.data ?? [];
                     
                     if (posts.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No saved posts',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.bold,
+                      return CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          SliverFillRemaining(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No saved posts',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Save posts from the feed to see them here',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Save posts from the feed to see them here',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       );
                     }
 
                     return GridView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(2),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 3,
@@ -735,32 +873,40 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                     _isLoadingMedia
                         ? const Center(child: CircularProgressIndicator())
                         : _profileMedia.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[400]),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'No media yet',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        color: Colors.grey[600],
-                                        fontWeight: FontWeight.bold,
+                            ? CustomScrollView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                slivers: [
+                                  SliverFillRemaining(
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[400]),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'No media yet',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              color: Colors.grey[600],
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Upload photos or videos to your profile',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[500],
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Upload photos or videos to your profile',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[500],
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               )
                             : GridView.builder(
+                                physics: const AlwaysScrollableScrollPhysics(),
                                 padding: const EdgeInsets.all(2),
                                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 3,
@@ -777,7 +923,20 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                                       // TODO: Show full screen media viewer
                                     },
                                     onLongPress: () async {
-                                      // Show delete option
+                                      // Only allow deleting if it's from profile_media, not from posts
+                                      final isFromPost = media['source'] == 'post';
+                                      
+                                      if (isFromPost) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('This media is part of a post. Delete the post to remove it.'),
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      
+                                      // Show delete option for profile media
                                       final shouldDelete = await showDialog<bool>(
                                         context: context,
                                         builder: (context) => AlertDialog(

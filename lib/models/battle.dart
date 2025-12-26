@@ -17,6 +17,12 @@ enum VoteType {
   rebate
 }
 
+enum BattleStatus {
+  active,
+  completed,
+  expired
+}
+
 class Battle {
   final String? id;
   final String player1Id;
@@ -109,6 +115,12 @@ class Battle {
     return isQuickfire 
         ? const Duration(minutes: 4, seconds: 20)
         : const Duration(hours: 24);
+  }
+
+  BattleStatus get status {
+    if (winnerId != null) return BattleStatus.completed;
+    if (isTimerExpired()) return BattleStatus.expired;
+    return BattleStatus.active;
   }
 
   Map<String, dynamic> toMap() {

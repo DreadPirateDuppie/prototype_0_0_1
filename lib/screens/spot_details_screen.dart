@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:math' as math;
 import '../models/post.dart';
 import '../models/spot_video.dart';
 import '../services/supabase_service.dart';
-import '../widgets/star_rating_display.dart';
 import '../widgets/vote_buttons.dart';
 import '../utils/error_helper.dart';
 import 'edit_post_dialog.dart';
@@ -35,7 +33,6 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
 
   // Matrix theme colors
   static const Color matrixGreen = Color(0xFF00FF41);
-  static const Color matrixBlack = Color(0xFF000000);
   static const Color matrixDark = Color(0xFF0A0A0A);
 
   @override
@@ -478,118 +475,6 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Description
-                  Text(
-                    currentPost.description,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 16,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Mini Map Preview - tappable to go to map tab (Only if location exists)
-                  if (currentPost.latitude != null && currentPost.longitude != null)
-                    GestureDetector(
-                      onTap: () {
-                        // Navigate to map tab and center on this spot
-                        final navProvider = Provider.of<NavigationProvider>(context, listen: false);
-                        navProvider.setIndex(
-                          2, // Map tab is index 2
-                          targetLocation: LatLng(currentPost.latitude!, currentPost.longitude!),
-                        );
-                        Navigator.of(context).popUntil((route) => route.isFirst);
-                      },
-                      child: Container(
-                        height: 180,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: matrixGreen.withValues(alpha: 0.3), width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: matrixGreen.withValues(alpha: 0.2),
-                              blurRadius: 8,
-                              spreadRadius: 0,
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Stack(
-                            children: [
-                              MiniMapSnapshot(
-                                latitude: currentPost.latitude!,
-                                longitude: currentPost.longitude!,
-                              ),
-                              // Overlay with "View on Map" label
-                              Positioned(
-                                bottom: 0,
-                                left: 0,
-                                right: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.7),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                       Icon(
-                                         Icons.map,
-                                         color: matrixGreen,
-                                         size: 18,
-                                       ),
-                                      const SizedBox(width: 8),
-                                      const Text(
-                                        'TAP TO VIEW ON MAP',
-                                        style: TextStyle(
-                                          color: Color(0xFF00FF41),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'monospace',
-                                          letterSpacing: 1.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  const SizedBox(height: 24),
-
-                  // Ratings
-                  Row(
-                    children: [
-                      _buildRatingChip(
-                        Icons.local_fire_department_rounded,
-                        'Popularity',
-                        currentPost.popularityRating,
-                        Colors.orange,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildRatingChip(
-                        Icons.shield_rounded,
-                        'Security',
-                        currentPost.securityRating,
-                        Colors.blue,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildRatingChip(
-                        Icons.star_rounded,
-                        'Quality',
-                        currentPost.qualityRating,
-                        Colors.green,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
                   // Location with clickable coordinates (Only if location exists)
                   if (currentPost.latitude != null && currentPost.longitude != null)
                     GestureDetector(
@@ -632,10 +517,50 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                         ),
                       ),
                     ),
+                  const SizedBox(height: 16),
+
+                  // Ratings
+                  Row(
+                    children: [
+                      _buildRatingChip(
+                        Icons.local_fire_department_rounded,
+                        'Popularity',
+                        currentPost.popularityRating,
+                        Colors.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildRatingChip(
+                        Icons.shield_rounded,
+                        'Security',
+                        currentPost.securityRating,
+                        Colors.blue,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildRatingChip(
+                        Icons.star_rounded,
+                        'Quality',
+                        currentPost.qualityRating,
+                        Colors.green,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Description
+                  Text(
+                    currentPost.description,
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 16,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   
                   if (currentPost.latitude != null && currentPost.longitude != null)
                     const SizedBox(height: 16),
-                  
+
                   // Users at spot
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -721,6 +646,83 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 24),
+
+                  // Mini Map Preview - tappable to go to map tab (Only if location exists)
+                  if (currentPost.latitude != null && currentPost.longitude != null)
+                    GestureDetector(
+                      onTap: () {
+                        // Navigate to map tab and center on this spot
+                        final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+                        navProvider.setIndex(
+                          2, // Map tab is index 2
+                          targetLocation: LatLng(currentPost.latitude!, currentPost.longitude!),
+                        );
+                        Navigator.of(context).popUntil((route) => route.isFirst);
+                      },
+                      child: Container(
+                        height: 180,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: matrixGreen.withValues(alpha: 0.3), width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: matrixGreen.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Stack(
+                            children: [
+                              MiniMapSnapshot(
+                                latitude: currentPost.latitude!,
+                                longitude: currentPost.longitude!,
+                              ),
+                              // Overlay with "View on Map" label
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.7),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                       Icon(
+                                         Icons.map,
+                                         color: matrixGreen,
+                                         size: 18,
+                                       ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'TAP TO VIEW ON MAP',
+                                        style: TextStyle(
+                                          color: Color(0xFF00FF41),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'monospace',
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 24),
+
+
                   
 
                   Divider(color: isDark ? Colors.white24 : Colors.black12),

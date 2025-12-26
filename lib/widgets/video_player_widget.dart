@@ -65,7 +65,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         });
       }
     } catch (e) {
-      print('Error initializing video player: $e');
+      // Error logging removed
     }
   }
 
