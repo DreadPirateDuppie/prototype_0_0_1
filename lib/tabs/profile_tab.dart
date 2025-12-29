@@ -14,8 +14,10 @@ import 'dart:io';
 import '../utils/error_helper.dart';
 import '../config/theme_config.dart';
 import '../screens/spot_details_screen.dart';
+import '../screens/post_detail_screen.dart';
 import '../screens/upload_media_dialog.dart';
 import '../screens/create_feed_post_dialog.dart';
+import '../widgets/verified_badge.dart';
 
 
 class ProfileTab extends StatefulWidget {
@@ -378,10 +380,13 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
   Widget _buildGridPost(MapPost post) {
     return GestureDetector(
       onTap: () {
+        final isSpot = post.latitude != null && post.longitude != null;
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SpotDetailsScreen(post: post),
+            builder: (context) => isSpot 
+                ? SpotDetailsScreen(post: post)
+                : PostDetailScreen(post: post),
           ),
         ).then((_) => _refreshAll()); // Refresh on return in case of changes
       },
@@ -584,6 +589,8 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                                       fontFamily: 'monospace',
                                     ),
                                   ),
+                                  if (userProvider.isVerified)
+                                    const VerifiedBadge(size: 20, padding: EdgeInsets.only(left: 8.0)),
                                   IconButton(
                                     icon: const Icon(Icons.edit, size: 20, color: Colors.white70),
                                     onPressed: () {

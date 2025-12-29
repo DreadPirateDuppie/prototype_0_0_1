@@ -1,4 +1,3 @@
-import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import '../services/messaging_service.dart';
 import '../utils/error_helper.dart';
@@ -21,7 +20,7 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
   final TextEditingController _searchController = TextEditingController();
   
   List<Map<String, dynamic>> _availableUsers = [];
-  List<Map<String, dynamic>> _selectedUsers = [];
+  final List<Map<String, dynamic>> _selectedUsers = [];
   List<Map<String, dynamic>> _filteredUsers = [];
   bool _isLoading = true;
 
@@ -109,7 +108,9 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
 
       widget.onGroupCreated(conversationId);
     } catch (e) {
-      ErrorHelper.showError(context, 'Error creating group: $e');
+      if (mounted) {
+        ErrorHelper.showError(context, 'Error creating group: $e');
+      }
     }
   }
 
@@ -298,7 +299,7 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
           backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
           child: avatarUrl == null
               ? Text(
-                  (displayName[0] ?? 'U').toUpperCase(),
+                  displayName[0].toUpperCase(),
                   style: const TextStyle(
                     color: matrixGreen,
                     fontWeight: FontWeight.bold,

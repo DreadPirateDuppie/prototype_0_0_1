@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../services/admin_service.dart';
+
 import '../models/post.dart';
 import '../utils/error_helper.dart';
+import 'post_detail_screen.dart';
+import 'spot_details_screen.dart';
+import 'edit_post_dialog.dart';
 
 class AdminTheme {
   static const Color primary = Color(0xFF000000);
@@ -49,16 +54,22 @@ class _AdminDashboardState extends State<AdminDashboard>
   late TabController _reportsTabController;
   late Future<List<Map<String, dynamic>>> _reportsFuture;
   late Future<List<MapPost>> _allPostsFuture;
+  late Future<List<MapPost>> _unverifiedPostsFuture;
   late Future<List<Map<String, dynamic>>> _usersFuture;
   late Future<Map<String, dynamic>> _analyticsData;
   final _adminService = AdminService();
   bool _isCheckingAuth = true;
   bool _isAuthorized = false;
 
+  // Search and Filter state for All Posts
+  final TextEditingController _postSearchController = TextEditingController();
+  String _selectedPostType = 'All';
+  String _selectedCategory = 'All';
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _reportsTabController = TabController(length: 2, vsync: this);
     _checkAuthorization();
   }
@@ -97,6 +108,7 @@ class _AdminDashboardState extends State<AdminDashboard>
   void dispose() {
     _tabController.dispose();
     _reportsTabController.dispose();
+    _postSearchController.dispose();
     super.dispose();
   }
 
@@ -104,6 +116,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     setState(() {
       _reportsFuture = SupabaseService.getReportedPosts();
       _allPostsFuture = SupabaseService.getAllMapPostsWithVotes();
+      _unverifiedPostsFuture = _adminService.getUnverifiedPosts();
       _usersFuture = _adminService.getAllUsers(limit: 100);
       _analyticsData = _loadAnalytics();
     });
@@ -128,7 +141,19 @@ class _AdminDashboardState extends State<AdminDashboard>
 
   Future<Map<String, dynamic>> _loadAnalytics() async {
     try {
-      final posts = await SupabaseService.getAllMapPostsWithVotes();
+      final allPosts = await SupabaseService.getAllMapPostsWithVotes();
+      
+      // Filter out test videos from vs feature as requested
+      final posts = allPosts.where((p) {
+        if (p.videoUrl != null && p.videoUrl!.isNotEmpty) {
+          // Skip if it's a battle/vs related post (test content)
+          if (p.category == 'Battle' || p.category == 'VS' || p.tags.contains('battle') || p.tags.contains('vs')) {
+            return false;
+          }
+        }
+        return true;
+      }).toList();
+
       final reports = await SupabaseService.getReportedPosts();
       final users = await _adminService.getAllUsers();
       
@@ -169,8 +194,13 @@ class _AdminDashboardState extends State<AdminDashboard>
       // Get post types distribution
       final postTypes = <String, int>{};
       for (var post in posts) {
-        final type = post.photoUrl != null ? 'video' : 'text';
-        postTypes[type] = (postTypes[type] ?? 0) + 1;
+        if (post.videoUrl != null && post.videoUrl!.isNotEmpty) {
+          postTypes['video'] = (postTypes['video'] ?? 0) + 1;
+        } else if (post.photoUrls.isNotEmpty) {
+          postTypes['image'] = (postTypes['image'] ?? 0) + 1;
+        } else {
+          postTypes['text'] = (postTypes['text'] ?? 0) + 1;
+        }
       }
 
       return {
@@ -314,6 +344,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               tabs: const [
                 Tab(icon: Icon(Icons.grid_view_rounded), text: 'Overview'),
                 Tab(icon: Icon(Icons.insights_rounded), text: 'Analytics'),
+                Tab(icon: Icon(Icons.verified_rounded), text: 'Verification'),
                 Tab(icon: Icon(Icons.gavel_rounded), text: 'Moderation'),
                 Tab(icon: Icon(Icons.people_alt_rounded), text: 'Users'),
               ],
@@ -335,6 +366,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               children: [
                 _buildOverviewTab(),
                 _buildAnalyticsTab(),
+                _buildVerificationTab(),
                 _buildReportsTab(),
                 _buildUsersTab(),
               ],
@@ -521,6 +553,9 @@ class _AdminDashboardState extends State<AdminDashboard>
                 case 'user':
                   _viewUserProfile(post.userId);
                   break;
+                case 'edit':
+                  _editPost(post);
+                  break;
                 case 'delete':
                   if (post.id != null) {
                     _deletePost(post.id!);
@@ -550,6 +585,16 @@ class _AdminDashboardState extends State<AdminDashboard>
                 ),
               ),
               const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_rounded, size: 18, color: Colors.orange),
+                    SizedBox(width: 12),
+                    Text('Edit Post'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'delete',
                 child: Row(
                   children: [
@@ -569,158 +614,210 @@ class _AdminDashboardState extends State<AdminDashboard>
   Future<void> _showAllPostsDialog() async {
     await showDialog(
       context: context,
-      builder: (context) => Dialog.fullscreen(
-        backgroundColor: AdminTheme.primary,
-        child: Column(
-          children: [
-            AppBar(
-              backgroundColor: AdminTheme.secondary,
-              title: const Text('ALL_POSTS', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold)),
-              leading: IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.pop(context),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog.fullscreen(
+          backgroundColor: AdminTheme.primary,
+          child: Column(
+            children: [
+              AppBar(
+                backgroundColor: AdminTheme.secondary,
+                title: const Text('ALL_POSTS', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+                leading: IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded),
+                    onPressed: () {
+                      setState(() {
+                        _allPostsFuture = SupabaseService.getAllMapPostsWithVotes();
+                      });
+                    },
+                  ),
+                ],
               ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
-                  onPressed: () {
-                    setState(() {
-                      _allPostsFuture = SupabaseService.getAllMapPostsWithVotes();
-                    });
+              // Search and Filters UI
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                color: AdminTheme.secondary,
+                child: Column(
+                  children: [
+                    // Search Bar
+                    TextField(
+                      controller: _postSearchController,
+                      onChanged: (value) => setDialogState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Search by title, description, or user...',
+                        prefixIcon: const Icon(Icons.search_rounded, color: AdminTheme.accent),
+                        suffixIcon: _postSearchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, color: AdminTheme.textMuted),
+                                onPressed: () {
+                                  _postSearchController.clear();
+                                  setDialogState(() {});
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Filter Chips - TYPE
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: _buildFilterGroup(
+                        'TYPE:',
+                        ['All', 'Video', 'Image', 'Text'],
+                        _selectedPostType,
+                        (value) => setDialogState(() => _selectedPostType = value),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Filter Chips - CATEGORY
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: _buildFilterGroup(
+                        'CATEGORY:',
+                        ['All', 'Spot', 'Battle', 'VS', 'Other'],
+                        _selectedCategory,
+                        (value) => setDialogState(() => _selectedCategory = value),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: FutureBuilder<List<MapPost>>(
+                  future: _allPostsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: AdminTheme.accent));
+                    }
+                    if (snapshot.hasError) {
+                      return _buildErrorState('Error loading posts', snapshot.error.toString());
+                    }
+                    
+                    final allPosts = snapshot.data ?? [];
+                    final filteredPosts = _filterPosts(allPosts);
+
+                    if (filteredPosts.isEmpty) {
+                      return _buildEmptyState(
+                        Icons.search_off_rounded, 
+                        'No matching posts', 
+                        'Try adjusting your search or filters.'
+                      );
+                    }
+                    
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(20),
+                      itemCount: filteredPosts.length,
+                      itemBuilder: (context, index) => _buildActivityItem(filteredPosts[index]),
+                    );
                   },
                 ),
-              ],
-            ),
-            Expanded(
-              child: FutureBuilder<List<MapPost>>(
-                future: _allPostsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: AdminTheme.accent));
-                  }
-                  if (snapshot.hasError) {
-                    return _buildErrorState('Error loading posts', snapshot.error.toString());
-                  }
-                  final posts = snapshot.data ?? [];
-                  if (posts.isEmpty) {
-                    return _buildEmptyState(Icons.map_rounded, 'No posts found', 'Start by creating some content.');
-                  }
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(20),
-                    itemCount: posts.length,
-                    itemBuilder: (context, index) => _buildActivityItem(posts[index]),
-                  );
-                },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
+  Widget _buildFilterGroup(String label, List<String> options, String selectedValue, Function(String) onSelected) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.bold,
+            color: AdminTheme.textMuted,
+          ),
+        ),
+        const SizedBox(width: 8),
+        ...options.map((option) => Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: ChoiceChip(
+            label: Text(option, style: const TextStyle(fontSize: 11)),
+            selected: selectedValue == option,
+            onSelected: (selected) {
+              if (selected) onSelected(option);
+            },
+            selectedColor: AdminTheme.accent.withValues(alpha: 0.2),
+            labelStyle: TextStyle(
+              color: selectedValue == option ? AdminTheme.accent : AdminTheme.textSecondary,
+              fontWeight: selectedValue == option ? FontWeight.bold : FontWeight.normal,
+            ),
+            backgroundColor: Colors.transparent,
+            side: BorderSide(
+              color: selectedValue == option ? AdminTheme.accent : Colors.white10,
+            ),
+            padding: EdgeInsets.zero,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        )),
+      ],
+    );
+  }
+
+  List<MapPost> _filterPosts(List<MapPost> posts) {
+    return posts.where((post) {
+      // Search filter
+      final query = _postSearchController.text.toLowerCase();
+      final matchesSearch = query.isEmpty ||
+          post.title.toLowerCase().contains(query) ||
+          post.description.toLowerCase().contains(query) ||
+          (post.userName?.toLowerCase().contains(query) ?? false);
+
+      if (!matchesSearch) return false;
+
+      // Post Type filter
+      if (_selectedPostType != 'All') {
+        final isVideo = post.videoUrl != null && post.videoUrl!.isNotEmpty;
+        final isImage = post.photoUrls.isNotEmpty;
+        
+        if (_selectedPostType == 'Video' && !isVideo) return false;
+        if (_selectedPostType == 'Image' && !isImage) return false;
+        if (_selectedPostType == 'Text' && (isVideo || isImage)) return false;
+      }
+
+      // Category filter
+      if (_selectedCategory != 'All') {
+        if (post.category != _selectedCategory) return false;
+      }
+
+      return true;
+    }).toList();
+  }
+
   void _viewPostDetails(MapPost post) {
+    final isSpot = post.latitude != null && post.longitude != null;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => isSpot 
+            ? SpotDetailsScreen(post: post)
+            : PostDetailScreen(post: post),
+      ),
+    ).then((_) => _loadData());
+  }
+
+  void _editPost(MapPost post) {
     showDialog(
       context: context,
-      barrierColor: Colors.black87,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0A0A0A), // Solid dark background
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: AdminTheme.accent.withValues(alpha: 0.4)), // More visible border
-        ),
-        title: Row(
-          children: [
-            const Icon(Icons.description_rounded, color: AdminTheme.accent, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                post.title.toUpperCase(),
-                style: const TextStyle(color: AdminTheme.accent, fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (post.photoUrl != null && post.photoUrl!.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white10),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      post.photoUrl!,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        height: 200,
-                        color: Colors.white.withValues(alpha: 0.05),
-                        child: const Center(
-                          child: Icon(Icons.broken_image_rounded, color: AdminTheme.textMuted, size: 40),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              _buildDetailRow('Author', post.userName ?? "Anonymous"),
-              const SizedBox(height: 8),
-              _buildDetailRow('Category', post.category),
-              const SizedBox(height: 8),
-              _buildDetailRow('Upvotes', post.voteScore.toString()),
-              const SizedBox(height: 8),
-              _buildDetailRow('Created', post.createdAt.toLocal().toString().split('.')[0]),
-              const Divider(color: Colors.white10, height: 24),
-              const Text(
-                'DESCRIPTION',
-                style: TextStyle(fontSize: 10, color: AdminTheme.textMuted, fontFamily: 'monospace'),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                post.description.isEmpty ? 'No description provided' : post.description,
-                style: const TextStyle(color: AdminTheme.textPrimary, fontSize: 14),
-              ),
-              if (post.tags.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text(
-                  'TAGS',
-                  style: TextStyle(fontSize: 10, color: AdminTheme.textMuted, fontFamily: 'monospace'),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: post.tags.map((tag) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AdminTheme.accent.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AdminTheme.accent.withValues(alpha: 0.2)),
-                    ),
-                    child: Text(
-                      '#$tag',
-                      style: const TextStyle(color: AdminTheme.accent, fontSize: 10, fontWeight: FontWeight.bold),
-                    ),
-                  )).toList(),
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CLOSE', style: TextStyle(color: AdminTheme.textMuted, fontFamily: 'monospace')),
-          ),
-        ],
+      builder: (context) => EditPostDialog(
+        post: post,
+        onPostUpdated: () {
+          _loadData();
+        },
       ),
     );
   }
@@ -944,6 +1041,150 @@ class _AdminDashboardState extends State<AdminDashboard>
         ),
       ],
     );
+  }
+
+  Widget _buildVerificationTab() {
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() {
+          _unverifiedPostsFuture = _adminService.getUnverifiedPosts();
+        });
+      },
+      child: FutureBuilder<List<MapPost>>(
+        future: _unverifiedPostsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: AdminTheme.accent));
+          }
+
+          if (snapshot.hasError) {
+            return _buildErrorState('Error loading unverified posts', snapshot.error.toString());
+          }
+
+          final posts = snapshot.data ?? [];
+
+          if (posts.isEmpty) {
+            return _buildEmptyState(
+              Icons.verified_rounded,
+              'No pending verifications',
+              'All spots have been reviewed.',
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: posts.length,
+            itemBuilder: (context, index) {
+              final post = posts[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: AdminTheme.glassDecoration(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AdminTheme.accent.withValues(alpha: 0.1),
+                        child: const Icon(Icons.location_on_rounded, color: AdminTheme.accent, size: 20),
+                      ),
+                      title: Text(
+                        post.title,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        'by ${post.userName ?? "Anonymous"} • ${_formatTimestamp(post.createdAt)}',
+                        style: const TextStyle(color: AdminTheme.textMuted, fontSize: 12),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.visibility_rounded, color: AdminTheme.accent),
+                        onPressed: () => _viewPostDetails(post),
+                      ),
+                    ),
+                    if (post.photoUrl != null && post.photoUrl!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            post.photoUrl!,
+                            height: 150,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              height: 150,
+                              color: Colors.white.withValues(alpha: 0.05),
+                              child: const Center(child: Icon(Icons.broken_image_rounded)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            post.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: AdminTheme.textSecondary, fontSize: 13),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _verifyPost(post.id!),
+                                  icon: const Icon(Icons.check_circle_rounded),
+                                  label: const Text('VERIFY & AWARD 5 PTS'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AdminTheme.accent,
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              IconButton(
+                                onPressed: () => _deletePost(post.id!),
+                                icon: const Icon(Icons.delete_outline_rounded, color: AdminTheme.error),
+                                tooltip: 'Reject & Delete',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _verifyPost(String postId) async {
+    try {
+      await _adminService.verifyMapPost(postId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Spot verified and points awarded!'),
+            backgroundColor: AdminTheme.success,
+          ),
+        );
+        setState(() {
+          _unverifiedPostsFuture = _adminService.getUnverifiedPosts();
+          _analyticsData = _loadAnalytics(); // Refresh analytics too
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHelper.showError(context, 'Error verifying spot: $e');
+      }
+    }
   }
 
   Widget _buildAnalyticRow(
@@ -1381,6 +1622,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     final username = user['username'] as String? ?? 'Unknown User';
     final email = user['email'] as String? ?? 'No email';
     final isAdmin = user['is_admin'] == true;
+    final isVerified = user['is_verified'] == true;
     final isBanned = user['is_banned'] == true;
     final points = user['points'] as num? ?? 0;
 
@@ -1428,6 +1670,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               ),
             ),
             if (isAdmin) _buildBadge('ADMIN', AdminTheme.accent),
+            if (isVerified) _buildBadge('VERIFIED', Colors.blue),
             if (isBanned) _buildBadge('BANNED', AdminTheme.error),
           ],
         ),
@@ -1500,10 +1743,21 @@ class _AdminDashboardState extends State<AdminDashboard>
     final email = user['email'] as String? ?? 'No email';
     final userId = user['id'] as String? ?? '';
     final isAdmin = user['is_admin'] == true;
+    final isVerified = user['is_verified'] == true;
     final isBanned = user['is_banned'] == true;
     final banReason = user['ban_reason'] as String?;
     final points = user['points'] as num? ?? 0;
     final canPost = user['can_post'] != false;
+
+    // Fetch XP history and scores
+    final xpHistoryFuture = _adminService.getXpHistory(userId);
+    // We need a way to get UserScores directly. AdminService doesn't expose it easily, but we can use PointsService logic or add a method.
+    // Actually, let's just fetch the scores directly here since we have SupabaseService
+    final scoresFuture = Supabase.instance.client
+        .from('user_scores')
+        .select()
+        .eq('user_id', userId)
+        .maybeSingle();
 
     await showDialog(
       context: context,
@@ -1517,41 +1771,141 @@ class _AdminDashboardState extends State<AdminDashboard>
           username.toUpperCase(),
           style: const TextStyle(color: AdminTheme.accent, fontFamily: 'monospace', fontWeight: FontWeight.bold),
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDetailRow('Email', email),
-              const SizedBox(height: 12),
-              _buildDetailRow('User ID', userId),
-              const SizedBox(height: 12),
-              _buildDetailRow('Points', points.toString()),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _buildStatusBadge(isAdmin ? 'ADMIN' : 'USER', isAdmin ? AdminTheme.accent : AdminTheme.textMuted),
-                  const SizedBox(width: 8),
-                  _buildStatusBadge(isBanned ? 'BANNED' : 'ACTIVE', isBanned ? AdminTheme.error : AdminTheme.success),
-                ],
-              ),
-              if (isBanned && banReason != null) ...[
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDetailRow('Email', email),
                 const SizedBox(height: 12),
-                _buildDetailRow('Ban Reason', banReason),
-              ],
-              const SizedBox(height: 24),
-              const Text(
-                'ADMIN_ACTIONS',
-                style: TextStyle(fontSize: 10, color: AdminTheme.accent, fontFamily: 'monospace'),
-              ),
-              const SizedBox(height: 12),
+                _buildDetailRow('User ID', userId),
+                const SizedBox(height: 12),
+                _buildDetailRow('Wallet Balance', points.toString()),
+                const SizedBox(height: 12),
+                
+                // Scores Section
+                FutureBuilder<Map<String, dynamic>?>(
+                  future: scoresFuture,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox.shrink();
+                    final data = snapshot.data!;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Divider(color: Colors.white10),
+                        const Text('SCORES', style: TextStyle(color: AdminTheme.accent, fontSize: 10, fontFamily: 'monospace')),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildScoreItem('MAP', data['map_score']),
+                            _buildScoreItem('PLAYER', data['player_score']),
+                            _buildScoreItem('RANKING', data['ranking_score']),
+                          ],
+                        ),
+                        const Divider(color: Colors.white10),
+                      ],
+                    );
+                  },
+                ),
+
+                Row(
+                  children: [
+                    _buildStatusBadge(isAdmin ? 'ADMIN' : 'USER', isAdmin ? AdminTheme.accent : AdminTheme.textMuted),
+                    const SizedBox(width: 8),
+                    _buildStatusBadge(isVerified ? 'VERIFIED' : 'UNVERIFIED', isVerified ? Colors.blue : AdminTheme.textMuted),
+                    const SizedBox(width: 8),
+                    _buildStatusBadge(isBanned ? 'BANNED' : 'ACTIVE', isBanned ? AdminTheme.error : AdminTheme.success),
+                  ],
+                ),
+                if (isBanned && banReason != null) ...[
+                  const SizedBox(height: 12),
+                  _buildDetailRow('Ban Reason', banReason),
+                ],
+                
+                const SizedBox(height: 24),
+                const Text(
+                  'XP_HISTORY',
+                  style: TextStyle(fontSize: 10, color: AdminTheme.accent, fontFamily: 'monospace'),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                    future: xpHistoryFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                      }
+                      final history = snapshot.data ?? [];
+                      if (history.isEmpty) {
+                        return const Center(
+                          child: Text('No history found', style: TextStyle(color: AdminTheme.textMuted, fontSize: 12)),
+                        );
+                      }
+                      return ListView.separated(
+                        itemCount: history.length,
+                        separatorBuilder: (context, index) => const Divider(height: 1, color: Colors.white10),
+                        itemBuilder: (context, index) {
+                          final item = history[index];
+                          final amount = (item['amount'] as num).toDouble();
+                          final isPositive = amount >= 0;
+                          return ListTile(
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                            title: Text(
+                              item['reason'] ?? 'Unknown',
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+                            subtitle: Text(
+                              _formatTimestamp(DateTime.parse(item['created_at'])),
+                              style: const TextStyle(color: AdminTheme.textMuted, fontSize: 10),
+                            ),
+                            trailing: Text(
+                              '${isPositive ? '+' : ''}${amount.toStringAsFixed(1)}',
+                              style: TextStyle(
+                                color: isPositive ? AdminTheme.success : AdminTheme.error,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                const Text(
+                  'ADMIN_ACTIONS',
+                  style: TextStyle(fontSize: 10, color: AdminTheme.accent, fontFamily: 'monospace'),
+                ),
+                const SizedBox(height: 12),
+                _buildActionButton(
+                  isAdmin ? 'Demote from Admin' : 'Promote to Admin',
+                  isAdmin ? Icons.remove_moderator_rounded : Icons.admin_panel_settings_rounded,
+                  isAdmin ? AdminTheme.warning : AdminTheme.accent,
+                  () {
+                    Navigator.pop(context);
+                    _toggleAdminStatus(userId, username, !isAdmin);
+                  },
+                ),
+              const SizedBox(height: 8),
               _buildActionButton(
-                isAdmin ? 'Demote from Admin' : 'Promote to Admin',
-                isAdmin ? Icons.remove_moderator_rounded : Icons.admin_panel_settings_rounded,
-                isAdmin ? AdminTheme.warning : AdminTheme.accent,
+                isVerified ? 'Unverify User' : 'Verify User',
+                isVerified ? Icons.verified_user_outlined : Icons.verified_user_rounded,
+                isVerified ? AdminTheme.textMuted : Colors.blue,
                 () {
                   Navigator.pop(context);
-                  _toggleAdminStatus(userId, username, !isAdmin);
+                  _toggleVerificationStatus(userId, username, !isVerified);
                 },
               ),
               const SizedBox(height: 8),
@@ -1606,12 +1960,13 @@ class _AdminDashboardState extends State<AdminDashboard>
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CLOSE', style: TextStyle(color: AdminTheme.textMuted)),
-          ),
-        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CLOSE', style: TextStyle(color: AdminTheme.textMuted)),
+        ),
+      ],
       ),
     );
   }
@@ -1628,6 +1983,31 @@ class _AdminDashboardState extends State<AdminDashboard>
         label,
         style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
       ),
+    );
+  }
+
+  Widget _buildScoreItem(String label, dynamic value) {
+    final score = (value as num?)?.toDouble() ?? 0.0;
+    return Column(
+      children: [
+        Text(
+          score.toStringAsFixed(1),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AdminTheme.textMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1714,6 +2094,66 @@ class _AdminDashboardState extends State<AdminDashboard>
       } catch (e) {
         if (mounted) {
           ErrorHelper.showError(context, 'Error updating admin status: $e');
+        }
+      }
+    }
+  }
+
+  Future<void> _toggleVerificationStatus(String userId, String username, bool makeVerified) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AdminTheme.secondary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: AdminTheme.accent.withValues(alpha: 0.2)),
+        ),
+        title: Text(
+          makeVerified ? 'VERIFY_USER' : 'UNVERIFY_USER',
+          style: const TextStyle(color: AdminTheme.accent, fontFamily: 'monospace', fontSize: 16),
+        ),
+        content: Text(
+          makeVerified
+              ? 'Are you sure you want to verify $username?'
+              : 'Are you sure you want to remove verification from $username?',
+          style: const TextStyle(color: AdminTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('CANCEL', style: TextStyle(color: AdminTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: makeVerified ? Colors.blue : AdminTheme.warning,
+              foregroundColor: Colors.black,
+            ),
+            child: Text(makeVerified ? 'VERIFY' : 'UNVERIFY'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        if (makeVerified) {
+          await _adminService.verifyUser(userId);
+        } else {
+          await _adminService.unverifyUser(userId);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(makeVerified ? 'User verified' : 'User verification removed'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+          _loadData();
+        }
+      } catch (e) {
+        if (mounted) {
+          ErrorHelper.showError(context, 'Error updating verification status: $e');
         }
       }
     }

@@ -690,7 +690,7 @@ class SupabaseService {
           .select('player1_id, player2_id, winner_id, status')
           .eq('status', 'completed');
 
-      if (battles == null || (battles as List).isEmpty) return [];
+      if ((battles as List).isEmpty) return [];
 
       // Calculate stats per user
       final Map<String, Map<String, dynamic>> userStats = {};
@@ -858,18 +858,12 @@ class SupabaseService {
   // Upload post image to Supabase storage
   static Future<String> uploadPostImage(File imageFile, String userId) async {
     try {
-      print('SupabaseService: Starting uploadPostImage for user $userId');
-      print('SupabaseService: Image path: ${imageFile.path}');
       
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filename = 'post_${userId}_$timestamp.jpg';
-      print('SupabaseService: Target filename: $filename');
 
-      print('SupabaseService: Reading image bytes...');
       final bytes = await imageFile.readAsBytes();
-      print('SupabaseService: Read ${bytes.length} bytes');
       
-      print('SupabaseService: Uploading to storage bucket "post_images"...');
       await _client.storage
           .from('post_images')
           .uploadBinary(
@@ -878,36 +872,29 @@ class SupabaseService {
             fileOptions: const FileOptions(contentType: 'image/jpeg'),
           );
       
-      print('SupabaseService: Upload successful, getting public URL...');
       final publicUrl = _client.storage
           .from('post_images')
           .getPublicUrl(filename);
       
-      print('SupabaseService: Public URL: $publicUrl');
       return publicUrl;
     } on SocketException catch (e) {
-      print('SupabaseService: SocketException: $e');
       throw AppNetworkException(
         'Network error during image upload',
         originalError: e,
       );
     } on async.TimeoutException catch (e) {
-      print('SupabaseService: TimeoutException: $e');
       throw AppTimeoutException(
         'Image upload timed out',
         userMessage: 'Upload is taking too long. Please check your connection and try again.',
         originalError: e,
       );
     } on FileSystemException catch (e) {
-      print('SupabaseService: FileSystemException: $e');
       throw AppStorageException(
         'File system error: $e',
         userMessage: 'Unable to read the image file. Please try selecting it again.',
         originalError: e,
       );
-    } catch (e, stackTrace) {
-      print('SupabaseService: Unknown error: $e');
-      print('SupabaseService: Stack trace: $stackTrace');
+    } catch (e) {
       throw AppStorageException(
         'Failed to upload image: $e',
         userMessage: 'Image upload failed. Please try again.',
@@ -919,18 +906,12 @@ class SupabaseService {
   // Upload post video to Supabase storage
   static Future<String> uploadPostVideo(File videoFile, String userId) async {
     try {
-      print('SupabaseService: Starting uploadPostVideo for user $userId');
-      print('SupabaseService: Video path: ${videoFile.path}');
       
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filename = 'post_video_${userId}_$timestamp.mp4';
-      print('SupabaseService: Target filename: $filename');
 
-      print('SupabaseService: Reading video bytes...');
       final bytes = await videoFile.readAsBytes();
-      print('SupabaseService: Read ${bytes.length} bytes');
       
-      print('SupabaseService: Uploading to storage bucket "post_videos"...');
       // Ensure bucket exists or use a shared bucket
       await _client.storage
           .from('post_images') // Reusing post_images bucket for now, or create post_videos
@@ -940,15 +921,12 @@ class SupabaseService {
             fileOptions: const FileOptions(contentType: 'video/mp4'),
           );
       
-      print('SupabaseService: Upload successful, getting public URL...');
       final publicUrl = _client.storage
           .from('post_images')
           .getPublicUrl(filename);
       
-      print('SupabaseService: Public URL: $publicUrl');
       return publicUrl;
     } catch (e) {
-      print('SupabaseService: Video upload error: $e');
       throw AppStorageException(
         'Failed to upload video: $e',
         userMessage: 'Video upload failed. Please try again.',
@@ -962,14 +940,12 @@ class SupabaseService {
   /// Upload media to user's profile gallery (no points awarded)
   static Future<String> uploadProfileMedia(File mediaFile, String userId, String mediaType) async {
     try {
-      print('SupabaseService: Starting uploadProfileMedia for user $userId, type: $mediaType');
       
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final extension = mediaType == 'video' ? 'mp4' : 'jpg';
       final filename = 'profile_media_${userId}_$timestamp.$extension';
       
       final bytes = await mediaFile.readAsBytes();
-      print('SupabaseService: Read ${bytes.length} bytes');
       
       final contentType = mediaType == 'video' ? 'video/mp4' : 'image/jpeg';
       
@@ -985,10 +961,8 @@ class SupabaseService {
           .from('post_images')
           .getPublicUrl(filename);
       
-      print('SupabaseService: Uploaded profile media: $publicUrl');
       return publicUrl;
     } catch (e) {
-      print('SupabaseService: Profile media upload error: $e');
       throw AppStorageException(
         'Failed to upload media: $e',
         userMessage: 'Media upload failed. Please try again.',
@@ -1176,13 +1150,12 @@ class SupabaseService {
             'quality_rating': rating,
             'security_rating': securityRating,
             'popularity_rating': popularityRating,
+            'is_verified': false,
             'created_at': DateTime.now().toIso8601String(),
           })
           .select()
           .single();
 
-      print('DEBUG: SupabaseService.createMapPost - Payload sent. Photo URLs: $photoUrls');
-      print('DEBUG: SupabaseService.createMapPost - Response: $response');
 
       final post = MapPost.fromMap(response);
       
@@ -1198,7 +1171,6 @@ class SupabaseService {
             );
           } catch (e) {
             // Continue even if profile media creation fails
-            print('DEBUG: Failed to create profile media entry: $e');
           }
         }
       }
@@ -1212,12 +1184,12 @@ class SupabaseService {
             caption: title,
           );
         } catch (e) {
-          print('DEBUG: Failed to create profile media entry for video: $e');
+          // Ignore profile media creation failure
         }
       }
       
-      // Award points for creating a post
-      await awardPoints(userId, 5.0, 'create_post', description: 'Created a new spot: $title');
+      // Award points for creating a post - REMOVED: Now awarded after admin verification
+      // await awardPoints(userId, 5.0, 'create_post', description: 'Created a new spot: $title');
       
       return post;
     } on SocketException catch (e) {
@@ -1774,22 +1746,24 @@ class SupabaseService {
       
       // Fetch user profiles for these posts to get up-to-date display names and avatars
       final userIds = posts.map((p) => p['user_id'] as String).toSet().toList();
-      Map<String, Map<String, String?>> userProfiles = {};
+      Map<String, Map<String, dynamic>> userProfiles = {};
       
       if (userIds.isNotEmpty) {
         try {
           final profilesResponse = await _client
               .from('user_profiles')
-              .select('id, display_name, username, avatar_url')
+              .select('id, display_name, username, avatar_url, is_verified')
               .filter('id', 'in', userIds);
               
           for (final profile in (profilesResponse as List)) {
             final id = profile['id'] as String;
             final name = profile['display_name'] as String? ?? profile['username'] as String?;
             final avatarUrl = profile['avatar_url'] as String?;
+            final isVerified = profile['is_verified'] as bool? ?? false;
             userProfiles[id] = {
               'name': name,
               'avatar_url': avatarUrl,
+              'is_verified': isVerified,
             };
           }
         } catch (e) {
@@ -1823,6 +1797,7 @@ class SupabaseService {
         if (userProfiles.containsKey(userId)) {
           post['user_name'] = userProfiles[userId]!['name'];
           post['avatar_url'] = userProfiles[userId]!['avatar_url'];
+          post['is_user_verified'] = userProfiles[userId]!['is_verified'];
         } else {
           // Clear email from user_name if no username is set
           // This ensures UI shows 'User' instead of email

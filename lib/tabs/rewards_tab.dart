@@ -116,8 +116,6 @@ class _RewardsTabState extends State<RewardsTab> {
                           const SizedBox(height: 24),
                           _buildEarnSection(context),
                           const SizedBox(height: 24),
-                          _buildCryptoTeaser(),
-                          const SizedBox(height: 24),
                           _buildTransactionHistory(context),
                           const SizedBox(height: 40),
                         ],
@@ -507,17 +505,6 @@ class _RewardsTabState extends State<RewardsTab> {
               const SizedBox(width: 12),
               _buildWatchAdCard(),
               const SizedBox(width: 12),
-              /* 
-              // Removed redundant Daily Login card as it is now a main button
-              _buildEarnCard(
-                icon: Icons.login,
-                color: const Color(0xFF00FF41),
-                title: 'Daily Login',
-                points: '+10+',
-                onTap: _checkDailyLogin,
-              ),
-              const SizedBox(width: 12),
-              */
               _buildEarnCard(
                 icon: Icons.sports_kabaddi,
                 color: const Color(0xFF00FF41),
@@ -631,94 +618,6 @@ class _RewardsTabState extends State<RewardsTab> {
     );
   }
 
-  Widget _buildCryptoTeaser() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.black,
-            const Color(0xFF001a00),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF00FF41), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF00FF41).withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00FF41).withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF00FF41)),
-                ),
-                child: const Icon(Icons.currency_bitcoin, color: Color(0xFF00FF41), size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'CRYPTO CONVERSION',
-                      style: TextStyle(
-                        color: Color(0xFF00FF41),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        letterSpacing: 1.2,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFFFD700)),
-                      ),
-                      child: const Text(
-                        'COMING SOON',
-                        style: TextStyle(
-                          color: Color(0xFFFFD700),
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Convert points to tokens for real value & DAO governance.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 13,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildTransactionHistory(BuildContext context) {
     return Column(

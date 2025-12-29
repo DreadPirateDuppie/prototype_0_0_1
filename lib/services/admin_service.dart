@@ -1,6 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 import '../config/service_locator.dart';
+import '../models/post.dart';
+import 'points_service.dart';
 
 /// Service responsible for admin-related operations
 class AdminService {
@@ -144,6 +146,61 @@ class AdminService {
     }
   }
 
+  /// Get all unverified map posts
+  Future<List<MapPost>> getUnverifiedPosts() async {
+    try {
+      final response = await _client
+          .from('map_posts')
+          .select()
+          .or('is_verified.eq.false,is_verified.is.null')
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null)
+          .order('created_at', ascending: false);
+
+      final posts = (response as List).cast<Map<String, dynamic>>();
+      return posts.map((p) => MapPost.fromMap(p)).toList();
+    } catch (e) {
+      developer.log('Error getting unverified posts: $e', name: 'AdminService');
+      return [];
+    }
+  }
+
+  /// Verify a map post and award points to the creator
+  Future<void> verifyMapPost(String postId) async {
+    try {
+      // 1. Get the post to find the user_id and title
+      final postResponse = await _client
+          .from('map_posts')
+          .select('user_id, title')
+          .eq('id', postId)
+          .single();
+      
+      final userId = postResponse['user_id'] as String;
+      final title = postResponse['title'] as String;
+
+      // 2. Update the post to verified
+      await _client
+          .from('map_posts')
+          .update({'is_verified': true})
+          .eq('id', postId);
+
+      // 3. Award points to the creator
+      final pointsService = PointsService();
+      await pointsService.awardPoints(
+        userId, 
+        5.0, 
+        'create_post', 
+        description: 'Spot verified: $title',
+        referenceId: postId,
+      );
+
+      developer.log('Verified post $postId and awarded points to $userId', name: 'AdminService');
+    } catch (e) {
+      developer.log('Error verifying post: $e', name: 'AdminService');
+      throw Exception('Failed to verify post: $e');
+    }
+  }
+
   /// Get pending videos for moderation
   Future<List<Map<String, dynamic>>> getPendingVideos() async {
     try {
@@ -176,58 +233,52 @@ class AdminService {
   /// Get all users (for admin management)
   Future<List<Map<String, dynamic>>> getAllUsers({int limit = 1000}) async {
     try {
-      // Level 1: Try to get all columns including points from user_wallets
+      // 1. Fetch user profiles
       final response = await _client
           .from('user_profiles')
-          .select('id, username, display_name, email, avatar_url, bio, is_admin, is_banned, ban_reason, banned_at, created_at, updated_at, can_post, user_wallets(balance)')
+          .select('id, username, display_name, email, avatar_url, bio, is_admin, is_verified, is_banned, ban_reason, banned_at, created_at, updated_at, can_post')
           .order('created_at', ascending: false)
           .limit(limit);
 
       final users = (response as List).cast<Map<String, dynamic>>();
       
-      // Map user_wallets balance to points field for UI consistency
+      if (users.isEmpty) return [];
+
+      // 2. Fetch wallet balances for these users
+      final userIds = users.map((u) => u['id'] as String).toList();
+      final walletsResponse = await _client
+          .from('user_wallets')
+          .select('user_id, balance')
+          .filter('user_id', 'in', userIds);
+
+      final wallets = (walletsResponse as List).cast<Map<String, dynamic>>();
+      final walletMap = {
+        for (var w in wallets) w['user_id'] as String: w['balance'] as num
+      };
+
+      // 3. Merge points into user data
       return users.map((u) {
-        final wallet = u['user_wallets'] as Map<String, dynamic>?;
+        final userId = u['id'] as String;
         return {
           ...u,
-          'points': wallet?['balance'] ?? 0.0,
+          'points': walletMap[userId] ?? 0.0,
         };
       }).toList();
     } catch (e) {
-      developer.log('Level 1 fetch failed, trying Level 2 (No email/can_post): $e', name: 'AdminService');
+      developer.log('Error getting users in AdminService: $e', name: 'AdminService');
       
+      // Fallback to bare minimum if Level 1 fails (e.g., missing columns)
       try {
-        // Level 2: Fallback to a set of columns that are likely to exist, still trying to get points
         final response = await _client
             .from('user_profiles')
-            .select('id, username, display_name, is_admin, is_banned, created_at, user_wallets(balance)')
+            .select('id, username, display_name, is_admin, created_at')
             .order('created_at', ascending: false)
             .limit(limit);
 
-        final users = (response as List).cast<Map<String, dynamic>>();
-        return users.map((u) {
-          final wallet = u['user_wallets'] as Map<String, dynamic>?;
-          return {
-            ...u,
-            'points': wallet?['balance'] ?? 0.0,
-          };
-        }).toList();
+        return (response as List).cast<Map<String, dynamic>>();
       } catch (e2) {
-        developer.log('Level 2 fetch failed, trying Level 3 (Bare Minimum, no points): $e2', name: 'AdminService');
-        
-        try {
-          // Level 3: Bare minimum columns that should always exist in user_profiles
-          final response = await _client
-              .from('user_profiles')
-              .select('id, username, display_name, is_admin, created_at')
-              .order('created_at', ascending: false)
-              .limit(limit);
-
-          return (response as List).cast<Map<String, dynamic>>();
-        } catch (e3) {
-          developer.log('Critical error getting users: $e3', name: 'AdminService');
-          throw Exception('Failed to load users even with bare minimum columns: $e3');
-        }
+        developer.log('Critical error getting users: $e2', name: 'AdminService');
+        throw Exception('Failed to load users: $e2');
       }
     }
   }
@@ -244,6 +295,22 @@ class AdminService {
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
       developer.log('Error getting point transactions: $e', name: 'AdminService');
+      return [];
+    }
+  }
+
+  /// Get XP history for a specific user
+  Future<List<Map<String, dynamic>>> getXpHistory(String userId) async {
+    try {
+      final response = await _client
+          .from('xp_history')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error getting XP history: $e', name: 'AdminService');
       return [];
     }
   }
@@ -354,6 +421,32 @@ class AdminService {
     } catch (e) {
       developer.log('Error toggling posting restriction: $e', name: 'AdminService');
       throw Exception('Failed to toggle posting restriction: $e');
+    }
+  }
+
+  /// Verify a user
+  Future<void> verifyUser(String userId) async {
+    try {
+      await _client.from('user_profiles').update({
+        'is_verified': true,
+      }).eq('id', userId);
+      developer.log('Verified user $userId', name: 'AdminService');
+    } catch (e) {
+      developer.log('Error verifying user: $e', name: 'AdminService');
+      throw Exception('Failed to verify user: $e');
+    }
+  }
+
+  /// Unverify a user
+  Future<void> unverifyUser(String userId) async {
+    try {
+      await _client.from('user_profiles').update({
+        'is_verified': false,
+      }).eq('id', userId);
+      developer.log('Unverified user $userId', name: 'AdminService');
+    } catch (e) {
+      developer.log('Error unverifying user: $e', name: 'AdminService');
+      throw Exception('Failed to unverify user: $e');
     }
   }
 

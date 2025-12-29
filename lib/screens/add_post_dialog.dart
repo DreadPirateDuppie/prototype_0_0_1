@@ -64,7 +64,6 @@ class _AddPostDialogState extends State<AddPostDialog> {
         }
       }
     } catch (e) {
-      print('Error picking video: $e');
       if (mounted) {
         ErrorHelper.showError(context, 'Error picking video: $e');
       }
@@ -78,11 +77,9 @@ class _AddPostDialogState extends State<AddPostDialog> {
   }
 
   Future<void> _pickImages() async {
-    print('DEBUG: _pickImages called, _isPickingImage: $_isPickingImage');
 
     // Add extra check and force reset if needed
     if (_isPickingImage) {
-      print('DEBUG: Image picker already active, forcing reset and ignoring');
       setState(() {
         _isPickingImage = false;
       });
@@ -94,13 +91,10 @@ class _AddPostDialogState extends State<AddPostDialog> {
     });
 
     try {
-      print('DEBUG: Creating ImagePicker instance');
       final ImagePicker picker = ImagePicker();
 
-      print('DEBUG: Calling pickMultiImage');
       final List<XFile> images = await picker.pickMultiImage();
 
-      print('DEBUG: Picked ${images.length} images');
 
       if (images.isNotEmpty) {
         if (mounted) {
@@ -111,43 +105,35 @@ class _AddPostDialogState extends State<AddPostDialog> {
 
         for (int i = 0; i < images.length; i++) {
           final image = images[i];
-          print('DEBUG: Processing image $i: ${image.path}');
 
           try {
             // Try compression first
             final compressedImage = await ImageService.compressImage(File(image.path));
-            print('DEBUG: Compression result for image $i: ${compressedImage?.path ?? "null"}');
 
             if (compressedImage != null) {
               if (mounted) {
                 setState(() {
                   _selectedImages.add(compressedImage);
-                  print('DEBUG: Added compressed image $i. Total images: ${_selectedImages.length}');
                 });
               }
             } else {
-              print('DEBUG: Compression returned null for image $i, trying original');
               // If compression fails, use original
               if (mounted) {
                 setState(() {
                   _selectedImages.add(File(image.path));
-                  print('DEBUG: Added original image $i. Total images: ${_selectedImages.length}');
                 });
               }
             }
           } catch (imageError) {
-            print('DEBUG: Error processing image $i: $imageError');
             // Try to add original as fallback
             if (mounted) {
               setState(() {
                 _selectedImages.add(File(image.path));
-                print('DEBUG: Added original image as fallback. Total images: ${_selectedImages.length}');
               });
             }
           }
         }
 
-        print('DEBUG: Final image count: ${_selectedImages.length}');
 
         if (mounted && _selectedImages.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -155,11 +141,8 @@ class _AddPostDialogState extends State<AddPostDialog> {
           );
         }
       } else {
-        print('DEBUG: No images selected');
       }
-    } catch (e, stackTrace) {
-      print('DEBUG: Error in _pickImages: $e');
-      print('DEBUG: Stack trace: $stackTrace');
+    } catch (e) {
       if (mounted) {
         // Don't show error for "already_active" - just silently handle it
         if (!e.toString().contains('already_active')) {
@@ -171,18 +154,10 @@ class _AddPostDialogState extends State<AddPostDialog> {
         setState(() {
           _isPickingImage = false;
         });
-        print('DEBUG: _pickImages completed, _isPickingImage set to false');
       }
     }
   }
 
-  void _removeImage(int index) {
-    print('DEBUG: _removeImage called with index $index, current length: ${_selectedImages.length}');
-    setState(() {
-      _selectedImages.removeAt(index);
-      print('DEBUG: After removal, new length: ${_selectedImages.length}');
-    });
-  }
 
   Future<void> _createPost() async {
     if (_titleController.text.trim().isEmpty ||
@@ -203,27 +178,21 @@ class _AddPostDialogState extends State<AddPostDialog> {
       final userName = await SupabaseService.getCurrentUserDisplayName();
 
       List<String> photoUrls = [];
-      print('DEBUG: Starting image uploads for ${_selectedImages.length} images');
       
       for (int i = 0; i < _selectedImages.length; i++) {
         final image = _selectedImages[i];
-        print('DEBUG: Uploading image $i: ${image.path}');
         
         try {
           final url = await SupabaseService.uploadPostImage(image, user.id);
-          if (url != null && url.isNotEmpty) {
+          if (url.isNotEmpty) {
             photoUrls.add(url);
-            print('DEBUG: Successfully uploaded image $i, URL: $url');
           } else {
-            print('DEBUG: Failed to upload image $i: null or empty URL');
           }
         } catch (uploadError) {
-          print('DEBUG: Error uploading image $i: $uploadError');
           // Continue with other images even if one fails
         }
       }
       
-      print('DEBUG: Uploaded ${photoUrls.length} out of ${_selectedImages.length} images');
 
       if (_selectedImages.isNotEmpty && photoUrls.isEmpty) {
         throw Exception('Failed to upload any images. Please check your connection and try again.');
@@ -238,20 +207,16 @@ class _AddPostDialogState extends State<AddPostDialog> {
       // Upload video if selected
       String? videoUrl;
       if (_selectedVideo != null) {
-        print('DEBUG: Uploading video: ${_selectedVideo!.path}');
         try {
           videoUrl = await SupabaseService.uploadPostVideo(_selectedVideo!, user.id);
-          print('DEBUG: Video uploaded successfully: $videoUrl');
         } catch (videoError) {
-          print('DEBUG: Error uploading video: $videoError');
           // Decide if we should fail the whole post or just skip the video
           // For now, let's fail and tell the user
           throw Exception('Failed to upload video: $videoError');
         }
       }
 
-      print('DEBUG: Creating post with ${photoUrls.length} images and video: $videoUrl');
-      final post = await SupabaseService.createMapPost(
+      await SupabaseService.createMapPost(
         userId: user.id,
         userName: userName ?? 'Anonymous',
         userEmail: user.email ?? 'No Email',
@@ -268,15 +233,12 @@ class _AddPostDialogState extends State<AddPostDialog> {
         popularityRating: _popularityRating,
       );
 
-      print('DEBUG: Post created successfully: ${post?.id}');
 
       if (mounted) {
         widget.onPostAdded();
         Navigator.of(context).pop();
       }
-    } catch (e, stackTrace) {
-      print('DEBUG: Error in _createPost: $e');
-      print('DEBUG: Stack trace: $stackTrace');
+    } catch (e) {
       if (mounted) {
         ErrorHelper.showError(context, 'Error creating post: $e');
       }
@@ -556,11 +518,9 @@ class _AddPostDialogState extends State<AddPostDialog> {
                               color: Colors.transparent,
                               child: InkWell(
                                 onTap: () {
-                                  print('DEBUG: Removing image at index $index, total images: ${_selectedImages.length}');
                                   setState(() {
                                     _selectedImages.removeAt(index);
                                   });
-                                  print('DEBUG: After removal, total images: ${_selectedImages.length}');
                                 },
                                 borderRadius: BorderRadius.circular(20),
                                 child: Container(

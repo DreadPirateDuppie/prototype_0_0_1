@@ -37,6 +37,7 @@ class _EditPostDialogState extends State<EditPostDialog> {
   late double _popularityRating;
   late double _securityRating;
   late double _qualityRating;
+  late bool _isSpot;
 
   static const matrixGreen = Color(0xFF00FF41);
   static const matrixBlack = Color(0xFF000000);
@@ -58,6 +59,7 @@ class _EditPostDialogState extends State<EditPostDialog> {
     _popularityRating = widget.post.popularityRating;
     _securityRating = widget.post.securityRating;
     _qualityRating = widget.post.qualityRating;
+    _isSpot = widget.post.latitude != null && widget.post.longitude != null;
   }
 
   @override
@@ -258,7 +260,7 @@ class _EditPostDialogState extends State<EditPostDialog> {
       try {
         await SupabaseService.deletePost(widget.post.id!);
         if (mounted) {
-          Navigator.of(context).pop(); // Close edit dialog
+          Navigator.of(context).pop(true); // Close edit dialog and signal deletion
           widget.onPostUpdated(); // Trigger refresh
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -344,37 +346,39 @@ class _EditPostDialogState extends State<EditPostDialog> {
                 maxLines: 4,
               ),
               const SizedBox(height: 16),
-              Theme(
-                data: Theme.of(context).copyWith(
-                  canvasColor: matrixBlack,
+              if (_isSpot) ...[
+                Theme(
+                  data: Theme.of(context).copyWith(
+                    canvasColor: matrixBlack,
+                  ),
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedCategory,
+                    style: const TextStyle(color: matrixGreen, fontFamily: 'monospace'),
+                    decoration: _buildMatrixInputDecoration('Category', 'Select category'),
+                    dropdownColor: matrixBlack,
+                    items: _categories.map((category) {
+                      return DropdownMenuItem(
+                        value: category,
+                        child: Text(category),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedCategory = value;
+                        });
+                      }
+                    },
+                  ),
                 ),
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedCategory,
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _tagsController,
                   style: const TextStyle(color: matrixGreen, fontFamily: 'monospace'),
-                  decoration: _buildMatrixInputDecoration('Category', 'Select category'),
-                  dropdownColor: matrixBlack,
-                  items: _categories.map((category) {
-                    return DropdownMenuItem(
-                      value: category,
-                      child: Text(category),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _selectedCategory = value;
-                      });
-                    }
-                  },
+                  decoration: _buildMatrixInputDecoration('Tags', 'stairs, ledge, rail'),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _tagsController,
-                style: const TextStyle(color: matrixGreen, fontFamily: 'monospace'),
-                decoration: _buildMatrixInputDecoration('Tags', 'stairs, ledge, rail'),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
+              ],
               // Image section
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -517,44 +521,45 @@ class _EditPostDialogState extends State<EditPostDialog> {
               ),
               const SizedBox(height: 24),
               // Ratings section
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'RATINGS',
-                    style: TextStyle(
-                      color: matrixGreen,
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+              if (_isSpot)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'RATINGS',
+                      style: TextStyle(
+                        color: matrixGreen,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildRatingSlider(
-                    label: 'POPULARITY',
-                    value: _popularityRating,
-                    icon: Icons.local_fire_department_rounded,
-                    color: Colors.orange,
-                    onChanged: (val) => setState(() => _popularityRating = val),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildRatingSlider(
-                    label: 'SECURITY',
-                    value: _securityRating,
-                    icon: Icons.shield_rounded,
-                    color: Colors.blue,
-                    onChanged: (val) => setState(() => _securityRating = val),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildRatingSlider(
-                    label: 'QUALITY',
-                    value: _qualityRating,
-                    icon: Icons.star_rounded,
-                    color: matrixGreen,
-                    onChanged: (val) => setState(() => _qualityRating = val),
-                  ),
-                ],
-              ),
+                    const SizedBox(height: 16),
+                    _buildRatingSlider(
+                      label: 'POPULARITY',
+                      value: _popularityRating,
+                      icon: Icons.local_fire_department_rounded,
+                      color: Colors.orange,
+                      onChanged: (val) => setState(() => _popularityRating = val),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildRatingSlider(
+                      label: 'SECURITY',
+                      value: _securityRating,
+                      icon: Icons.shield_rounded,
+                      color: Colors.blue,
+                      onChanged: (val) => setState(() => _securityRating = val),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildRatingSlider(
+                      label: 'QUALITY',
+                      value: _qualityRating,
+                      icon: Icons.star_rounded,
+                      color: matrixGreen,
+                      onChanged: (val) => setState(() => _qualityRating = val),
+                    ),
+                  ],
+                ),
               const SizedBox(height: 32),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

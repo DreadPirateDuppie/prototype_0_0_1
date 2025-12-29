@@ -21,6 +21,7 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
   final _skaterNameController = TextEditingController();
   final _urlController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _tagsController = TextEditingController();
   bool _isSubmitting = false;
 
   @override
@@ -28,6 +29,7 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
     _skaterNameController.dispose();
     _urlController.dispose();
     _descriptionController.dispose();
+    _tagsController.dispose();
     super.dispose();
   }
 
@@ -51,12 +53,17 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception('User not logged in');
 
+      final tags = _tagsController.text.trim().isEmpty 
+          ? [] 
+          : _tagsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+
       await Supabase.instance.client.from('spot_videos').insert({
         'spot_id': widget.spotId,
         'user_id': user.id,
         'trick_name': _skaterNameController.text.trim(),
         'video_url': _urlController.text.trim().isEmpty ? null : _urlController.text.trim(),
         'description': _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+        'tags': tags,
         'created_at': DateTime.now().toIso8601String(),
       });
 
@@ -164,6 +171,19 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 3,
+                  textInputAction: TextInputAction.done,
+                ),
+                const SizedBox(height: 16),
+                
+                // Tags Field
+                TextFormField(
+                  controller: _tagsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Tags (comma separated)',
+                    hintText: 'e.g., flatground, technical, ledge',
+                    border: OutlineInputBorder(),
+                    helperText: 'Separate tags with commas',
+                  ),
                   textInputAction: TextInputAction.done,
                 ),
                 const SizedBox(height: 24),

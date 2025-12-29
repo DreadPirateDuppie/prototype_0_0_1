@@ -5,8 +5,6 @@ import '../providers/theme_provider.dart';
 import '../screens/admin_dashboard.dart';
 import '../utils/error_helper.dart';
 import '../screens/premium_screen.dart';
-import '../services/now_payments_service.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter/services.dart';
 

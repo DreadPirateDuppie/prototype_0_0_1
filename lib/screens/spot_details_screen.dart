@@ -12,6 +12,7 @@ import '../widgets/mini_map_snapshot.dart';
 import '../providers/navigation_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:latlong2/latlong.dart';
+import '../widgets/verified_badge.dart';
 
 class SpotDetailsScreen extends StatefulWidget {
   final MapPost post;
@@ -30,6 +31,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
   String _sortBy = 'recent';
   int _usersAtSpot = 0;
   bool _isLoadingUsers = true;
+  String _selectedTag = 'All';
 
   // Matrix theme colors
   static const Color matrixGreen = Color(0xFF00FF41);
@@ -111,7 +113,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
   }
 
   Future<void> _showEditDialog() async {
-    showDialog(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => EditPostDialog(
         post: currentPost,
@@ -134,6 +136,10 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
         },
       ),
     );
+
+    if (result == true && mounted) {
+      Navigator.of(context).pop(); // Close detail screen if post was deleted
+    }
   }
 
   void _showReportDialog() {
@@ -426,15 +432,21 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            currentPost.userName?.isNotEmpty == true
-                                ? currentPost.userName!
-                                : 'Unknown Skater',
-                            style: TextStyle(
-                              color: textColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                currentPost.userName?.isNotEmpty == true
+                                    ? currentPost.userName!
+                                    : 'Unknown Skater',
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              if (currentPost.isUserVerified)
+                                const VerifiedBadge(size: 16),
+                            ],
                           ),
                           Text(
                             currentPost.createdAt.toString().substring(0, 10),
@@ -467,7 +479,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                               });
                             }
                           } catch (e) {
-                            print('DEBUG: Error refreshing post after vote: $e');
+                            // Ignore refresh error
                           }
                         },
                       ),
@@ -763,6 +775,23 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  
+                  // Tag Filter Bar
+                  if (_tricks.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Container(
+                        height: 40,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            _buildTagFilter('All'),
+                            ..._getAllTags().map((tag) => _buildTagFilter(tag)),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -803,13 +832,21 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  final trick = _tricks[index];
+                  final filteredTricks = _selectedTag == 'All' 
+                      ? _tricks 
+                      : _tricks.where((t) => t.tags.contains(_selectedTag)).toList();
+                  
+                  if (index >= filteredTricks.length) return null;
+                  
+                  final trick = filteredTricks[index];
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     child: _buildTrickItem(trick),
                   );
                 },
-                childCount: _tricks.length,
+                childCount: (_selectedTag == 'All' 
+                    ? _tricks 
+                    : _tricks.where((t) => t.tags.contains(_selectedTag)).toList()).length,
               ),
             ),
             
@@ -854,9 +891,33 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
           trick.displayTitle,
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        subtitle: Text(
-          trick.timeAgo,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              trick.timeAgo,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+            ),
+            if (trick.tags.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Wrap(
+                  spacing: 4,
+                  children: trick.tags.map((tag) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: matrixGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: matrixGreen.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      tag,
+                      style: const TextStyle(color: matrixGreen, fontSize: 10),
+                    ),
+                  )).toList(),
+                ),
+              ),
+          ],
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -873,6 +934,41 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
       ),
     );
   }
+  Widget _buildTagFilter(String tag) {
+    final isSelected = _selectedTag == tag;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: ChoiceChip(
+        label: Text(tag),
+        selected: isSelected,
+        onSelected: (selected) {
+          if (selected) {
+            setState(() => _selectedTag = tag);
+          }
+        },
+        backgroundColor: matrixDark,
+        selectedColor: matrixGreen,
+        labelStyle: TextStyle(
+          color: isSelected ? Colors.black : matrixGreen,
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: matrixGreen.withValues(alpha: 0.3)),
+        ),
+      ),
+    );
+  }
+
+  List<String> _getAllTags() {
+    final tags = <String>{};
+    for (final trick in _tricks) {
+      tags.addAll(trick.tags);
+    }
+    return tags.toList()..sort();
+  }
+
   Widget _buildRatingChip(IconData icon, String label, double rating, Color color) {
     const matrixGreen = Color(0xFF00FF41);
     

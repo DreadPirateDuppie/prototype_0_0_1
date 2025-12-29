@@ -6,9 +6,11 @@ import '../models/post.dart';
 import '../services/supabase_service.dart';
 import '../screens/edit_post_dialog.dart';
 import '../screens/spot_details_screen.dart';
+import '../screens/post_detail_screen.dart';
 import '../screens/user_profile_screen.dart';
 import 'vote_buttons.dart';
 import 'mini_map_snapshot.dart';
+import 'verified_badge.dart';
 import '../utils/error_helper.dart';
 import 'video_player_widget.dart';
 
@@ -128,10 +130,14 @@ class _PostCardState extends State<PostCard> {
   }
 
   void _showDetails() {
+    final isSpot = currentPost.latitude != null && currentPost.longitude != null;
+    
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SpotDetailsScreen(post: currentPost),
+        builder: (context) => isSpot 
+            ? SpotDetailsScreen(post: currentPost)
+            : PostDetailScreen(post: currentPost),
       ),
     ).then((_) => widget.onPostUpdated?.call());
   }
@@ -395,15 +401,21 @@ class _PostCardState extends State<PostCard> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  currentPost.userName?.isNotEmpty == true
-                                      ? currentPost.userName!
-                                      : 'User',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Theme.of(context).textTheme.bodySmall?.color,
+                                  Row(
+                                    children: [
+                                      Text(
+                                        currentPost.userName?.isNotEmpty == true
+                                            ? currentPost.userName!
+                                            : 'User',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Theme.of(context).textTheme.bodySmall?.color,
+                                        ),
+                                      ),
+                                      if (currentPost.isUserVerified)
+                                        const VerifiedBadge(),
+                                    ],
                                   ),
-                                ),
                                 Text(
                                   currentPost.title,
                                   style: const TextStyle(
@@ -632,20 +644,23 @@ class _PostCardState extends State<PostCard> {
               });
             },
             itemBuilder: (context, index) {
-              return Image.network(
-                currentPost.photoUrls[index],
-                height: 220,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 220,
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: Icon(Icons.image_not_supported, size: 48),
-                    ),
-                  );
-                },
+              return GestureDetector(
+                onTap: _showDetails,
+                child: Image.network(
+                  currentPost.photoUrls[index],
+                  height: 220,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 220,
+                      color: Colors.grey[300],
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported, size: 48),
+                      ),
+                    );
+                  },
+                ),
               );
             },
           ),

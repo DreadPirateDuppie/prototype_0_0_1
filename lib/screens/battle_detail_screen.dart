@@ -47,6 +47,9 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
   String? _player2Name;
   String? _player2Avatar;
 
+  Map<String, dynamic>? _player1Analytics;
+  Map<String, dynamic>? _player2Analytics;
+
 
 
   @override
@@ -205,12 +208,17 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
       final p2Name = await SupabaseService.getUserUsername(_battle.player2Id);
       final p2Avatar = await SupabaseService.getUserAvatarUrl(_battle.player2Id);
 
+      final p1Analytics = await BattleService.getUserAnalytics(_battle.player1Id);
+      final p2Analytics = await BattleService.getUserAnalytics(_battle.player2Id);
+
       if (mounted) {
         setState(() {
           _player1Name = p1Name;
           _player1Avatar = p1Avatar;
           _player2Name = p2Name;
           _player2Avatar = p2Avatar;
+          _player1Analytics = p1Analytics;
+          _player2Analytics = p2Analytics;
         });
       }
     } catch (e) {
@@ -491,7 +499,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                       ? Image.network(
                           avatarUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(
+                          errorBuilder: (_, _, _) => const Icon(
                             Icons.person,
                             size: 50,
                             color: ThemeColors.matrixGreen,
@@ -660,7 +668,12 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
     required Color progressValueColor,
     String? name,
     String? avatarUrl,
+    Map<String, dynamic>? analytics,
   }) {
+    final wins = analytics?['wins'] ?? 0;
+    final losses = analytics?['losses'] ?? 0;
+    final favoriteTrick = analytics?['favoriteTrick'] ?? 'None';
+
     return Column(
       children: [
         // Avatar and Name
@@ -698,6 +711,29 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
             fontFamily: 'monospace',
             fontSize: 10,
             letterSpacing: 1,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        // Analytics: W/L Record
+        Text(
+          'W: $wins | L: $losses',
+          style: AppTextStyles.caption.copyWith(
+            color: secondaryTextColor,
+            fontSize: 8,
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 2),
+        // Analytics: Favorite Trick
+        Text(
+          'FAV: ${favoriteTrick.toUpperCase()}',
+          style: AppTextStyles.caption.copyWith(
+            color: secondaryTextColor.withValues(alpha: 0.7),
+            fontSize: 7,
+            fontFamily: 'monospace',
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -1892,6 +1928,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                       progressValueColor: ThemeColors.matrixGreen,
                       name: _isPlayer1 ? _player1Name : _player2Name,
                       avatarUrl: _isPlayer1 ? _player1Avatar : _player2Avatar,
+                      analytics: _isPlayer1 ? _player1Analytics : _player2Analytics,
                     ),
                   ),
                 ),
@@ -1940,6 +1977,7 @@ class _BattleDetailScreenState extends State<BattleDetailScreen> {
                       progressValueColor: Colors.red.withValues(alpha: 0.7),
                       name: _isPlayer1 ? _player2Name : _player1Name,
                       avatarUrl: _isPlayer1 ? _player2Avatar : _player1Avatar,
+                      analytics: _isPlayer1 ? _player2Analytics : _player1Analytics,
                     ),
                   ),
                 ),

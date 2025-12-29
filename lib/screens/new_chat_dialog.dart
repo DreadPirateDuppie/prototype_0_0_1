@@ -1,4 +1,3 @@
-import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import '../services/messaging_service.dart';
 import '../utils/error_helper.dart';
@@ -73,7 +72,9 @@ class _NewChatDialogState extends State<NewChatDialog> {
       final conversationId = await MessagingService.getOrCreateDirectConversation(user['id']);
       widget.onChatCreated(conversationId);
     } catch (e) {
-      ErrorHelper.showError(context, 'Error starting chat: $e');
+      if (mounted) {
+        ErrorHelper.showError(context, 'Error starting chat: $e');
+      }
     }
   }
 

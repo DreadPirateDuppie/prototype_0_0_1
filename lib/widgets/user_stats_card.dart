@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/user_scores.dart';
 
@@ -32,46 +33,61 @@ class _UserStatsCardState extends State<UserStatsCard> {
     const matrixGreen = Color(0xFF00FF41);
     final scores = widget.scores;
     
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.black,
-            Color(0xFF001a00),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: matrixGreen,
-          width: 2,
-        ),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: matrixGreen.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+            color: matrixGreen.withValues(alpha: 0.1),
+            blurRadius: 20,
+            spreadRadius: -5,
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          AnimatedCrossFade(
-            firstChild: Container(),
-            secondChild: _buildExpandedContent(scores),
-            crossFadeState: _isExpanded 
-                ? CrossFadeState.showSecond 
-                : CrossFadeState.showFirst,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            padding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: _isExpanded ? 16 : 10,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: matrixGreen.withValues(alpha: 0.2),
+                width: 1,
+              ),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  matrixGreen.withValues(alpha: 0.05),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                AnimatedCrossFade(
+                  firstChild: const SizedBox.shrink(),
+                  secondChild: _buildExpandedContent(scores),
+                  crossFadeState: _isExpanded 
+                      ? CrossFadeState.showSecond 
+                      : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 300),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -85,43 +101,55 @@ class _UserStatsCardState extends State<UserStatsCard> {
           _isExpanded = !_isExpanded;
         });
       },
-      child: Row(
-        children: [
-          Icon(
-            Icons.analytics_outlined,
-            color: matrixGreen,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            'STATS',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: matrixGreen,
-              fontFamily: 'monospace',
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(width: 4),
-          if (widget.onInfoPressed != null)
-            IconButton(
-              icon: const Icon(
-                Icons.info_outline,
-                size: 18,
-                color: matrixGreen,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: matrixGreen.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
               ),
-              onPressed: widget.onInfoPressed,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              tooltip: 'Learn about stats',
+              child: const Icon(
+                Icons.analytics_rounded,
+                color: matrixGreen,
+                size: 18,
+              ),
             ),
-          const Spacer(),
-          Icon(
-            _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-            color: matrixGreen,
-          ),
-        ],
+            const SizedBox(width: 12),
+            const Text(
+              'STATS',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: matrixGreen,
+                fontFamily: 'monospace',
+                letterSpacing: 2.0,
+              ),
+            ),
+            const SizedBox(width: 4),
+            if (widget.onInfoPressed != null)
+              IconButton(
+                icon: Icon(
+                  Icons.help_outline_rounded,
+                  size: 16,
+                  color: matrixGreen.withValues(alpha: 0.5),
+                ),
+                onPressed: widget.onInfoPressed,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Learn about stats',
+              ),
+            const Spacer(),
+            Icon(
+              _isExpanded ? Icons.unfold_less_rounded : Icons.unfold_more_rounded,
+              color: matrixGreen.withValues(alpha: 0.5),
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -129,36 +157,36 @@ class _UserStatsCardState extends State<UserStatsCard> {
   Widget _buildExpandedContent(UserScores scores) {
     return Column(
       children: [
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         ScoreProgressBar(
-          label: 'Spotter Lvl',
+          label: 'SPOTTER',
           score: scores.mapScore,
-          color: Colors.green.shade600,
-          subtitle: 'XP from map contributions',
+          color: const Color(0xFF00FF41),
+          subtitle: 'Map contributions & upvotes',
           isXP: true,
           level: scores.mapLevel,
           levelProgress: scores.mapLevelProgress,
           xpForNextLevel: scores.mapXPForNextLevel,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         ScoreProgressBar(
-          label: 'VS Lvl',
+          label: 'VERSUS',
           score: scores.playerScore,
-          color: Colors.blue.shade600,
-          subtitle: 'XP from battle performance',
+          color: const Color(0xFF00E5FF),
+          subtitle: 'Battle performance & wins',
           isXP: true,
           level: scores.playerLevel,
           levelProgress: scores.playerLevelProgress,
           xpForNextLevel: scores.playerXPForNextLevel,
         ),
-        const SizedBox(height: 12),
-        ScoreProgressBar(
-          label: 'Ranking Score',
-          score: scores.rankingScore,
-          color: Colors.orange.shade300,
-          subtitle: 'Voting accuracy (500-1000)',
-        ),
         const SizedBox(height: 16),
+        ScoreProgressBar(
+          label: 'RANKING',
+          score: scores.rankingScore,
+          color: const Color(0xFFFFB300),
+          subtitle: 'Voting accuracy & community trust',
+        ),
+        const SizedBox(height: 24),
         _buildFinalScoreRow(scores),
       ],
     );
@@ -167,66 +195,89 @@ class _UserStatsCardState extends State<UserStatsCard> {
   Widget _buildFinalScoreRow(UserScores scores) {
     const matrixGreen = Color(0xFF00FF41);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.7), // Adjusted for dark theme
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: matrixGreen.withValues(alpha: 0.2),
+          color: Colors.white.withValues(alpha: 0.05),
           width: 1,
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Final Score',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: matrixGreen.withValues(alpha: 0.8), // Adjusted color
-                  fontWeight: FontWeight.w500,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'OVERALL SCORE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                scores.finalScore.toStringAsFixed(1),
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: matrixGreen,
+                const SizedBox(height: 4),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      scores.finalScore.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: matrixGreen,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '/ 1000',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: matrixGreen.withValues(alpha: 0.3),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           Container(
             height: 40,
             width: 1,
-            color: matrixGreen.withValues(alpha: 0.3), // Adjusted color
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            color: Colors.white.withValues(alpha: 0.1),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Vote Weight',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).textTheme.bodySmall?.color,
-                  fontWeight: FontWeight.w500,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'VOTE WEIGHT',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${(scores.voteWeight * 100).toStringAsFixed(0)}%',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange.shade700,
+                const SizedBox(height: 4),
+                Text(
+                  '${(scores.voteWeight * 100).toStringAsFixed(0)}%',
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFFFB300),
+                    fontFamily: 'monospace',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -265,9 +316,9 @@ class ScoreProgressBar extends StatelessWidget {
     
     if (isXP && level != null && levelProgress != null && xpForNextLevel != null) {
       progress = levelProgress!;
-      displayValue = 'Lvl $level • ${score.toStringAsFixed(0)} XP';
+      displayValue = 'LVL $level';
       final xpNeeded = (xpForNextLevel! - score).toStringAsFixed(0);
-      progressSubtitle = '$xpNeeded XP to Lvl ${level! + 1}';
+      progressSubtitle = '$xpNeeded XP TO NEXT';
     } else {
       progress = score / 1000.0;
       displayValue = score.toStringAsFixed(0);
@@ -278,55 +329,89 @@ class ScoreProgressBar extends StatelessWidget {
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.white.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  displayValue,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                if (progressSubtitle != null) ...[
+                  Text(
+                    progressSubtitle,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: color.withValues(alpha: 0.5),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Stack(
+          children: [
+            Container(
+              height: 4,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            Text(
-              displayValue,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 1000),
+              curve: Curves.easeOutCubic,
+              height: 4,
+              width: (MediaQuery.of(context).size.width - 64) * progress.clamp(0.0, 1.0),
+              decoration: BoxDecoration(
                 color: color,
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: progress.clamp(0.0, 1.0),
-            backgroundColor: Theme.of(context).dividerColor.withValues(alpha: 0.1),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 6,
-          ),
-        ),
-        if (progressSubtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            progressSubtitle,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: color.withValues(alpha: 0.8),
-            ),
-          ),
-        ],
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            subtitle!,
-            style: TextStyle(
-              fontSize: 11,
-              color: Theme.of(context).textTheme.bodySmall?.color,
-            ),
-          ),
-        ],
       ],
     );
   }

@@ -145,9 +145,13 @@ class _BattleLeaderboardScreenState extends State<BattleLeaderboardScreen> {
                       final isCurrentUser = player['user_id'] == _currentUser?.id;
                       
                       Color rankColor = matrixGreen;
-                      if (rank == 1) rankColor = goldColor;
-                      else if (rank == 2) rankColor = silverColor;
-                      else if (rank == 3) rankColor = bronzeColor;
+                      if (rank == 1) {
+                        rankColor = goldColor;
+                      } else if (rank == 2) {
+                        rankColor = silverColor;
+                      } else if (rank == 3) {
+                        rankColor = bronzeColor;
+                      }
 
                       return Container(
                         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

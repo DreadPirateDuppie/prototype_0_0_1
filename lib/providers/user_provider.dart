@@ -14,6 +14,7 @@ class UserProvider extends ChangeNotifier {
   UserScores? _userScores;
   bool _isLoading = false;
   bool _isAdmin = false;
+  bool _isVerified = false;
   String? _error;
 
   // Getters
@@ -25,6 +26,7 @@ class UserProvider extends ChangeNotifier {
   UserScores? get userScores => _userScores;
   bool get isLoading => _isLoading;
   bool get isAdmin => _isAdmin;
+  bool get isVerified => _isVerified;
   String? get error => _error;
   bool get hasError => _error != null;
   bool get isLoggedIn => _currentUser != null;
@@ -65,6 +67,10 @@ class UserProvider extends ChangeNotifier {
       
       // Check admin status
       _isAdmin = await SupabaseService.isCurrentUserAdmin();
+      
+      // Load verification status
+      final profile = await SupabaseService.getUserProfile(_currentUser!.id);
+      _isVerified = profile?['is_verified'] as bool? ?? false;
       
       _error = null;
     } catch (e) {
@@ -179,6 +185,7 @@ class UserProvider extends ChangeNotifier {
     _bio = null;
     _userScores = null;
     _isAdmin = false;
+    _isVerified = false;
     _error = null;
     notifyListeners();
   }

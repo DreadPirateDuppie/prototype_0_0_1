@@ -5,7 +5,8 @@ import '../models/battle.dart';
 import '../providers/battle_provider.dart';
 import '../screens/battle_leaderboard_screen.dart';
 import '../screens/battle_detail_screen.dart';
-import '../screens/create_battle_dialog.dart';
+
+import '../screens/battle_mode_selection_screen.dart';
 import '../services/supabase_service.dart';
 import '../config/theme_config.dart';
 import '../widgets/leaderboard_card.dart';
@@ -793,16 +794,18 @@ class _VsTabState extends State<VsTab> {
                         padding: const EdgeInsets.all(AppSpacing.md),
                         child: ElevatedButton.icon(
                           onPressed: () async {
-                            final result = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => const CreateBattleDialog(),
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const BattleModeSelectionScreen(),
+                              ),
                             );
                             if (result == true) {
                               _loadBattles();
                             }
                           },
                           icon: const Icon(Icons.add),
-                          label: const Text('CREATE NEW BATTLE'),
+                          label: const Text('NEW GAME'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: ThemeColors.matrixGreen,
                             foregroundColor: Colors.black,

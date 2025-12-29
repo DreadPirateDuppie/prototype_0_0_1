@@ -20,7 +20,6 @@ class CreateFeedPostDialog extends StatefulWidget {
 class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _tagsController = TextEditingController();
   bool _isLoading = false;
   bool _isPickingImage = false;
   final List<File> _selectedImages = [];
@@ -30,7 +29,7 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _tagsController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -135,7 +134,7 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
       for (final image in _selectedImages) {
         try {
           final url = await SupabaseService.uploadPostImage(image, user.id);
-          if (url != null) photoUrls.add(url);
+          if (url.isNotEmpty) photoUrls.add(url);
         } catch (e) {
           // Continue with other images
         }
@@ -145,11 +144,7 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
         throw Exception('Failed to upload images. Please try again.');
       }
 
-      final tags = _tagsController.text
-          .split(',')
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
+      final tags = <String>[];
 
       String? videoUrl;
       if (_selectedVideo != null) {
@@ -236,26 +231,6 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
               enabled: !_isLoading,
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _tagsController,
-              style: TextStyle(color: textColor),
-              decoration: InputDecoration(
-                labelText: 'Tags',
-                labelStyle: TextStyle(color: textColor.withValues(alpha: 0.7)),
-                hintText: 'comma separated',
-                hintStyle: TextStyle(color: textColor.withValues(alpha: 0.3)),
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: borderColor, width: 2),
-                ),
-              ),
-              enabled: !_isLoading,
-            ),
             const SizedBox(height: 12),
             TextField(
               controller: _descriptionController,
@@ -317,7 +292,6 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
                           right: 0,
                           child: IconButton(
                             onPressed: () {
-                              print('DEBUG: IconButton tapped for index $index');
                               _removeImage(index);
                             },
                             icon: Icon(

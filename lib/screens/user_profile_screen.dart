@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../models/user_scores.dart';
@@ -8,8 +7,8 @@ import '../widgets/user_stats_card.dart';
 import '../widgets/mini_map_snapshot.dart';
 import '../screens/spot_details_screen.dart';
 import '../screens/followers_list_screen.dart';
-import '../config/theme_config.dart';
 import '../utils/error_helper.dart';
+import '../widgets/verified_badge.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -29,14 +28,17 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState extends State<UserProfileScreen> with SingleTickerProviderStateMixin {
   late Future<List<MapPost>> _userPostsFuture;
+  late TabController _tabController;
   UserScores? _userScores;
-  bool _isLoading = true;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
   int _followersCount = 0;
   int _followingCount = 0;
   String? _currentUsername;
   String? _currentAvatarUrl;
+  bool _isVerified = false;
+  List<Map<String, dynamic>> _profileMedia = [];
+  bool _isLoadingMedia = true;
   
   // Stats expansion state
   final bool _isStatsExpanded = false;
@@ -44,26 +46,32 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _currentUsername = widget.username;
     _currentAvatarUrl = widget.avatarUrl;
     _loadUserData();
   }
 
-  Future<void> _loadUserData() async {
-    setState(() {
-      _isLoading = true;
-    });
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
+  Future<void> _loadUserData() async {
     try {
       // Load posts
       _userPostsFuture = SupabaseService.getUserMapPosts(widget.userId);
       
-      // Load profile data if missing
-      if (_currentUsername == null || _currentAvatarUrl == null) {
-        final profile = await SupabaseService.getUserProfile(widget.userId);
-        if (profile != null) {
-          _currentUsername = profile['username'];
-          _currentAvatarUrl = profile['avatar_url'];
+      // Load profile data
+      final profile = await SupabaseService.getUserProfile(widget.userId);
+      if (profile != null) {
+        if (mounted) {
+          setState(() {
+            _currentUsername = profile['username'];
+            _currentAvatarUrl = profile['avatar_url'];
+            _isVerified = profile['is_verified'] as bool? ?? false;
+          });
         }
       }
 
@@ -78,13 +86,27 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
       _followersCount = counts['followers'] ?? 0;
       _followingCount = counts['following'] ?? 0;
 
+      // Load media
+      _loadProfileMedia();
+
     } catch (e) {
-      print('Error loading user profile: $e');
-    } finally {
+      // Ignore load error
+    }
+  }
+
+  Future<void> _loadProfileMedia() async {
+    setState(() => _isLoadingMedia = true);
+    try {
+      final media = await SupabaseService.getProfileMedia(widget.userId);
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _profileMedia = media;
+          _isLoadingMedia = false;
         });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMedia = false);
       }
     }
   }
@@ -245,8 +267,96 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
     );
   }
 
+  Widget _buildMediaGrid() {
+    if (_isLoadingMedia) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_profileMedia.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.perm_media_outlined, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'No media yet',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(2),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
+      ),
+      itemCount: _profileMedia.length,
+      itemBuilder: (context, index) {
+        final media = _profileMedia[index];
+        final isVideo = media['media_type'] == 'video';
+        
+        return GestureDetector(
+          onTap: () {
+            // Show full screen media viewer
+            showDialog(
+              context: context,
+              builder: (context) => Dialog(
+                backgroundColor: Colors.transparent,
+                insetPadding: EdgeInsets.zero,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    InteractiveViewer(
+                      child: Image.network(
+                        media['media_url'],
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    Positioned(
+                      top: 40,
+                      right: 20,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[900],
+              image: DecorationImage(
+                image: NetworkImage(media['media_url']),
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: isVideo
+                ? const Center(
+                    child: Icon(Icons.play_circle_outline, color: Colors.white, size: 32),
+                  )
+                : null,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    const neonGreen = Color(0xFF00FF41);
+
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
@@ -314,13 +424,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                         ),
                         const SizedBox(height: 16),
                         // Username
-                        Text(
-                          _currentUsername != null ? '@$_currentUsername' : 'User',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _currentUsername != null ? '@$_currentUsername' : 'User',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            if (_isVerified)
+                              const VerifiedBadge(size: 20, padding: EdgeInsets.only(left: 8.0)),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         
@@ -328,9 +445,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                         ElevatedButton(
                           onPressed: _toggleFollow,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _isFollowing ? Colors.transparent : Colors.white,
-                            foregroundColor: _isFollowing ? Colors.white : Colors.black,
-                            side: _isFollowing ? const BorderSide(color: Colors.white) : null,
+                            backgroundColor: _isFollowing ? Colors.transparent : neonGreen,
+                            foregroundColor: _isFollowing ? neonGreen : Colors.black,
+                            side: _isFollowing ? const BorderSide(color: neonGreen) : null,
                             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(20),
@@ -342,7 +459,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                                   width: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: _isFollowing ? Colors.white : Colors.black,
+                                    color: _isFollowing ? neonGreen : Colors.black,
                                   ),
                                 )
                               : Text(
@@ -418,52 +535,101 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                     )
                   : const SizedBox.shrink(),
             ),
-          ];
-        },
-        body: FutureBuilder<List<MapPost>>(
-          future: _userPostsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            
-            final posts = snapshot.data ?? [];
-            
-            if (posts.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[400]),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No posts yet',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+
+            // Tab Bar
+            SliverPersistentHeader(
+              delegate: _SliverAppBarDelegate(
+                TabBar(
+                  controller: _tabController,
+                  indicatorColor: neonGreen,
+                  labelColor: neonGreen,
+                  unselectedLabelColor: Colors.white60,
+                  tabs: const [
+                    Tab(text: 'Posts', icon: Icon(Icons.grid_on)),
+                    Tab(text: 'Media', icon: Icon(Icons.perm_media)),
                   ],
                 ),
-              );
-            }
-
-            return GridView.builder(
-              padding: const EdgeInsets.all(2),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 2,
-                mainAxisSpacing: 2,
               ),
-              itemCount: posts.length,
-              itemBuilder: (context, index) {
-                return _buildGridPost(posts[index]);
+              pinned: true,
+            ),
+          ];
+        },
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            // Posts Tab
+            FutureBuilder<List<MapPost>>(
+              future: _userPostsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                final posts = snapshot.data ?? [];
+                
+                if (posts.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No posts yet',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(2),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 2,
+                    mainAxisSpacing: 2,
+                  ),
+                  itemCount: posts.length,
+                  itemBuilder: (context, index) {
+                    return _buildGridPost(posts[index]);
+                  },
+                );
               },
-            );
-          },
+            ),
+            // Media Tab
+            _buildMediaGrid(),
+          ],
         ),
       ),
     );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar _tabBar;
+
+  _SliverAppBarDelegate(this._tabBar);
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: _tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }

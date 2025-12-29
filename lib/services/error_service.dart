@@ -1,8 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 
 class ErrorService {
-  static final SupabaseClient _client = Supabase.instance.client;
 
   /// Initialize error tracking
   static void initialize() {
@@ -46,12 +45,10 @@ class ErrorService {
       
       // For now, just log to console in debug mode
       if (kDebugMode) {
-        print('[$errorType] $error');
       }
     } catch (e) {
       // Fail silently to avoid infinite error loops
       if (kDebugMode) {
-        print('Error logging failed: $e');
       }
     }
   }

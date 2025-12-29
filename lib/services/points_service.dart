@@ -179,8 +179,24 @@ class PointsService {
     }
   }
 
+  /// Log XP history
+  Future<void> logXpHistory(
+      String userId, double amount, String type, String reason) async {
+    try {
+      await _client.from('xp_history').insert({
+        'user_id': userId,
+        'score_type': type,
+        'amount': amount,
+        'reason': reason,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      developer.log('Error logging XP history: $e', name: 'PointsService');
+    }
+  }
+
   /// Update user map score (XP)
-  Future<void> updateMapScore(String userId, double newScore) async {
+  Future<void> updateMapScore(String userId, double newScore, {String reason = 'Map score update'}) async {
     try {
       // Get existing scores
       final response = await _client
@@ -189,14 +205,77 @@ class PointsService {
           .eq('user_id', userId)
           .maybeSingle();
 
+      final currentScore = (response?['map_score'] as num?)?.toDouble() ?? 0.0;
+      final diff = newScore - currentScore;
+
       await _client.from('user_scores').upsert({
         'user_id': userId,
         'map_score': newScore.clamp(0.0, double.infinity),
-        'player_score': response?['player_score'] ?? 100.0,
-        'ranking_score': response?['ranking_score'] ?? 0.0,
+        'player_score': response?['player_score'] ?? 0.0,
+        'ranking_score': response?['ranking_score'] ?? 500.0,
       });
+
+      if (diff != 0) {
+        await logXpHistory(userId, diff, 'map', reason);
+      }
     } catch (e) {
       developer.log('Error updating map score: $e', name: 'PointsService');
+    }
+  }
+
+  /// Update player score (XP)
+  Future<void> updatePlayerScore(String userId, double newScore, {String reason = 'Player score update'}) async {
+    try {
+      // Get existing scores
+      final response = await _client
+          .from('user_scores')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      final currentScore = (response?['player_score'] as num?)?.toDouble() ?? 0.0;
+      final diff = newScore - currentScore;
+
+      await _client.from('user_scores').upsert({
+        'user_id': userId,
+        'map_score': response?['map_score'] ?? 0.0,
+        'player_score': newScore.clamp(0.0, double.infinity),
+        'ranking_score': response?['ranking_score'] ?? 500.0,
+      });
+
+      if (diff != 0) {
+        await logXpHistory(userId, diff, 'player', reason);
+      }
+    } catch (e) {
+      developer.log('Error updating player score: $e', name: 'PointsService');
+    }
+  }
+
+  /// Update ranking score
+  Future<void> updateRankingScore(String userId, double newScore, {String reason = 'Ranking score update'}) async {
+    try {
+      // Get existing scores
+      final response = await _client
+          .from('user_scores')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      final currentScore = (response?['ranking_score'] as num?)?.toDouble() ?? 500.0;
+      final diff = newScore - currentScore;
+
+      await _client.from('user_scores').upsert({
+        'user_id': userId,
+        'map_score': response?['map_score'] ?? 0.0,
+        'player_score': response?['player_score'] ?? 0.0,
+        'ranking_score': newScore.clamp(0.0, 1000.0),
+      });
+
+      if (diff != 0) {
+        await logXpHistory(userId, diff, 'ranking', reason);
+      }
+    } catch (e) {
+      developer.log('Error updating ranking score: $e', name: 'PointsService');
     }
   }
 
@@ -216,6 +295,8 @@ class PointsService {
         'user_id': userId,
         'map_score': newScore,
       });
+
+      await logXpHistory(userId, xpChange.toDouble(), 'map', 'Post upvote/downvote');
     } catch (e) {
       developer.log('Error updating poster XP: $e', name: 'PointsService');
     }
@@ -243,10 +324,23 @@ class PointsService {
 
       final totalMapScore = xpFromPosts + xpFromVotes;
 
+      // Get current score to calculate diff
+      final currentScoreResponse = await _client
+          .from('user_scores')
+          .select('map_score')
+          .eq('user_id', userId)
+          .maybeSingle();
+      final currentScore = (currentScoreResponse?['map_score'] as num?)?.toDouble() ?? 0.0;
+      final diff = totalMapScore - currentScore;
+
       await _client.from('user_scores').upsert({
         'user_id': userId,
         'map_score': totalMapScore,
       });
+
+      if (diff != 0) {
+        await logXpHistory(userId, diff, 'map', 'XP Recalculation');
+      }
 
       developer.log(
           'Recalculated XP for $userId: $totalMapScore ($postCount posts)',

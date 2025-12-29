@@ -1,9 +1,6 @@
-import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import '../models/message_models.dart';
 import '../services/messaging_service.dart';
-import '../services/supabase_service.dart';
-import '../utils/error_helper.dart';
 import '../screens/chat_screen.dart';
 import '../screens/create_group_dialog.dart';
 import '../screens/new_chat_dialog.dart';

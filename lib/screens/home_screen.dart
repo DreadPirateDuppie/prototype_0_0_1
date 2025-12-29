@@ -25,6 +25,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   late List<Animation<double>> _scaleAnimations;
   late List<Animation<double>> _glowAnimations;
 
+  final List<GlobalKey<NavigatorState>> _navigatorKeys = [
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -83,14 +91,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   }
 
   void _onItemTapped(int index) {
-    Provider.of<NavigationProvider>(context, listen: false).setIndex(index);
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
     
-    // Animate the selected item
-    for (int i = 0; i < _controllers.length; i++) {
-      if (i == index) {
-        _controllers[i].forward();
-      } else {
-        _controllers[i].reverse();
+    if (navProvider.selectedIndex == index) {
+      // If tapping the same tab, pop to root
+      _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+    } else {
+      navProvider.setIndex(index);
+      
+      // Animate the selected item
+      for (int i = 0; i < _controllers.length; i++) {
+        if (i == index) {
+          _controllers[i].forward();
+        } else {
+          _controllers[i].reverse();
+        }
       }
     }
   }
@@ -99,6 +114,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
 
   void _navigateToMap(LatLng location) {
     Provider.of<NavigationProvider>(context, listen: false).setIndex(2);
+    // Pop to root of map tab first to ensure we see the map
+    _navigatorKeys[2].currentState?.popUntil((route) => route.isFirst);
+    
     Future.delayed(const Duration(milliseconds: 100), () {
       _mapTabKey.currentState?.moveToLocation(location);
     });
@@ -121,6 +139,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     }
   }
 
+  Widget _buildNavigator(int index) {
+    return Navigator(
+      key: _navigatorKeys[index],
+      onGenerateRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (_) => _buildTabContent(index),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<NavigationProvider>(
@@ -136,15 +165,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
           }
         });
         
-        return Scaffold(
-          extendBody: true,
-          body: Column(
-            children: [
-              ConnectivityService.buildOfflineBanner(context),
-              Expanded(child: _buildTabContent(navProvider.selectedIndex)),
-            ],
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) async {
+            if (didPop) return;
+
+            final isFirstRouteInCurrentTab = !await _navigatorKeys[navProvider.selectedIndex].currentState!.maybePop();
+            
+            if (isFirstRouteInCurrentTab) {
+              // If on the first route of the current tab, let the app exit or handle back
+              if (navProvider.selectedIndex != 0) {
+                // If not on the first tab, go back to the first tab
+                _onItemTapped(0);
+              } else {
+                // If on the first tab, exit the app (or let system handle it if we returned true above, but we returned false)
+                // Since we returned false, we need to manually pop if we want to exit, but usually we just want to minimize or let Android handle it.
+                // For now, let's just allow pop if we are at root of tab 0
+                 if (context.mounted) Navigator.of(context).pop();
+              }
+            }
+          },
+          child: Scaffold(
+            extendBody: true,
+            body: Column(
+              children: [
+                ConnectivityService.buildOfflineBanner(context),
+                Expanded(
+                  child: IndexedStack(
+                    index: navProvider.selectedIndex,
+                    children: [
+                      _buildNavigator(0), // Feed
+                      _buildNavigator(1), // VS
+                      _buildNavigator(2), // Map
+                      _buildNavigator(3), // Rewards
+                      _buildNavigator(4), // Profile
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            bottomNavigationBar: _buildFloatingNavBar(navProvider.selectedIndex),
           ),
-          bottomNavigationBar: _buildFloatingNavBar(navProvider.selectedIndex),
         );
       },
     );

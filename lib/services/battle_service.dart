@@ -8,6 +8,7 @@ import '../models/battle.dart';
 import '../models/battle_trick.dart';
 import '../models/user_scores.dart';
 import 'supabase_service.dart';
+import 'points_service.dart';
 import 'messaging_service.dart';
 import 'notification_service.dart';
 import 'error_types.dart';
@@ -497,6 +498,8 @@ class BattleService {
   // Update player score based on battle outcome
   static Future<void> updatePlayerScoreForBattle(Battle battle) async {
     try {
+      final pointsService = PointsService();
+      
       // Get current scores for both players
       final winner = await getUserScores(battle.winnerId!);
       final loser = await getUserScores(
@@ -507,7 +510,11 @@ class BattleService {
 
       // Winner gains points
       final newWinnerScore = (winner.playerScore + 10).clamp(0.0, 1000.0);
-      await updatePlayerScore(battle.winnerId!, newWinnerScore);
+      await pointsService.updatePlayerScore(
+        battle.winnerId!, 
+        newWinnerScore, 
+        reason: 'Won battle ${battle.id}'
+      );
 
       // Loser loses points based on letters collected
       final loserId = battle.player1Id == battle.winnerId
@@ -520,9 +527,14 @@ class BattleService {
       // Fewer letters = better performance = less point loss
       final pointsLost = 5 + (loserLetters.length * 2);
       final newLoserScore = (loser.playerScore - pointsLost).clamp(0.0, 1000.0);
-      await updatePlayerScore(loserId, newLoserScore);
+      await pointsService.updatePlayerScore(
+        loserId, 
+        newLoserScore, 
+        reason: 'Lost battle ${battle.id}'
+      );
     } catch (e) {
       // Silently fail score updates
+      developer.log('Failed to update battle scores: $e', name: 'BattleService');
     }
   }
 
@@ -548,49 +560,19 @@ class BattleService {
 
   // Update player score
   static Future<void> updatePlayerScore(String userId, double newScore) async {
-    try {
-      final scores = await getUserScores(userId);
-      await _client.from('user_scores').upsert({
-        'user_id': userId,
-        'map_score': scores.mapScore,
-        'player_score': newScore.clamp(0.0, 1000.0),
-        'ranking_score': scores.rankingScore,
-      });
-    } catch (e) {
-      throw Exception('Failed to update player score: $e');
-    }
+    await PointsService().updatePlayerScore(userId, newScore);
   }
 
   // Update ranking score
-  static Future<void> updateRankingScore(String userId, int adjustment) async {
-    try {
-      final scores = await getUserScores(userId);
-      final newScore = (scores.rankingScore + adjustment).clamp(0.0, 1000.0);
-
-      await _client.from('user_scores').upsert({
-        'user_id': userId,
-        'map_score': scores.mapScore,
-        'player_score': scores.playerScore,
-        'ranking_score': newScore,
-      });
-    } catch (e) {
-      throw Exception('Failed to update ranking score: $e');
-    }
+  static Future<void> updateRankingScore(String userId, double adjustment) async {
+    final scores = await getUserScores(userId);
+    final newScore = (scores.rankingScore + adjustment).clamp(0.0, 1000.0);
+    await PointsService().updateRankingScore(userId, newScore);
   }
 
   // Update map score
   static Future<void> updateMapScore(String userId, double newScore) async {
-    try {
-      final scores = await getUserScores(userId);
-      await _client.from('user_scores').upsert({
-        'user_id': userId,
-        'map_score': newScore.clamp(0.0, 1000.0),
-        'player_score': scores.playerScore,
-        'ranking_score': scores.rankingScore,
-      });
-    } catch (e) {
-      throw Exception('Failed to update map score: $e');
-    }
+    await PointsService().updateMapScore(userId, newScore);
   }
 
   // Switch turn to next player
@@ -1040,6 +1022,260 @@ class BattleService {
       }
     } catch (e) {
       throw Exception('Failed to resolve votes: $e');
+    }
+  }
+
+  // Get user analytics (W/L ratio, favorite trick)
+  static Future<Map<String, dynamic>> getUserAnalytics(String userId) async {
+    try {
+      // 1. Get Win/Loss stats from battles table
+      final battlesResponse = await _client
+          .from('battles')
+          .select('winner_id, player1_id, player2_id')
+          .or('player1_id.eq.$userId,player2_id.eq.$userId')
+          .eq('status', 'completed');
+
+      int wins = 0;
+      int losses = 0;
+
+      for (final battle in (battlesResponse as List)) {
+        if (battle['winner_id'] == userId) {
+          wins++;
+        } else if (battle['winner_id'] != null) {
+          losses++;
+        }
+      }
+
+      // 2. Get Favorite Trick from battle_tricks table
+      // We look for tricks where the user was the setter and the outcome was 'landed'
+      final tricksResponse = await _client
+          .from('battle_tricks')
+          .select('trick_name')
+          .eq('setter_id', userId)
+          .eq('outcome', 'landed');
+
+      String favoriteTrick = 'None';
+      if ((tricksResponse as List).isNotEmpty) {
+        final Map<String, int> trickCounts = {};
+        for (final trick in tricksResponse) {
+          final name = trick['trick_name'] as String;
+          trickCounts[name] = (trickCounts[name] ?? 0) + 1;
+        }
+
+        favoriteTrick = trickCounts.entries
+            .reduce((a, b) => a.value > b.value ? a : b)
+            .key;
+      }
+
+      return {
+        'wins': wins,
+        'losses': losses,
+        'favoriteTrick': favoriteTrick,
+      };
+    } catch (e) {
+      developer.log('Error fetching user analytics: $e', name: 'BattleService');
+      return {
+        'wins': 0,
+        'losses': 0,
+        'favoriteTrick': 'None',
+      };
+    }
+  }
+
+  // ==================== MATCHMAKING QUEUE ====================
+
+  /// Join the matchmaking queue for Quick Match
+  static Future<void> joinMatchmakingQueue({
+    required GameMode gameMode,
+    bool isQuickfire = true,
+    int betAmount = 0,
+  }) async {
+    try {
+      final userId = _client.auth.currentUser!.id;
+      final userScores = await getUserScores(userId);
+      
+      // Verify user has enough points for bet
+      if (betAmount > 0) {
+        final balance = await SupabaseService.getUserPoints(userId);
+        if (balance < betAmount) {
+          throw Exception('Insufficient points for bet');
+        }
+      }
+      
+      // Upsert to queue (replace existing entry if any)
+      await _client.from('matchmaking_queue').upsert({
+        'user_id': userId,
+        'game_mode': gameMode.toString().split('.').last,
+        'is_quickfire': isQuickfire,
+        'bet_amount': betAmount,
+        'ranking_score': userScores.rankingScore,
+        'status': 'waiting',
+        'joined_at': DateTime.now().toIso8601String(),
+        'matched_with': null,
+        'battle_id': null,
+      }, onConflict: 'user_id');
+      
+      developer.log('Joined matchmaking queue with ranking: ${userScores.rankingScore}', name: 'BattleService');
+    } catch (e) {
+      developer.log('Error joining matchmaking queue: $e', name: 'BattleService');
+      rethrow;
+    }
+  }
+
+  /// Leave the matchmaking queue
+  static Future<void> leaveMatchmakingQueue() async {
+    try {
+      final userId = _client.auth.currentUser!.id;
+      await _client.from('matchmaking_queue').delete().eq('user_id', userId);
+      developer.log('Left matchmaking queue', name: 'BattleService');
+    } catch (e) {
+      developer.log('Error leaving matchmaking queue: $e', name: 'BattleService');
+    }
+  }
+
+  /// Find a match in the queue (skill-based)
+  static Future<Map<String, dynamic>?> findMatch({
+    required double myRankingScore,
+    required String gameMode,
+    required bool isQuickfire,
+    int betAmount = 0,
+    int expandedRange = 100,
+  }) async {
+    try {
+      final userId = _client.auth.currentUser!.id;
+      
+      // Find opponents within ranking range who want similar bet, oldest first
+      final results = await _client
+          .from('matchmaking_queue')
+          .select()
+          .neq('user_id', userId)
+          .eq('game_mode', gameMode)
+          .eq('is_quickfire', isQuickfire)
+          .eq('status', 'waiting')
+          .gte('ranking_score', myRankingScore - expandedRange)
+          .lte('ranking_score', myRankingScore + expandedRange)
+          .order('joined_at', ascending: true)
+          .limit(1);
+      
+      if (results.isNotEmpty) {
+        final match = results.first;
+        // Check bet compatibility - either both 0 or within 20% of each other
+        final matchBet = match['bet_amount'] as int;
+        final betCompatible = (betAmount == 0 && matchBet == 0) ||
+            (betAmount > 0 && matchBet > 0 && 
+             (matchBet - betAmount).abs() <= (betAmount * 0.2).round());
+        
+        if (betCompatible) {
+          return match;
+        }
+      }
+      return null;
+    } catch (e) {
+      developer.log('Error finding match: $e', name: 'BattleService');
+      return null;
+    }
+  }
+
+  /// Get current queue entry for user
+  static Future<Map<String, dynamic>?> getQueueEntry() async {
+    try {
+      final userId = _client.auth.currentUser!.id;
+      final result = await _client
+          .from('matchmaking_queue')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+      return result;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Subscribe to queue changes for real-time match detection
+  static RealtimeChannel subscribeToQueueUpdates(
+    String userId,
+    Function(Map<String, dynamic>) onMatch,
+  ) {
+    return _client
+        .channel('matchmaking:$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'matchmaking_queue',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            if (payload.newRecord['status'] == 'matched') {
+              onMatch(payload.newRecord);
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  /// Create battle from a matched queue entry
+  static Future<Battle?> createBattleFromMatch({
+    required String opponentId,
+    required GameMode gameMode,
+    bool isQuickfire = true,
+    int betAmount = 0,
+  }) async {
+    try {
+      final userId = _client.auth.currentUser!.id;
+      
+      // Update both queue entries to 'matched'
+      await _client.from('matchmaking_queue').update({
+        'status': 'matched',
+        'matched_with': opponentId,
+      }).eq('user_id', userId);
+      
+      await _client.from('matchmaking_queue').update({
+        'status': 'matched',
+        'matched_with': userId,
+      }).eq('user_id', opponentId);
+      
+      // Create the battle
+      final battle = await createBattle(
+        player1Id: userId,
+        player2Id: opponentId,
+        gameMode: gameMode,
+        betAmount: betAmount,
+        isQuickfire: isQuickfire,
+      );
+      
+      // Update queue entries with battle ID
+      if (battle != null) {
+        await _client.from('matchmaking_queue').update({
+          'battle_id': battle.id,
+        }).or('user_id.eq.$userId,user_id.eq.$opponentId');
+      }
+      
+      // Clean up queue entries after a delay
+      Future.delayed(const Duration(seconds: 5), () {
+        _client.from('matchmaking_queue').delete().eq('user_id', userId);
+        _client.from('matchmaking_queue').delete().eq('user_id', opponentId);
+      });
+      
+      return battle;
+    } catch (e) {
+      developer.log('Error creating battle from match: $e', name: 'BattleService');
+      rethrow;
+    }
+  }
+
+  /// Get count of players currently in queue
+  static Future<int> getQueueCount() async {
+    try {
+      final result = await _client
+          .from('matchmaking_queue')
+          .select('id')
+          .eq('status', 'waiting');
+      return (result as List).length;
+    } catch (e) {
+      return 0;
     }
   }
 }

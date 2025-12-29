@@ -21,6 +21,8 @@ class MapPost {
   final int? userVote;
   final String category;
   final List<String> tags;
+  final bool isVerified;
+  final bool isUserVerified;
 
   MapPost({
     this.id,
@@ -45,6 +47,8 @@ class MapPost {
     this.userVote,
     this.category = 'Other',
     this.tags = const [],
+    this.isVerified = false,
+    this.isUserVerified = false,
   }) : photoUrls = photoUrls ?? [];
 
   // Backward compatibility getter
@@ -71,12 +75,13 @@ class MapPost {
       'vote_score': voteScore,
       'category': category,
       'tags': tags,
+      'is_verified': isVerified,
+      'is_user_verified': isUserVerified,
     };
   }
 
   factory MapPost.fromMap(Map<String, dynamic> map) {
     // Debug logging for photo data
-    // print('DEBUG: MapPost.fromMap - ID: ${map['id']}, photo_urls: ${map['photo_urls']}, photo_url: ${map['photo_url']}');
 
     // Handle both old photo_url and new photo_urls
     List<String> photos = [];
@@ -109,6 +114,8 @@ class MapPost {
       userVote: map['user_vote'] as int?,
       category: map['category'] as String? ?? 'Other',
       tags: (map['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
+      isVerified: map['is_verified'] as bool? ?? false,
+      isUserVerified: map['is_user_verified'] as bool? ?? false,
     );
   }
 }
