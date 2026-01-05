@@ -58,16 +58,20 @@ ALTER TABLE skate_lobby_players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE skate_lobby_events ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for Matchmaking Queue
+DROP POLICY IF EXISTS matchmaking_queue_all ON matchmaking_queue;
 CREATE POLICY matchmaking_queue_all ON matchmaking_queue 
   FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 
 -- RLS Policies for Skate Lobbies
+DROP POLICY IF EXISTS skate_lobbies_all ON skate_lobbies;
 CREATE POLICY skate_lobbies_all ON skate_lobbies
     FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS skate_lobby_players_all ON skate_lobby_players;
 CREATE POLICY skate_lobby_players_all ON skate_lobby_players
     FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS skate_lobby_events_all ON skate_lobby_events;
 CREATE POLICY skate_lobby_events_all ON skate_lobby_events
     FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 

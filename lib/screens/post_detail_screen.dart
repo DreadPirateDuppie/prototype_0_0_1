@@ -149,13 +149,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                   const VerifiedBadge(),
                               ],
                             ),
-                            Text(
-                              'Posted ${currentPost.createdAt.toString().substring(0, 10)}',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.5),
-                                fontSize: 11,
-                              ),
-                            ),
+                             Text(
+                               'TIMESTAMP://' + currentPost.createdAt.toString().substring(2, 4) + '.' + 
+                               currentPost.createdAt.toString().substring(5, 7) + '.' + 
+                               currentPost.createdAt.toString().substring(8, 10),
+                               style: TextStyle(
+                                 color: Colors.white.withValues(alpha: 0.4),
+                                 fontSize: 9,
+                                 fontFamily: 'monospace',
+                                 letterSpacing: 1,
+                               ),
+                             ),
                           ],
                         ),
                       ],

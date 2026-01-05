@@ -3,6 +3,7 @@ class SpotVideo {
   final String spotId;
   final String url;
   final String platform;
+  final String? trickName;
   final String? skaterName;
   final String? description;
   final String? submittedBy;
@@ -12,12 +13,15 @@ class SpotVideo {
   final DateTime? approvedAt;
   final String? approvedBy;
   final int? userVote; // Current user's vote: 1, -1, or null
+  final String? thumbnailUrl;
+  final List<String> tags;
 
   SpotVideo({
     required this.id,
     required this.spotId,
     required this.url,
     required this.platform,
+    this.trickName,
     this.skaterName,
     this.description,
     this.submittedBy,
@@ -31,15 +35,13 @@ class SpotVideo {
     this.tags = const [],
   });
 
-  final String? thumbnailUrl;
-  final List<String> tags;
-
   factory SpotVideo.fromMap(Map<String, dynamic> map) {
     return SpotVideo(
       id: map['id'] as String,
       spotId: map['spot_id'] as String,
       url: map['url'] as String,
-      platform: map['platform'] as String,
+      platform: map['platform'] as String? ?? 'native',
+      trickName: map['trick_name'] as String?,
       skaterName: map['skater_name'] as String?,
       description: map['description'] as String?,
       submittedBy: map['submitted_by'] as String?,
@@ -62,6 +64,7 @@ class SpotVideo {
       'spot_id': spotId,
       'url': url,
       'platform': platform,
+      'trick_name': trickName,
       'skater_name': skaterName,
       'description': description,
       'submitted_by': submittedBy,
@@ -76,6 +79,9 @@ class SpotVideo {
   }
 
   String get displayTitle {
+    if (trickName != null && trickName!.isNotEmpty) {
+      return trickName!;
+    }
     if (skaterName != null && skaterName!.isNotEmpty) {
       return skaterName!;
     }

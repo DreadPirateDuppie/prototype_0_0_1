@@ -1,1031 +1,271 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/supabase_service.dart';
-import '../models/post.dart';
-import '../models/user_scores.dart';
-import '../screens/edit_username_dialog.dart';
-import '../screens/followers_list_screen.dart';
-import '../widgets/mini_map_snapshot.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../providers/profile_provider.dart';
+import '../widgets/profile/profile_header.dart';
+
+// Removed ProfileStatsRow as it's replaced by UserStatsCard
+import '../widgets/profile/profile_media_grid.dart';
 import '../widgets/user_stats_card.dart';
-import '../providers/user_provider.dart';
+import '../screens/followers_list_screen.dart';
 import 'settings_tab.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import '../utils/error_helper.dart';
 import '../config/theme_config.dart';
-import '../screens/spot_details_screen.dart';
-import '../screens/post_detail_screen.dart';
-import '../screens/upload_media_dialog.dart';
-import '../screens/create_feed_post_dialog.dart';
-import '../widgets/verified_badge.dart';
+import '../services/supabase_service.dart';
 
-
-class ProfileTab extends StatefulWidget {
-  final VoidCallback? onProfileUpdated;
-
-  const ProfileTab({super.key, this.onProfileUpdated});
+class ProfileTab extends StatelessWidget {
+  const ProfileTab({super.key});
 
   @override
-  State<ProfileTab> createState() => _ProfileTabState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => ProfileProvider(),
+      child: const _ProfileTabContent(),
+    );
+  }
 }
 
-class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateMixin {
-  late Future<List<MapPost>> _userPostsFuture;
-  late TabController _tabController;
-  final bool _isStatsExpanded = false;
-  bool _isUploadingImage = false;
-  int _followersCount = 0;
-  int _followingCount = 0;
-  List<Map<String, dynamic>> _profileMedia = [];
-  bool _isLoadingMedia = true;
+class _ProfileTabContent extends StatefulWidget {
+  const _ProfileTabContent();
+
+  @override
+  State<_ProfileTabContent> createState() => _ProfileTabContentState();
+}
+
+class _ProfileTabContentState extends State<_ProfileTabContent> {
+  final _currentUser = Supabase.instance.client.auth.currentUser;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // Changed from 2 to 3
-    
-    // Initialize posts future
-    final user = SupabaseService.getCurrentUser();
-    if (user != null) {
-      _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
-      _loadFollowCounts(user.id);
-      _loadProfileMedia(user.id);
-    } else {
-      _userPostsFuture = Future.value([]);
-    }
-    
-    // Initialize user provider after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      if (userProvider.currentUser == null) {
-        userProvider.initialize();
-      } else {
-        userProvider.loadUserProfile();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _refreshAll() async {
-    final user = SupabaseService.getCurrentUser();
-    if (user != null) {
-      // Refresh user provider (handles XP recalculation)
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      await userProvider.refreshScores();
-      await userProvider.loadUserProfile(); // Reload profile data (username, avatar, etc.)
-      
-      // Refresh posts, follow counts, and profile media
-      if (mounted) {
-        setState(() {
-          _userPostsFuture = SupabaseService.getUserMapPosts(user.id);
-        });
-        await _loadFollowCounts(user.id);
-        await _loadProfileMedia(user.id);
-      }
-    }
-  }
-
-  Future<void> _loadFollowCounts(String userId) async {
-    try {
-      final counts = await SupabaseService.getFollowCounts(userId);
-      if (mounted) {
-        setState(() {
-          _followersCount = counts['followers'] ?? 0;
-          _followingCount = counts['following'] ?? 0;
-        });
-      }
-    } catch (e) {
-      // Silently fail - follow counts are not critical
-    }
-  }
-
-  Future<void> _loadProfileMedia(String userId) async {
-    setState(() => _isLoadingMedia = true);
-    try {
-      final media = await SupabaseService.getProfileMedia(userId);
-      if (mounted) {
-        setState(() {
-          _profileMedia = media;
-          _isLoadingMedia = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingMedia = false);
-      }
-    }
-  }
-
-  Future<void> _showUploadMediaDialog() async {
-    showDialog(
-      context: context,
-      builder: (context) => UploadMediaDialog(
-        onMediaUploaded: () {
-          final user = SupabaseService.getCurrentUser();
-          if (user != null) {
-            _loadProfileMedia(user.id);
-          }
-        },
-      ),
-    );
-  }
-
-
-  Future<void> _pickAndUploadImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, maxHeight: 800);
-
-    if (pickedFile != null) {
-      setState(() {
-        _isUploadingImage = true;
+    if (_currentUser != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<ProfileProvider>().loadProfile(_currentUser.id);
       });
-
-      try {
-        final user = SupabaseService.getCurrentUser();
-        if (user != null) {
-          final newUrl = await SupabaseService.uploadProfileImage(File(pickedFile.path), user.id);
-          // Update provider with new avatar URL
-          if (mounted) {
-            final userProvider = Provider.of<UserProvider>(context, listen: false);
-            userProvider.updateAvatarUrl(newUrl);
-            widget.onProfileUpdated?.call(); // Notify parent to refresh nav bar
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          ErrorHelper.showError(context, 'Error uploading image: $e');
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isUploadingImage = false;
-          });
-        }
-      }
     }
   }
 
-  void _editUsername(String currentUsername) {
-    showDialog(
-      context: context,
-      builder: (context) => EditUsernameDialog(
-        currentUsername: currentUsername,
-        onUsernameSaved: (newUsername) async {
-          final userProvider = Provider.of<UserProvider>(context, listen: false);
-          await userProvider.updateUsername(newUsername);
-          widget.onProfileUpdated?.call();
-        },
-      ),
-    );
-  }
-
-  void _editAge(int? currentAge) {
-    final ageController = TextEditingController(text: currentAge?.toString() ?? '');
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Age'),
-        content: TextField(
-          controller: ageController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            hintText: 'Enter your age',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final age = int.tryParse(ageController.text);
-              if (age != null) {
-                final userProvider = Provider.of<UserProvider>(context, listen: false);
-                await userProvider.updateAge(age);
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  widget.onProfileUpdated?.call();
-                }
-              } else {
-                ErrorHelper.showError(context, 'Please enter a valid age');
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _editBio(String currentBio) {
-    final bioController = TextEditingController(text: currentBio);
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Bio'),
-        content: TextField(
-          controller: bioController,
-          maxLines: 5,
-          maxLength: 150,
-          decoration: const InputDecoration(
-            hintText: 'Tell us about yourself...',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final userProvider = Provider.of<UserProvider>(context, listen: false);
-              await userProvider.updateBio(bioController.text);
-              if (context.mounted) {
-                Navigator.pop(context);
-                widget.onProfileUpdated?.call();
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-
-  Widget _buildStatColumn(String label, String count) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          count,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            // color: Colors.black87, // Removed to use theme default
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Theme.of(context).textTheme.bodySmall?.color,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-
-
-  void _showStatsInfo() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.info_outline, color: Colors.green.shade700),
-            const SizedBox(width: 8),
-            const Text('Stats Explained'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildInfoSection(
-                '🎯 VS Lvl',
-                'Earn XP from battles: Win = +10 XP, Lose = -5 to -15 XP (based on performance). Progressive leveling: Lvl 1 = 100 XP, Lvl 2 = 300 XP, Lvl 3 = 600 XP, etc.',
-              ),
-              const SizedBox(height: 12),
-              _buildInfoSection(
-                '📍 Spotter Lvl',
-                'Earn XP from posting spots on the map. Get +1 XP for each upvote on your posts! Progressive leveling: Lvl 1 = 100 XP, Lvl 2 = 300 XP, Lvl 3 = 600 XP, etc.',
-              ),
-              const SizedBox(height: 12),
-              _buildInfoSection(
-                '⭐ Ranking Score',
-                'Traditional scoring (0-1000). Starts at 500. Increases with voting accuracy.',
-              ),
-              const SizedBox(height: 12),
-              _buildInfoSection(
-                '🏆 Final Score',
-                'Average of all three scores. Determines your overall standing.',
-              ),
-              const SizedBox(height: 12),
-              _buildInfoSection(
-                '⚖️ Vote Weight',
-                'Your voting influence (0-100%). Higher final score = more influence.',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it!'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoSection(String title, String description) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          description,
-          style: TextStyle(
-            fontSize: 13,
-            color: Theme.of(context).textTheme.bodySmall?.color,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Stats section now uses the extracted UserStatsCard widget
-  Widget _buildStatsSection(UserScores scores) {
-    return UserStatsCard(
-      scores: scores,
-      initiallyExpanded: _isStatsExpanded,
-      onInfoPressed: _showStatsInfo,
-    );
-  }
-
-
-
-  Widget _buildGridPost(MapPost post) {
-    return GestureDetector(
-      onTap: () {
-        final isSpot = post.latitude != null && post.longitude != null;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => isSpot 
-                ? SpotDetailsScreen(post: post)
-                : PostDetailScreen(post: post),
-          ),
-        ).then((_) => _refreshAll()); // Refresh on return in case of changes
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          image: post.photoUrl != null
-              ? DecorationImage(
-                  image: NetworkImage(post.photoUrl!),
-                  fit: BoxFit.cover,
-                )
-              : null,
-        ),
-        child: post.photoUrl == null
-            ? (post.latitude != null && post.longitude != null
-                ? MiniMapSnapshot(
-                    latitude: post.latitude!,
-                    longitude: post.longitude!,
-                  )
-                : Container(
-                    color: Colors.grey[900],
-                    child: const Center(
-                      child: Icon(Icons.article, color: Colors.white54),
-                    ),
-                  ))
-            : null,
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
-    final user = SupabaseService.getCurrentUser();
+    return Consumer<ProfileProvider>(
+      builder: (context, provider, child) {
+        if (provider.isLoading && provider.profileData == null) {
+          return const Center(child: CircularProgressIndicator(color: ThemeColors.matrixGreen));
+        }
 
-    return Consumer<UserProvider>(
-      builder: (context, userProvider, child) {
-        return Scaffold(
-          body: RefreshIndicator(
-            onRefresh: _refreshAll,
-            color: Theme.of(context).colorScheme.primary,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            child: NestedScrollView(
+        final profileData = provider.profileData;
+        if (profileData == null) {
+          return const Center(child: Text('Failed to load profile'));
+        }
+
+        return DefaultTabController(
+          length: 2,
+          child: Scaffold(
+            backgroundColor: Colors.transparent, // Let global Matrix show through
+            body: NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) {
                 return [
                   SliverAppBar(
-                    expandedHeight: 400.0,
+                    expandedHeight: 120.0,
                     floating: false,
                     pinned: true,
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    leading: IconButton(
-                      icon: const Icon(Icons.add_box_outlined, color: Colors.white),
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => CreateFeedPostDialog(
-                            onPostAdded: _refreshAll,
-                          ),
-                        );
-                      },
+                    backgroundColor: Colors.transparent, // Show global Matrix
+                    elevation: 0,
+                    flexibleSpace: const FlexibleSpaceBar(
+                      background: SizedBox.expand(),
                     ),
-                    title: const Text(
-                      '> PUSHINN_',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    centerTitle: true,
                     actions: [
                       IconButton(
-                        icon: const Icon(Icons.settings, color: Colors.white),
+                        icon: const Icon(Icons.settings),
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => const SettingsTab(),
-                            ),
+                            MaterialPageRoute(builder: (_) => const SettingsTab()),
                           );
                         },
                       ),
                     ],
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Theme.of(context).colorScheme.primary,
-                            Theme.of(context).scaffoldBackgroundColor
-                          ],
-                          stops: const [0.0, 0.6],
+                  ),
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        ProfileHeader(
+                          profileData: profileData,
+                          isCurrentUser: true,
                         ),
-                      ),
-                      child: SafeArea(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            const SizedBox(height: 10),
-                            // Avatar
-                            GestureDetector(
-                              onTap: _pickAndUploadImage,
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 3),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.2),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 5),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Builder(
-                                      builder: (context) {
-                                        if (_isUploadingImage) {
-                                          return CircleAvatar(
-                                            radius: 50,
-                                            backgroundColor: Colors.black54,
-                                            child: const CircularProgressIndicator(color: Colors.green),
-                                          );
-                                        }
-                                        
-                                        if (userProvider.avatarUrl != null) {
-                                          return CircleAvatar(
-                                            radius: 50,
-                                            backgroundImage: NetworkImage(userProvider.avatarUrl!),
-                                            backgroundColor: Colors.green.shade200,
-                                          );
-                                        }
-                                        
-                                        return CircleAvatar(
-                                          radius: 50,
-                                          backgroundColor: Colors.green.shade200,
-                                          child: Text(
-                                            user?.email?.substring(0, 1).toUpperCase() ?? 'U',
-                                            style: const TextStyle(
-                                               fontSize: 40,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: 0,
-                                    right: 0,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: ThemeColors.darkGreen,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 2),
-                                      ),
-                                      child: const Icon(
-                                        Icons.camera_alt,
-                                        size: 16,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            // Username - now from UserProvider
-                            if (userProvider.username == null || userProvider.username!.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    _editUsername('');
-                                  },
-                                  icon: const Icon(Icons.alternate_email, size: 18),
-                                  label: const Text('Set Username'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: Colors.green.shade700,
-                                    elevation: 2,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        const SizedBox(height: 12),
+                        if (provider.userScores != null) ...[
+                          const SizedBox(height: 8),
+                          UserStatsCard(
+                            scores: provider.userScores!,
+                            followersCount: provider.followersCount,
+                            followingCount: provider.followingCount,
+                            postCount: provider.userPosts.length,
+                            initiallyExpanded: false,
+                            onPostsTap: () {
+                              // Maybe switch to Posts tab?
+                              DefaultTabController.of(context).animateTo(0);
+                            },
+                            onFollowersTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => FollowersListScreen(
+                                    userId: _currentUser!.id,
+                                    username: profileData['username'],
+                                    initialTab: 0,
                                   ),
                                 ),
-                              )
-                            else
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '@${userProvider.username}${userProvider.age != null ? " • ${userProvider.age}" : ""}',
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'monospace',
-                                    ),
+                              );
+                            },
+                            onFollowingTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => FollowersListScreen(
+                                    userId: _currentUser!.id,
+                                    username: profileData['username'],
+                                    initialTab: 1,
                                   ),
-                                  if (userProvider.isVerified)
-                                    const VerifiedBadge(size: 20, padding: EdgeInsets.only(left: 8.0)),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, size: 20, color: Colors.white70),
-                                    onPressed: () {
-                                      // Show a menu to edit username or age
-                                      showModalBottomSheet(
-                                        context: context,
-                                        builder: (context) => SafeArea(
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              ListTile(
-                                                leading: const Icon(Icons.alternate_email),
-                                                title: const Text('Edit Username'),
-                                                onTap: () {
-                                                  Navigator.pop(context);
-                                                  _editUsername(userProvider.username ?? '');
-                                                },
-                                              ),
-                                              ListTile(
-                                                leading: const Icon(Icons.cake),
-                                                title: const Text('Edit Age'),
-                                                onTap: () {
-                                                  Navigator.pop(context);
-                                                  _editAge(userProvider.age);
-                                                },
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    tooltip: 'Edit Profile Info',
-                                  ),
-                                ],
-                              ),
-                            const SizedBox(height: 8),
-                            // Bio section
-                            GestureDetector(
-                              onTap: () => _editBio(userProvider.bio ?? ''),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        userProvider.bio != null && userProvider.bio!.isNotEmpty
-                                            ? userProvider.bio!
-                                            : 'Add a bio...',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: userProvider.bio != null && userProvider.bio!.isNotEmpty
-                                              ? Colors.white.withValues(alpha: 0.9)
-                                              : Colors.white.withValues(alpha: 0.5),
-                                          fontStyle: userProvider.bio == null || userProvider.bio!.isEmpty
-                                              ? FontStyle.italic
-                                              : FontStyle.normal,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      Icons.edit,
-                                      size: 16,
-                                      color: Colors.white.withValues(alpha: 0.5),
-                                    ),
-                                  ],
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            // Stats Row
-                            FutureBuilder<List<MapPost>>(
-                              future: _userPostsFuture,
-                              builder: (context, snapshot) {
-                                final postCount = snapshot.data?.length ?? 0;
-                                return Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    _buildStatColumn('Posts', '$postCount'),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => FollowersListScreen(
-                                              userId: user!.id,
-                                              username: userProvider.username,
-                                              initialTab: 0, // Show followers
-                                            ),
-                                          ),
-                                        ).then((_) => _loadFollowCounts(user!.id));
-                                      },
-                                      child: _buildStatColumn('Followers', '$_followersCount'),
-                                    ),
-                                    Container(
-                                      height: 24,
-                                      width: 1,
-                                      color: Colors.white24,
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => FollowersListScreen(
-                                              userId: user!.id,
-                                              username: userProvider.username,
-                                              initialTab: 1, // Show following
-                                            ),
-                                          ),
-                                        ).then((_) => _loadFollowCounts(user!.id));
-                                      },
-                                      child: _buildStatColumn('Following', '$_followingCount'),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 20),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // User Stats Section (Scrollable) - now from UserProvider
-                SliverToBoxAdapter(
-                  child: Builder(
-                    builder: (context) {
-                      if (userProvider.isLoading) {
-                        return Container(
-                          margin: const EdgeInsets.all(16),
-                          padding: const EdgeInsets.all(24),
-                          child: const Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      if (userProvider.userScores != null) {
-                        return _buildStatsSection(userProvider.userScores!);
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                ),
-                // Persistent Tab Bar
-                SliverPersistentHeader(
-                  delegate: _SliverAppBarDelegate(
-                    TabBar(
-                      controller: _tabController,
-                      indicatorColor: Theme.of(context).colorScheme.primary,
-                      labelColor: Theme.of(context).colorScheme.primary,
-                      unselectedLabelColor: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
-                      tabs: const [
-                        Tab(text: 'My Posts', icon: Icon(Icons.grid_on)),
-                        Tab(text: 'Saved', icon: Icon(Icons.bookmark)),
-                        Tab(text: 'Media', icon: Icon(Icons.perm_media)),
+                              );
+                            },
+                          ),
+                        ],
+                        const SizedBox(height: 8),
                       ],
                     ),
                   ),
-                  pinned: true,
-                ),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                // Tab 1: My Posts (Grid)
-                FutureBuilder<List<MapPost>>(
-                  future: _userPostsFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    
-                    final posts = snapshot.data ?? [];
-                    
-                    if (posts.isEmpty) {
-                      return CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          SliverFillRemaining(
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[400]),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'No posts yet',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                  SliverPersistentHeader(
+                    delegate: _SliverAppBarDelegate(
+                      const TabBar(
+                        indicatorColor: ThemeColors.matrixGreen,
+                        labelColor: ThemeColors.matrixGreen,
+                        unselectedLabelColor: Colors.white60,
+                        tabs: [
+                          Tab(text: 'Posts', icon: Icon(Icons.grid_on)),
+                          Tab(text: 'Media', icon: Icon(Icons.perm_media)),
                         ],
-                      );
-                    }
-
-                    return GridView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(2),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 2,
-                        mainAxisSpacing: 2,
-                      ),
-                      itemCount: posts.length,
-                      itemBuilder: (context, index) {
-                        return _buildGridPost(posts[index]);
-                      },
-                    );
-                  },
-                ),
-                
-                // Tab 2: Saved Posts (Grid)
-                FutureBuilder<List<MapPost>>(
-                  future: SupabaseService.getSavedPosts(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    
-                    final posts = snapshot.data ?? [];
-                    
-                    if (posts.isEmpty) {
-                      return CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          SliverFillRemaining(
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'No saved posts',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Save posts from the feed to see them here',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[500],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-
-                    return GridView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(2),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 2,
-                        mainAxisSpacing: 2,
-                      ),
-                      itemCount: posts.length,
-                      itemBuilder: (context, index) {
-                        return _buildGridPost(posts[index]);
-                      },
-                    );
-                  },
-                ),
-                // Tab 3: Media Gallery
-                Stack(
-                  children: [
-                    _isLoadingMedia
-                        ? const Center(child: CircularProgressIndicator())
-                        : _profileMedia.isEmpty
-                            ? CustomScrollView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                slivers: [
-                                  SliverFillRemaining(
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey[400]),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            'No media yet',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              color: Colors.grey[600],
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Upload photos or videos to your profile',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : GridView.builder(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.all(2),
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 3,
-                                  crossAxisSpacing: 2,
-                                  mainAxisSpacing: 2,
-                                ),
-                                itemCount: _profileMedia.length,
-                                itemBuilder: (context, index) {
-                                  final media = _profileMedia[index];
-                                  final isVideo = media['media_type'] == 'video';
-                                  
-                                  return GestureDetector(
-                                    onTap: () {
-                                      // TODO: Show full screen media viewer
-                                    },
-                                    onLongPress: () async {
-                                      // Only allow deleting if it's from profile_media, not from posts
-                                      final isFromPost = media['source'] == 'post';
-                                      
-                                      if (isFromPost) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('This media is part of a post. Delete the post to remove it.'),
-                                            duration: Duration(seconds: 2),
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      
-                                      // Show delete option for profile media
-                                      final shouldDelete = await showDialog<bool>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text('Delete Media'),
-                                          content: const Text('Are you sure you want to delete this media?'),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(context, false),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(context, true),
-                                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      
-                                      if (shouldDelete == true) {
-                                        try {
-                                          await SupabaseService.deleteProfileMedia(media['id']);
-                                          final user = SupabaseService.getCurrentUser();
-                                          if (user != null) {
-                                            _loadProfileMedia(user.id);
-                                          }
-                                        } catch (e) {
-                                          if (mounted) {
-                                            ErrorHelper.showError(context, 'Error deleting media: $e');
-                                          }
-                                        }
-                                      }
-                                    },
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        Image.network(
-                                          media['media_url'],
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Container(
-                                              color: Colors.grey[300],
-                                              child: const Icon(Icons.broken_image, size: 32),
-                                            );
-                                          },
-                                        ),
-                                        if (isVideo)
-                                          Center(
-                                            child: Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black54,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(
-                                                Icons.play_arrow,
-                                                color: Colors.white,
-                                                size: 32,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                    // Upload FAB
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: FloatingActionButton(
-                        onPressed: _showUploadMediaDialog,
-                        backgroundColor: const Color(0xFF00FF41),
-                        child: const Icon(Icons.add, color: Colors.black),
                       ),
                     ),
-                  ],
+                    pinned: true,
+                  ),
+                ];
+              },
+              body: TabBarView(
+                children: [
+                  ProfileMediaGrid(
+                    posts: provider.userPosts,
+                    isLoading: provider.isLoading,
+                  ),
+                  _buildMediaTab(),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMediaTab() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseService.getProfileMedia(_currentUser!.id),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: ThemeColors.matrixGreen));
+        }
+        
+        final mediaList = snapshot.data ?? [];
+        
+        if (mediaList.isEmpty) {
+           return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.perm_media_outlined, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No media yet',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
+          );
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(2),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 2,
+            mainAxisSpacing: 2,
           ),
-        ),
-      );
+          itemCount: mediaList.length,
+          itemBuilder: (context, index) {
+            final media = mediaList[index];
+            final mediaUrl = media['media_url'];
+            final isVideo = media['media_type'] == 'video';
+            
+            return GestureDetector(
+              onTap: () {
+                if (mediaUrl == null) return;
+                // Show full screen media viewer
+                 showDialog(
+                  context: context,
+                  builder: (context) => Dialog(
+                    backgroundColor: Colors.transparent,
+                    insetPadding: EdgeInsets.zero,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        InteractiveViewer(
+                          child: Image.network(
+                            mediaUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => const Center(
+                              child: Icon(Icons.error, color: Colors.white, size: 50),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 40,
+                          right: 20,
+                          child: IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  image: mediaUrl != null 
+                    ? DecorationImage(
+                        image: NetworkImage(mediaUrl),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+                ),
+                child: isVideo
+                    ? const Center(
+                        child: Icon(Icons.play_circle_outline, color: Colors.white, size: 32),
+                      )
+                    : (mediaUrl == null 
+                        ? const Center(child: Icon(Icons.broken_image, color: Colors.white24))
+                        : null),
+              ),
+            );
+          },
+        );
       },
     );
   }
@@ -1038,14 +278,13 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   double get minExtent => _tabBar.preferredSize.height;
-
   @override
   double get maxExtent => _tabBar.preferredSize.height;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
+      color: Colors.transparent, // Let Matrix show under tabs
       child: _tabBar,
     );
   }

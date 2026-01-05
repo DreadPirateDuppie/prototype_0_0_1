@@ -59,9 +59,9 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
 
       await Supabase.instance.client.from('spot_videos').insert({
         'spot_id': widget.spotId,
-        'user_id': user.id,
+        'user_id': user.id, // Keep user_id for RLS/FK, but ensure we also use trick_name
         'trick_name': _skaterNameController.text.trim(),
-        'video_url': _urlController.text.trim().isEmpty ? null : _urlController.text.trim(),
+        'url': _urlController.text.trim().isEmpty ? null : _urlController.text.trim(),
         'description': _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
         'tags': tags,
         'created_at': DateTime.now().toIso8601String(),

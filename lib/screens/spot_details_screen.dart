@@ -32,6 +32,8 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
   int _usersAtSpot = 0;
   bool _isLoadingUsers = true;
   String _selectedTag = 'All';
+  Map<String, dynamic>? _mvpProfile;
+  bool _isLoadingMvp = false;
 
   // Matrix theme colors
   static const Color matrixGreen = Color(0xFF00FF41);
@@ -42,6 +44,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
     super.initState();
     currentPost = widget.post;
     _checkOwnership();
+    _loadMvpUser();
     _loadTricks();
     _loadUsersAtSpot();
   }
@@ -52,6 +55,26 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
       setState(() {
         _isOwnPost = currentPost.userId == userId;
       });
+    }
+  }
+
+  Future<void> _loadMvpUser() async {
+    if (currentPost.mvpUserId == null) return;
+    
+    setState(() => _isLoadingMvp = true);
+    
+    try {
+      final profile = await SupabaseService.getUserProfile(currentPost.mvpUserId!);
+      if (mounted) {
+        setState(() {
+          _mvpProfile = profile;
+          _isLoadingMvp = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMvp = false);
+      }
     }
   }
 
@@ -207,6 +230,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
               try {
                 await SupabaseService.reportPost(
                   postId: currentPost.id!,
+                  reporterUserId: SupabaseService.getCurrentUser()?.id ?? 'anonymous',
                   reason: reasonController.text.trim(),
                   details: detailsController.text.trim().isEmpty
                       ? null
@@ -449,10 +473,14 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                             ],
                           ),
                           Text(
-                            currentPost.createdAt.toString().substring(0, 10),
+                            'TIMESTAMP://' + currentPost.createdAt.toString().substring(2, 4) + '.' + 
+                            currentPost.createdAt.toString().substring(5, 7) + '.' + 
+                            currentPost.createdAt.toString().substring(8, 10),
                             style: TextStyle(
                               color: secondaryTextColor,
-                              fontSize: 12,
+                              fontSize: 10,
+                              fontFamily: 'monospace',
+                              letterSpacing: 1,
                             ),
                           ),
                         ],
@@ -486,6 +514,158 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
+
+                  // --- SPOT MVP SECTION ---
+                  if (currentPost.mvpUserId != null && (_mvpProfile != null || _isLoadingMvp))
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.amber.withValues(alpha: 0.1),
+                            Colors.amber.withValues(alpha: 0.05),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.5),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          // MVP Avatar with Crown
+                          Stack(
+                            alignment: Alignment.topRight,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: Colors.amber,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Colors.black,
+                                  backgroundImage: _mvpProfile?['avatar_url'] != null
+                                      ? NetworkImage(_mvpProfile!['avatar_url'])
+                                      : null,
+                                  child: _mvpProfile?['avatar_url'] == null
+                                      ? Text(
+                                          (_mvpProfile?['username']?.isNotEmpty == true)
+                                              ? _mvpProfile!['username'][0].toUpperCase()
+                                              : 'K',
+                                          style: const TextStyle(
+                                            color: Colors.amber,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                              ),
+                              Transform.translate(
+                                offset: const Offset(8, -8),
+                                child: const Icon(
+                                  Icons.emoji_events,
+                                  color: Colors.amber,
+                                  size: 24,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 16),
+                          
+                          // MVP Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'KING OF THE SPOT',
+                                      style: TextStyle(
+                                        color: Colors.amber,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'monospace',
+                                        letterSpacing: 1.5,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                                      ),
+                                      child: Text(
+                                        '${currentPost.mvpScore} PTS',
+                                        style: const TextStyle(
+                                          color: Colors.amber,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                if (_isLoadingMvp)
+                                  const Text(
+                                    'Loading...',
+                                    style: TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 14,
+                                    ),
+                                  )
+                                else
+                                  Row(
+                                    children: [
+                                      Text(
+                                        _mvpProfile?['username'] ?? 'Unknown',
+                                        style: TextStyle(
+                                          color: isDark ? Colors.white : Colors.black,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      if (SupabaseService.getCurrentUser()?.id == currentPost.mvpUserId)
+                                        Container(
+                                          margin: const EdgeInsets.only(left: 8),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: matrixGreen,
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: const Text(
+                                            'YOU',
+                                            style: TextStyle(
+                                              color: Colors.black,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   // Location with clickable coordinates (Only if location exists)
                   if (currentPost.latitude != null && currentPost.longitude != null)

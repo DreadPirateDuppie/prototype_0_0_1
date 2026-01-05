@@ -228,7 +228,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
         videoUrl: videoUrl,
         category: _selectedCategory,
         tags: tags,
-        rating: _rating,
+        qualityRating: _rating,
         securityRating: _securityRating,
         popularityRating: _popularityRating,
       );

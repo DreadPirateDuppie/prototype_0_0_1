@@ -1,27 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../providers/navigation_provider.dart';
 import '../models/post.dart';
 import '../services/supabase_service.dart';
 import '../screens/edit_post_dialog.dart';
 import '../screens/spot_details_screen.dart';
-import '../screens/post_detail_screen.dart';
 import '../screens/user_profile_screen.dart';
 import 'vote_buttons.dart';
 import 'mini_map_snapshot.dart';
-import 'verified_badge.dart';
-import '../utils/error_helper.dart';
 import 'video_player_widget.dart';
+import 'verified_badge.dart';
+import '../config/theme_config.dart';
 
 class PostCard extends StatefulWidget {
   final MapPost post;
-  final VoidCallback? onPostUpdated;
+  final VoidCallback? onDelete;
 
   const PostCard({
     super.key,
     required this.post,
-    this.onPostUpdated,
+    this.onDelete,
   });
 
   @override
@@ -30,286 +27,103 @@ class PostCard extends StatefulWidget {
 
 class _PostCardState extends State<PostCard> {
   late MapPost currentPost;
-  bool _isOwnPost = false;
   bool _isSaved = false;
   bool _isSaving = false;
+  bool _isOwnPost = false;
   int _currentImageIndex = 0;
 
   @override
   void initState() {
     super.initState();
     currentPost = widget.post;
-    // Debug logging removed
     _checkOwnership();
-  }
-
-  @override
-  void didUpdateWidget(PostCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.post != oldWidget.post) {
-      currentPost = widget.post;
-      _checkOwnership();
-    }
-  }
-
-  void _checkOwnership() {
-    final userId = SupabaseService.getCurrentUser()?.id;
-    if (userId != null) {
-      setState(() {
-        _isOwnPost = currentPost.userId == userId;
-      });
-    }
     _loadSavedStatus();
   }
 
+  void _checkOwnership() {
+    final user = SupabaseService.getCurrentUser();
+    if (user != null) {
+      if (mounted) {
+        setState(() {
+          _isOwnPost = currentPost.userId == user.id;
+        });
+      }
+    }
+  }
+
   Future<void> _loadSavedStatus() async {
-    if (currentPost.id == null) return;
-    final saved = await SupabaseService.isPostSaved(currentPost.id!);
-    if (mounted) {
-      setState(() {
-        _isSaved = saved;
-      });
+    try {
+      if (currentPost.id == null) return;
+      final isSaved = await SupabaseService.isPostSaved(currentPost.id!);
+      if (mounted) {
+        setState(() => _isSaved = isSaved);
+      }
+    } catch (e) {
+      // Silently fail
     }
   }
 
   Future<void> _toggleSave() async {
-    if (currentPost.id == null || _isSaving) return;
-    
-    setState(() {
-      _isSaving = true;
-    });
-
+    if (_isSaving) return;
     try {
-      final newSavedStatus = await SupabaseService.toggleSavePost(currentPost.id!);
-      if (mounted) {
-        setState(() {
-          _isSaved = newSavedStatus;
-          _isSaving = false;
-        });
+      if (currentPost.id == null) return;
+      setState(() => _isSaving = true);
+      
+      if (_isSaved) {
+        await SupabaseService.unsavePost(currentPost.id!);
+        if (mounted) setState(() => _isSaved = false);
+      } else {
+        await SupabaseService.savePost(currentPost.id!);
+        if (mounted) setState(() => _isSaved = true);
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-        ErrorHelper.showError(context, 'Error saving post: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
       }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  Future<void> _sharePost() async {
-    try {
-      final rating = currentPost.popularityRating > 0 
-          ? '${currentPost.popularityRating.toStringAsFixed(1)}/5 ⭐' 
-          : 'Not rated yet';
-      // ignore: deprecated_member_use
-      await Share.share(
-        'Check out "${currentPost.title}" 🛹\n'
-        'Rating: $rating\n'
-        '${currentPost.description}\n\n'
-        'Get the app: https://pushinn.app',
-        subject: 'Amazing spot on Pushinn!',
-      );
-    } catch (e) {
-      if (mounted) {
-        ErrorHelper.showError(context, 'Share failed: $e');
-      }
-    }
+  void _sharePost() {
+    // ignore: deprecated_member_use
+    Share.share(
+      'Check out this spot on Pushinn: ${currentPost.title}\n\n${currentPost.description}',
+      subject: 'Pushinn Spot: ${currentPost.title}',
+    );
   }
 
-  Future<void> _showEditDialog() async {
+  void _showEditDialog() {
     showDialog(
       context: context,
       builder: (context) => EditPostDialog(
         post: currentPost,
         onPostUpdated: () async {
-          widget.onPostUpdated?.call();
+          if (widget.onDelete != null) {
+             widget.onDelete!();
+          }
+          // Also refresh local state
+          try {
+             final posts = await SupabaseService.getAllMapPostsWithVotes();
+             final updated = posts.firstWhere((p) => p.id == currentPost.id, orElse: () => currentPost);
+             if (mounted) setState(() => currentPost = updated);
+          } catch (e) {
+            // ignore: empty_catches
+          }
         },
       ),
     );
   }
 
   void _showDetails() {
-    final isSpot = currentPost.latitude != null && currentPost.longitude != null;
-    
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => isSpot 
-            ? SpotDetailsScreen(post: currentPost)
-            : PostDetailScreen(post: currentPost),
-      ),
-    ).then((_) => widget.onPostUpdated?.call());
-  }
-
-  Future<void> _showReportDialog() async {
-    const matrixGreen = Color(0xFF00FF41);
-    String? selectedReason;
-    final reasons = [
-      'Spam or misleading',
-      'Inappropriate content',
-      'Harassment or hate speech',
-      'Violence or dangerous behavior',
-      'False information',
-      'Other',
-    ];
-
-    await showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: const Color(0xFF000000),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: matrixGreen, width: 2),
-          ),
-          title: const Text(
-            'Report Post',
-            style: TextStyle(
-              color: matrixGreen,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Why are you reporting this post?',
-                style: TextStyle(
-                  color: matrixGreen.withValues(alpha: 0.7),
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ...reasons.map((reason) => RadioListTile<String>(
-                    title: Text(
-                      reason,
-                      style: const TextStyle(color: matrixGreen, fontSize: 14),
-                    ),
-                    value: reason,
-                    groupValue: selectedReason,
-                    activeColor: matrixGreen,
-                    onChanged: (value) {
-                      setState(() {
-                        selectedReason = value;
-                      });
-                    },
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  )),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'CANCEL',
-                style: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: selectedReason == null
-                  ? null
-                  : () async {
-                      Navigator.of(context).pop();
-                      try {
-                        await SupabaseService.reportPost(
-                          postId: currentPost.id!,
-                          reason: selectedReason!,
-                        );
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Report submitted. Thank you for keeping our community safe.'),
-                              backgroundColor: matrixGreen,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ErrorHelper.showError(context, 'Error submitting report: $e');
-                        }
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.red.withValues(alpha: 0.3),
-              ),
-              child: const Text('REPORT'),
-            ),
-          ],
-        ),
+        builder: (context) => SpotDetailsScreen(post: currentPost),
       ),
     );
-  }
-
-  Future<void> _deletePost() async {
-    const matrixGreen = Color(0xFF00FF41);
-    
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF000000),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: matrixGreen, width: 2),
-        ),
-        title: const Text(
-          'DELETE POST',
-          style: TextStyle(
-            color: Colors.red,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to delete this post? This action cannot be undone.',
-          style: TextStyle(
-            color: matrixGreen.withValues(alpha: 0.7),
-            fontSize: 14,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(
-              'CANCEL',
-              style: TextStyle(color: matrixGreen.withValues(alpha: 0.7)),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('DELETE'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        await SupabaseService.deletePost(currentPost.id!);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Post deleted successfully'),
-              backgroundColor: matrixGreen,
-            ),
-          );
-          widget.onPostUpdated?.call();
-        }
-      } catch (e) {
-        if (mounted) {
-          ErrorHelper.showError(context, 'Error deleting post: $e');
-        }
-      }
-    }
   }
 
   @override
@@ -317,315 +131,276 @@ class _PostCardState extends State<PostCard> {
     const matrixGreen = Color(0xFF00FF41);
     
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      color: Colors.black, // Pure black for neon contrast
       elevation: 0,
-      color: const Color(0xFF000000), // Pure black background
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: matrixGreen.withValues(alpha: 0.3), width: 1),
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: matrixGreen.withValues(alpha: 0.3),
+          width: 1,
+        ),
       ),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: matrixGreen.withValues(alpha: 0.2),
-              blurRadius: 8,
+              color: matrixGreen.withValues(alpha: 0.15),
+              blurRadius: 12,
               spreadRadius: 0,
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header: User Info & Edit Button
+        child: InkWell(
+          onTap: _showDetails,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+            // Header: User Info & Title
             Padding(
               padding: const EdgeInsets.all(12.0),
               child: Row(
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        if (_isOwnPost) {
-                          // Navigate to Profile Tab (Index 4)
-                          Navigator.of(context).popUntil((route) => route.isFirst);
-                          Provider.of<NavigationProvider>(context, listen: false).setIndex(4);
-                        } else {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => UserProfileScreen(
-                                userId: currentPost.userId,
-                                username: currentPost.userName,
-                                avatarUrl: currentPost.avatarUrl,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      child: Row(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: matrixGreen, width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: matrixGreen.withValues(alpha: 0.5),
-                                  blurRadius: 4,
-                                ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 18,
-                              backgroundColor: const Color(0xFF000000), // Pure black
-                              backgroundImage: currentPost.avatarUrl != null
-                                  ? NetworkImage(currentPost.avatarUrl!)
-                                  : null,
-                              child: currentPost.avatarUrl == null
-                                  ? Text(
-                                      (currentPost.userName?.isNotEmpty == true)
-                                          ? currentPost.userName![0].toUpperCase()
-                                          : 'U',
-                                      style: const TextStyle(
-                                        color: matrixGreen,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        currentPost.userName?.isNotEmpty == true
-                                            ? currentPost.userName!
-                                            : 'User',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Theme.of(context).textTheme.bodySmall?.color,
-                                        ),
-                                      ),
-                                      if (currentPost.isUserVerified)
-                                        const VerifiedBadge(),
-                                    ],
-                                  ),
-                                Text(
-                                  currentPost.title,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                    color: Color(0xFF00FF41), // Matrix Green
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                if (currentPost.latitude != null && currentPost.longitude != null)
-                                  Text(
-                                    'Location: ${currentPost.latitude!.toStringAsFixed(4)}, ${currentPost.longitude!.toStringAsFixed(4)}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Theme.of(context).textTheme.bodySmall?.color,
-                                      fontFamily: 'monospace',
-                                    ),
-                                  ),
-                                Text(
-                                  'Posted: ${currentPost.createdAt.toString().substring(0, 16)}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Theme.of(context).textTheme.bodySmall?.color,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ],
-                            ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UserProfileScreen(userId: currentPost.userId),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: ThemeColors.neonGreen, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: ThemeColors.neonGreen.withValues(alpha: 0.3),
+                            blurRadius: 4,
+                            spreadRadius: 1,
                           ),
                         ],
                       ),
+                      child: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: ThemeColors.neonGreen.withValues(alpha: 0.1),
+                        backgroundImage: currentPost.avatarUrl != null
+                            ? NetworkImage(currentPost.avatarUrl!)
+                            : null,
+                        child: currentPost.avatarUrl == null
+                            ? Text(
+                                (currentPost.userName ?? 'U')[0].toUpperCase(),
+                                style: const TextStyle(
+                                  color: ThemeColors.neonGreen,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              )
+                            : null,
+                      ),
                     ),
                   ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert),
-                    color: const Color(0xFF0A0A0A),
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        _showEditDialog();
-                      } else if (value == 'delete') {
-                        _deletePost();
-                      } else if (value == 'report') {
-                        _showReportDialog();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      if (_isOwnPost) ...[
-                        const PopupMenuItem(
-                          value: 'edit',
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => UserProfileScreen(userId: currentPost.userId),
+                              ),
+                            );
+                          },
                           child: Row(
                             children: [
-                              Icon(Icons.edit, size: 20, color: Color(0xFF00FF41)),
-                              SizedBox(width: 12),
-                              Text('Edit Post', style: TextStyle(color: Color(0xFF00FF41))),
+                              Text(
+                                currentPost.userName ?? 'User',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              if (currentPost.isUserVerified)
+                                const VerifiedBadge(),
                             ],
                           ),
                         ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete, size: 20, color: Colors.red),
-                              SizedBox(width: 12),
-                              Text('Delete Post', style: TextStyle(color: Colors.red)),
-                            ],
+                        Text(
+                          currentPost.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: ThemeColors.neonGreen,
                           ),
                         ),
                       ],
-                      const PopupMenuItem(
-                        value: 'report',
-                        child: Row(
-                          children: [
-                            Icon(Icons.flag, size: 20, color: Colors.red),
-                            SizedBox(width: 12),
-                            Text('Report Post', style: TextStyle(color: Colors.red)),
-                          ],
+                    ),
+                  ),
+                  if (_isOwnPost)
+                    IconButton(
+                      icon: const Icon(Icons.more_vert, color: Colors.white70),
+                      onPressed: _showEditDialog,
+                    ),
+                ],
+              ),
+            ),
+
+            // Image or Map Snapshot
+            currentPost.videoUrl != null
+              ? VideoPlayerWidget(videoUrl: currentPost.videoUrl!)
+              : currentPost.photoUrls.isNotEmpty
+                ? _buildImageCarousel()
+                : SizedBox(
+                    height: 180,
+                    width: double.infinity,
+                    child: MiniMapSnapshot(
+                      latitude: currentPost.latitude ?? 0.0,
+                      longitude: currentPost.longitude ?? 0.0,
+                    ),
+                  ),
+            
+            // Description
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Text(
+                currentPost.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, color: Colors.white),
+              ),
+            ),
+
+            // Location & Date (Conditional: Only for maps)
+            if (currentPost.latitude != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Location: ${currentPost.latitude!.toStringAsFixed(4)}, ${currentPost.longitude!.toStringAsFixed(4)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white54,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'TIMESTAMP://' + currentPost.createdAt.toString().substring(2, 4) + '.' + 
+                      currentPost.createdAt.toString().substring(5, 7) + '.' + 
+                      currentPost.createdAt.toString().substring(8, 10) + '.' +
+                      currentPost.createdAt.toString().substring(11, 13) + 
+                      currentPost.createdAt.toString().substring(14, 16),
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: matrixGreen.withValues(alpha: 0.4),
+                        fontFamily: 'monospace',
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Ratings (Conditional: Only for maps)
+            if (currentPost.latitude != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                child: Row(
+                  children: [
+                    _buildRatingChip(
+                      Icons.local_fire_department_rounded,
+                      'Popularity',
+                      currentPost.popularityRating,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildRatingChip(
+                      Icons.shield_rounded,
+                      'Security',
+                      currentPost.securityRating,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildRatingChip(
+                      Icons.star_rounded,
+                      'Quality',
+                      currentPost.qualityRating,
+                    ),
+                  ],
+                ),
+              ),
+
+            // Footer: Votes & Share/Bookmark
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  VoteButtons(
+                    postId: currentPost.id!,
+                    voteScore: currentPost.voteScore,
+                    userVote: currentPost.userVote,
+                    isOwnPost: _isOwnPost,
+                    orientation: Axis.horizontal,
+                    onVoteChanged: () async {
+                      try {
+                        final allPosts = await SupabaseService.getAllMapPostsWithVotes();
+                        final updatedPost = allPosts.firstWhere(
+                          (p) => p.id == currentPost.id,
+                          orElse: () => currentPost,
+                        );
+                        if (mounted) setState(() => currentPost = updatedPost);
+                      } catch (e) {
+                        // ignore: empty_catches
+                      }
+                    },
+                  ),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: _showDetails,
+                        icon: const Icon(Icons.history, size: 18, color: ThemeColors.neonGreen),
+                        label: const Text(
+                          'History',
+                          style: TextStyle(
+                            color: ThemeColors.neonGreen,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.share, color: matrixGreen),
+                        onPressed: _sharePost,
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                          color: _isSaved ? matrixGreen : Colors.white70,
+                        ),
+                        onPressed: _toggleSave,
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-
-
-          // Image Carousel, Video, or Map Snapshot
-          InkWell(
-            onTap: _showDetails,
-            child: currentPost.videoUrl != null
-                ? VideoPlayerWidget(videoUrl: currentPost.videoUrl!)
-                : currentPost.photoUrls.isNotEmpty
-                    ? _buildImageCarousel()
-                    : (currentPost.latitude != null && currentPost.longitude != null)
-                        ? SizedBox(
-                            height: 180,
-                            width: double.infinity,
-                            child: MiniMapSnapshot(
-                              latitude: currentPost.latitude!,
-                              longitude: currentPost.longitude!,
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-          ),
-          
-          // Description
-          InkWell(
-            onTap: _showDetails,
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: Text(
-                  currentPost.description,
-                  maxLines: 5,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ),
-            ),
-          ),
-
-          // Ratings as horizontal chips
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-            child: Row(
-              children: [
-                _buildRatingChip(
-                  Icons.local_fire_department_rounded,
-                  'Popularity',
-                  currentPost.popularityRating,
-                  Colors.orange,
-                ),
-                const SizedBox(width: 8),
-                _buildRatingChip(
-                  Icons.shield_rounded,
-                  'Security',
-                  currentPost.securityRating,
-                  Colors.blue,
-                ),
-                const SizedBox(width: 8),
-                _buildRatingChip(
-                  Icons.star_rounded,
-                  'Quality',
-                  currentPost.qualityRating,
-                  Colors.green,
-                ),
-              ],
-            ),
-          ),
-
-          // Footer: Votes, History & Save
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                VoteButtons(
-                  postId: currentPost.id!,
-                  voteScore: currentPost.voteScore,
-                  userVote: currentPost.userVote,
-                  isOwnPost: _isOwnPost,
-                  orientation: Axis.horizontal,
-                  onVoteChanged: () async {
-                    // Refresh this specific post from database to get updated vote_score
-                    try {
-                      final userId = SupabaseService.getCurrentUser()?.id;
-                      if (userId != null) {
-                        // Fetch all posts and find this one (updated with real vote counts)
-                        final allPosts = await SupabaseService.getAllMapPostsWithVotes();
-                        final updatedPost = allPosts.firstWhere(
-                          (p) => p.id == currentPost.id,
-                          orElse: () => currentPost,
-                        );
-                        if (mounted) {
-                          setState(() {
-                            currentPost = updatedPost;
-                          });
-                        }
-                      }
-                    } catch (e) {
-                      // Silently fail - optimistic update already shown
-                    }
-                  },
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.share, color: Color(0xFF00FF41)),
-                      onPressed: _sharePost,
-                      tooltip: 'Share',
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                        color: _isSaved ? const Color(0xFF00FF41) : null,
-                      ),
-                      onPressed: _isSaving ? null : _toggleSave,
-                      tooltip: _isSaved ? 'Remove from saved' : 'Save',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
-  );
-}
-
+  ),
+);
+  }
 
   Widget _buildImageCarousel() {
     const matrixGreen = Color(0xFF00FF41);
@@ -635,37 +410,25 @@ class _PostCardState extends State<PostCard> {
       width: double.infinity,
       child: Stack(
         children: [
-          // Main carousel
           PageView.builder(
             itemCount: currentPost.photoUrls.length,
             onPageChanged: (index) {
-              setState(() {
-                _currentImageIndex = index;
-              });
+              if (mounted) setState(() => _currentImageIndex = index);
             },
             itemBuilder: (context, index) {
-              return GestureDetector(
-                onTap: _showDetails,
-                child: Image.network(
-                  currentPost.photoUrls[index],
+              return Image.network(
+                currentPost.photoUrls[index],
+                height: 220,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
                   height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 220,
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: Icon(Icons.image_not_supported, size: 48),
-                      ),
-                    );
-                  },
+                  color: Colors.grey[900],
+                  child: const Center(child: Icon(Icons.image_not_supported, size: 48, color: Colors.white54)),
                 ),
               );
             },
           ),
-          
-          // Page indicator dots
           if (currentPost.photoUrls.length > 1)
             Positioned(
               bottom: 8,
@@ -684,38 +447,7 @@ class _PostCardState extends State<PostCard> {
                       color: _currentImageIndex == index
                           ? matrixGreen
                           : matrixGreen.withValues(alpha: 0.3),
-                      boxShadow: _currentImageIndex == index
-                          ? [
-                              BoxShadow(
-                                color: matrixGreen.withValues(alpha: 0.5),
-                                blurRadius: 4,
-                              ),
-                            ]
-                          : null,
                     ),
-                  ),
-                ),
-              ),
-            ),
-          
-          // Image counter indicator
-          if (currentPost.photoUrls.length > 1)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${_currentImageIndex + 1}/${currentPost.photoUrls.length}',
-                  style: const TextStyle(
-                    color: matrixGreen,
-                    fontSize: 12,
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
@@ -725,7 +457,7 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
-  Widget _buildRatingChip(IconData icon, String label, double rating, Color color) {
+  Widget _buildRatingChip(IconData icon, String label, double rating) {
     const matrixGreen = Color(0xFF00FF41);
     
     return Expanded(
@@ -744,14 +476,14 @@ class _PostCardState extends State<PostCard> {
         ),
         child: Column(
           children: [
-            Icon(icon, size: 16, color: matrixGreen),
+            Icon(icon, size: 16, color: ThemeColors.neonGreen),
             const SizedBox(height: 2),
             Text(
               label,
               style: const TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
-                color: matrixGreen,
+                color: ThemeColors.neonGreen,
                 fontFamily: 'monospace',
               ),
             ),
@@ -762,8 +494,8 @@ class _PostCardState extends State<PostCard> {
               children: List.generate(5, (index) {
                 return Icon(
                   index < rating ? Icons.star : Icons.star_border,
-                  color: index < rating ? matrixGreen : matrixGreen.withValues(alpha: 0.3),
-                  size: 12,
+                  color: index < rating ? ThemeColors.neonGreen : ThemeColors.neonGreen.withValues(alpha: 0.3),
+                  size: 10,
                 );
               }),
             ),

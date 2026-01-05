@@ -1,0 +1,104 @@
+Analyzing prototype_0_0_1...                                    
+
+  error • The name 'File' isn't a type, so it can't be used as a type argument • lib/screens/add_post_dialog.dart:31:14 • non_type_as_type_argument
+  error • Undefined class 'File' • lib/screens/add_post_dialog.dart:32:3 • undefined_class
+  error • The method 'File' isn't defined for the type '_AddPostDialogState' • lib/screens/add_post_dialog.dart:58:28 • undefined_method
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:67:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:81:5 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:85:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:97:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:100:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:103:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:114:11 • avoid_print
+  error • The method 'File' isn't defined for the type '_AddPostDialogState' • lib/screens/add_post_dialog.dart:118:70 • undefined_method
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:119:13 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:125:19 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:129:15 • avoid_print
+  error • The method 'File' isn't defined for the type '_AddPostDialogState' • lib/screens/add_post_dialog.dart:133:39 • undefined_method
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:134:19 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:139:13 • avoid_print
+  error • The method 'File' isn't defined for the type '_AddPostDialogState' • lib/screens/add_post_dialog.dart:143:37 • undefined_method
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:144:17 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:150:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:158:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:161:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:162:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:174:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:199:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:203:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:209:13 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:211:13 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:214:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:219:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:234:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:237:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:239:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:246:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:264:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:271:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:272:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:552:35 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/add_post_dialog.dart:556:35 • avoid_print
+   info • The imported package 'intl' isn't a dependency of the importing package • lib/screens/admin_error_logs_screen.dart:4:8 • depend_on_referenced_packages
+   info • Unnecessary use of multiple underscores • lib/screens/battle_detail_screen.dart:502:45 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores • lib/screens/battle_detail_screen.dart:502:49 • unnecessary_underscores
+   info • Statements in an if should be enclosed in a block • lib/screens/battle_leaderboard_screen.dart:148:38 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/screens/battle_leaderboard_screen.dart:149:43 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/screens/battle_leaderboard_screen.dart:150:43 • curly_braces_in_flow_control_structures
+   info • Don't invoke 'print' in production code • lib/screens/create_battle_dialog.dart:109:7 • avoid_print
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/create_battle_dialog.dart:297:49 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/create_battle_dialog.dart:310:47 • use_build_context_synchronously
+   info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/screens/create_battle_dialog.dart:389:21 • deprecated_member_use
+   info • 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre • lib/screens/create_battle_dialog.dart:527:19 • deprecated_member_use
+warning • The operand can't be 'null', so the condition is always 'true' • lib/screens/create_feed_post_dialog.dart:138:19 • unnecessary_null_comparison
+   info • Don't invoke 'print' in production code • lib/screens/create_feed_post_dialog.dart:320:31 • avoid_print
+   info • The private field _selectedUsers could be 'final' • lib/screens/create_group_dialog.dart:23:30 • prefer_final_fields
+   info • Don't use 'BuildContext's across async gaps • lib/screens/create_group_dialog.dart:111:29 • use_build_context_synchronously
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre • lib/screens/location_privacy_dialog.dart:434:15 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre • lib/screens/location_privacy_dialog.dart:435:15 • deprecated_member_use
+   info • Don't use 'BuildContext's across async gaps • lib/screens/new_chat_dialog.dart:75:29 • use_build_context_synchronously
+   info • Don't invoke 'print' in production code • lib/screens/spot_details_screen.dart:474:29 • avoid_print
+   info • Don't invoke 'print' in production code • lib/screens/user_profile_screen.dart:75:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/image_service.dart:9:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/image_service.dart:15:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/image_service.dart:30:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/image_service.dart:33:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/image_service.dart:36:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/image_service.dart:40:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/image_service.dart:41:7 • avoid_print
+   info • The imported package 'timezone' isn't a dependency of the importing package • lib/services/notification_service.dart:3:8 • depend_on_referenced_packages
+   info • The imported package 'timezone' isn't a dependency of the importing package • lib/services/notification_service.dart:4:8 • depend_on_referenced_packages
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:861:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:862:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:866:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:868:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:870:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:872:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:881:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:886:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:889:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:895:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:902:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:909:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:910:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:922:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:923:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:927:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:929:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:931:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:933:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:943:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:948:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:951:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:965:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:972:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:988:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:991:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:1185:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:1186:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:1202:13 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/supabase_service.dart:1216:11 • avoid_print
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/tabs/profile_tab.dart:967:67 • use_build_context_synchronously
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre • lib/widgets/post_card.dart:186:21 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre • lib/widgets/post_card.dart:188:21 • deprecated_member_use
+

@@ -1,0 +1,6 @@
+Analyzing prototype_0_0_1...                                    
+
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/create_battle_dialog.dart:296:49 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/create_battle_dialog.dart:308:47 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/tabs/profile_tab.dart:968:67 • use_build_context_synchronously
+

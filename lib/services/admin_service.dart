@@ -230,21 +230,142 @@ class AdminService {
     }
   }
 
-  /// Get all users (for admin management)
-  Future<List<Map<String, dynamic>>> getAllUsers({int limit = 1000}) async {
+  // --- Advanced Analytics ---
+
+  /// Get Cohort Retention (months_back default 12)
+  Future<List<Map<String, dynamic>>> getCohortRetention({int monthsBack = 12}) async {
     try {
-      // 1. Fetch user profiles
-      final response = await _client
-          .from('user_profiles')
-          .select('id, username, display_name, email, avatar_url, bio, is_admin, is_verified, is_banned, ban_reason, banned_at, created_at, updated_at, can_post')
-          .order('created_at', ascending: false)
-          .limit(limit);
+      final response = await _client.rpc(
+        'get_cohort_retention',
+        params: {'months_back': monthsBack},
+      );
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error getting cohort retention: $e', name: 'AdminService');
+      return [];
+    }
+  }
 
-      final users = (response as List).cast<Map<String, dynamic>>();
+  /// Get Stickiness Ratio (DAU/MAU)
+  Future<Map<String, dynamic>> getStickinessRatio() async {
+    try {
+      final response = await _client.rpc('get_stickiness_ratio');
+      // response comes as a list of 1 object
+      if (response is List && response.isNotEmpty) {
+        return response[0] as Map<String, dynamic>;
+      }
+      return {'ratio': 0.0, 'dau': 0, 'mau': 0};
+    } catch (e) {
+      developer.log('Error getting stickiness ratio: $e', name: 'AdminService');
+      return {'ratio': 0.0, 'dau': 0, 'mau': 0};
+    }
+  }
+
+  /// Get Customer Health Scores
+  Future<List<Map<String, dynamic>>> getCustomerHealthScores({int limit = 50}) async {
+    try {
+      final response = await _client.rpc(
+        'get_customer_health_scores',
+        params: {'limit_cnt': limit},
+      );
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error getting health scores: $e', name: 'AdminService');
+      return [];
+    }
+  }
+
+  /// Get Time To Value (Avg hours to first post)
+  Future<double> getTimeToValue() async {
+    try {
+      final response = await _client.rpc('get_time_to_value_stats');
+      return (response as num?)?.toDouble() ?? 0.0;
+    } catch (e) {
+      developer.log('Error getting TTV: $e', name: 'AdminService');
+      return 0.0;
+    }
+  }
+
+  /// Get At-Risk Users
+  Future<List<Map<String, dynamic>>> getAtRiskUsers({int limit = 20}) async {
+    try {
+      final response = await _client.rpc(
+        'get_at_risk_users',
+        params: {'limit_cnt': limit},
+      );
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error getting at-risk users: $e', name: 'AdminService');
+      return [];
+    }
+  }
+
+  /// Get Daily Post Stats
+  Future<List<Map<String, dynamic>>> getDailyPostStats({int days = 30}) async {
+    try {
+      final response = await _client.rpc(
+        'get_daily_post_stats',
+        params: {'days_ago': days},
+      );
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error getting daily post stats: $e', name: 'AdminService');
+      return [];
+    }
+  }
+
+  /// Get User Growth Stats
+  Future<List<Map<String, dynamic>>> getUserGrowthStats({int days = 30}) async {
+    try {
+      final response = await _client.rpc(
+        'get_user_growth_stats',
+        params: {'days_ago': days},
+      );
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error getting user growth stats: $e', name: 'AdminService');
+      return [];
+    }
+  }
+
+  /// Get users with pagination and search
+  Future<Map<String, dynamic>> getUsersPaginated({
+    int page = 0,
+    int pageSize = 20,
+    String? searchQuery,
+    String? sortBy, // 'created_at', 'points', 'reports'
+    bool ascending = false,
+  }) async {
+    try {
+      // Start query builder
+      // Start query builder
+      var queryBuilder = _client.from('user_profiles').select(
+        'id, username, display_name, email, avatar_url, bio, is_admin, is_verified, is_banned, ban_reason, banned_at, created_at, updated_at, can_post',
+      );
+
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        queryBuilder = queryBuilder.or('username.ilike.%$searchQuery%,email.ilike.%$searchQuery%');
+      }
+
+      // Default sort
+      final sortField = sortBy ?? 'created_at';
+      var orderedBuilder = queryBuilder.order(sortField, ascending: ascending);
+
+      // Pagination
+      final start = page * pageSize;
+      final end = start + pageSize - 1;
       
-      if (users.isEmpty) return [];
+      // Execute with count
+      final response = await orderedBuilder.range(start, end).count(CountOption.exact);
+      
+      final users = (response.data as List).cast<Map<String, dynamic>>();
+      final count = response.count ?? 0;
 
-      // 2. Fetch wallet balances for these users
+      if (users.isEmpty) {
+        return {'users': <Map<String, dynamic>>[], 'count': count};
+      }
+
+      // Fetch wallet balances separately (optimization: only for fetched users)
       final userIds = users.map((u) => u['id'] as String).toList();
       final walletsResponse = await _client
           .from('user_wallets')
@@ -256,31 +377,29 @@ class AdminService {
         for (var w in wallets) w['user_id'] as String: w['balance'] as num
       };
 
-      // 3. Merge points into user data
-      return users.map((u) {
+      final enrichedUsers = users.map((u) {
         final userId = u['id'] as String;
         return {
           ...u,
           'points': walletMap[userId] ?? 0.0,
         };
       }).toList();
-    } catch (e) {
-      developer.log('Error getting users in AdminService: $e', name: 'AdminService');
-      
-      // Fallback to bare minimum if Level 1 fails (e.g., missing columns)
-      try {
-        final response = await _client
-            .from('user_profiles')
-            .select('id, username, display_name, is_admin, created_at')
-            .order('created_at', ascending: false)
-            .limit(limit);
 
-        return (response as List).cast<Map<String, dynamic>>();
-      } catch (e2) {
-        developer.log('Critical error getting users: $e2', name: 'AdminService');
-        throw Exception('Failed to load users: $e2');
-      }
+      return {
+        'users': enrichedUsers,
+        'count': count,
+      };
+
+    } catch (e) {
+      developer.log('Error getting paginated users: $e', name: 'AdminService');
+      throw Exception('Failed to load users: $e');
     }
+  }
+
+  /// Legacy: Get all users (kept for compatibility, but deprecated)
+  Future<List<Map<String, dynamic>>> getAllUsers({int limit = 1000}) async {
+    final result = await getUsersPaginated(page: 0, pageSize: limit);
+    return result['users'] as List<Map<String, dynamic>>;
   }
 
   /// Get point transactions for a specific user
@@ -473,6 +592,51 @@ class AdminService {
         'total_users': 0,
         'pending_reports': 0,
       };
+    }
+  }
+
+  /// Get error logs from the database
+  Future<List<Map<String, dynamic>>> getErrorLogs({int? limit}) async {
+    try {
+      var query = _client.from('error_logs').select().order('created_at', ascending: false);
+      if (limit != null) {
+        query = query.limit(limit);
+      }
+      final response = await query;
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      developer.log('Error getting error logs: $e', name: 'AdminService');
+      return [];
+    }
+  }
+  /// Get app settings by key
+  Future<Map<String, dynamic>?> getAppSettings(String key) async {
+    try {
+      final response = await _client
+          .from('app_settings')
+          .select('value')
+          .eq('key', key)
+          .maybeSingle();
+      
+      return response?['value'] as Map<String, dynamic>?;
+    } catch (e) {
+      developer.log('Error getting app settings: $e', name: 'AdminService');
+      return null;
+    }
+  }
+
+  /// Update app settings
+  Future<void> updateAppSettings(String key, Map<String, dynamic> value) async {
+    try {
+      await _client.from('app_settings').upsert({
+        'key': key,
+        'value': value,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      developer.log('Updated app settings for $key', name: 'AdminService');
+    } catch (e) {
+      developer.log('Error updating app settings: $e', name: 'AdminService');
+      throw Exception('Failed to update app settings: $e');
     }
   }
 }

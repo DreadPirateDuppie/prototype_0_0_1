@@ -66,8 +66,34 @@ class PointsService {
     }
   }
 
+  /// Get points configuration from app settings (with hardcoded fallbacks)
+  Future<Map<String, dynamic>> _getPointsConfig() async {
+    try {
+      final response = await _client
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'points_config')
+          .maybeSingle();
+
+      if (response != null && response['value'] != null) {
+        return response['value'] as Map<String, dynamic>;
+      }
+    } catch (e) {
+      developer.log('Error fetching points config, using defaults: $e', name: 'PointsService');
+    }
+
+    // Default fallbacks
+    return {
+      'base_daily_points': 3.5,
+      'streak_bonus_multiplier': 0.5,
+      'first_login_bonus': 10.0,
+      'post_xp': 100.0,
+      'vote_xp': 1.0,
+    };
+  }
+
   /// Check and update daily streak
-  Future<void> checkDailyStreak(String userId) async {
+  Future<double> checkDailyStreak(String userId) async {
     try {
       final streakData = await getUserStreak(userId);
       final currentStreak = streakData['current_streak'] as int;
@@ -77,12 +103,18 @@ class PointsService {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
 
+      // Load dynamic config
+      final config = await _getPointsConfig();
+      final baseDailyPoints = (config['base_daily_points'] ?? 3.5) as num;
+      final streakMultiplier = (config['streak_bonus_multiplier'] ?? 0.5) as num;
+      final firstLoginBonus = (config['first_login_bonus'] ?? 10.0) as num;
+
       // If never logged in before
       if (lastLoginStr == null) {
         await _updateStreak(userId, 1, 1, today);
-        await awardPoints(userId, 10, 'daily_login',
+        await awardPoints(userId, firstLoginBonus.toDouble(), 'daily_login',
             description: 'First login bonus');
-        return;
+        return firstLoginBonus.toDouble();
       }
 
       final lastLogin = DateTime.parse(lastLoginStr);
@@ -93,25 +125,28 @@ class PointsService {
 
       if (difference == 0) {
         // Already logged in today, do nothing
-        return;
+        return 0.0;
       } else if (difference == 1) {
         // Logged in yesterday, increment streak
         final newStreak = currentStreak + 1;
         final newLongest = newStreak > longestStreak ? newStreak : longestStreak;
         await _updateStreak(userId, newStreak, newLongest, today);
 
-        // Calculate bonus: Base 3.5 + (Streak * 0.5)
-        final bonus = 3.5 + (newStreak * 0.5);
-        await awardPoints(userId, bonus, 'daily_login',
+        // Calculate bonus: Base + (Streak * Multiplier)
+        final bonus = baseDailyPoints + (newStreak * streakMultiplier);
+        await awardPoints(userId, bonus.toDouble(), 'daily_login',
             description: 'Daily streak: $newStreak days');
+        return bonus.toDouble();
       } else {
         // Missed a day (or more), reset streak
         await _updateStreak(userId, 1, longestStreak, today);
-        await awardPoints(userId, 3.5, 'daily_login',
+        await awardPoints(userId, baseDailyPoints.toDouble(), 'daily_login',
             description: 'Daily login (streak reset)');
+        return baseDailyPoints.toDouble();
       }
     } catch (e) {
       developer.log('Error checking daily streak: $e', name: 'PointsService');
+      return 0.0;
     }
   }
 
@@ -195,7 +230,7 @@ class PointsService {
     }
   }
 
-  /// Update user map score (XP)
+  /// Update map score (XP)
   Future<void> updateMapScore(String userId, double newScore, {String reason = 'Map score update'}) async {
     try {
       // Get existing scores
@@ -313,13 +348,18 @@ class PointsService {
       final posts = (postsResponse as List).cast<Map<String, dynamic>>();
       final postCount = posts.length;
 
-      // XP from posts (100 XP per post)
-      double xpFromPosts = postCount * 100.0;
+      // Load dynamic config
+      final config = await _getPointsConfig();
+      final postXp = (config['post_xp'] ?? 100.0) as num;
+      final voteXp = (config['vote_xp'] ?? 1.0) as num;
+
+      // XP from posts
+      double xpFromPosts = postCount * postXp.toDouble();
 
       // XP from upvotes
       double xpFromVotes = 0;
       for (var post in posts) {
-        xpFromVotes += (post['likes'] as num? ?? 0).toDouble();
+        xpFromVotes += (post['likes'] as num? ?? 0).toDouble() * voteXp.toDouble();
       }
 
       final totalMapScore = xpFromPosts + xpFromVotes;

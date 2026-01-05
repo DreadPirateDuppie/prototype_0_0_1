@@ -23,6 +23,8 @@ class MapPost {
   final List<String> tags;
   final bool isVerified;
   final bool isUserVerified;
+  final String? mvpUserId;
+  final int mvpScore;
 
   MapPost({
     this.id,
@@ -49,6 +51,8 @@ class MapPost {
     this.tags = const [],
     this.isVerified = false,
     this.isUserVerified = false,
+    this.mvpUserId,
+    this.mvpScore = 0,
   }) : photoUrls = photoUrls ?? [];
 
   // Backward compatibility getter
@@ -77,6 +81,8 @@ class MapPost {
       'tags': tags,
       'is_verified': isVerified,
       'is_user_verified': isUserVerified,
+      'mvp_user_id': mvpUserId,
+      'mvp_score': mvpScore,
     };
   }
 
@@ -91,12 +97,14 @@ class MapPost {
       photos = [map['photo_url'] as String];
     }
 
+    final userProfile = map['user_profiles'] is Map ? map['user_profiles'] as Map<String, dynamic> : null;
+
     return MapPost(
       id: map['id'] as String?,
       userId: map['user_id'] as String,
       userName: map['user_name'] as String?,
       userEmail: map['user_email'] as String?,
-      avatarUrl: map['avatar_url'] as String?,
+      avatarUrl: (map['avatar_url'] as String?) ?? userProfile?['avatar_url'] as String?,
       latitude: map['latitude'] as double?,
       longitude: map['longitude'] as double?,
       title: map['title'] as String,
@@ -115,7 +123,9 @@ class MapPost {
       category: map['category'] as String? ?? 'Other',
       tags: (map['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
       isVerified: map['is_verified'] as bool? ?? false,
-      isUserVerified: map['is_user_verified'] as bool? ?? false,
+      isUserVerified: (map['is_user_verified'] as bool?) ?? userProfile?['is_verified'] as bool? ?? false,
+      mvpUserId: map['mvp_user_id'] as String?,
+      mvpScore: map['mvp_score'] as int? ?? 0,
     );
   }
 }

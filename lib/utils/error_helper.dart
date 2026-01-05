@@ -6,8 +6,7 @@ class ErrorHelper {
   static void showError(BuildContext context, String message, {String? screenName}) {
     // Auto-log error to admin dashboard
     SupabaseService.logError(
-      message: message,
-      screenName: screenName,
+      screenName != null ? '$screenName: $message' : message,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(

@@ -1,18 +1,32 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/user_scores.dart';
+import '../config/theme_config.dart';
 
-/// A reusable widget for displaying user stats with expandable details
 class UserStatsCard extends StatefulWidget {
   final UserScores scores;
+  final int followersCount;
+  final int followingCount;
+  final int postCount;
   final bool initiallyExpanded;
+  final bool showDetailedStats;
   final VoidCallback? onInfoPressed;
+  final VoidCallback? onFollowersTap;
+  final VoidCallback? onFollowingTap;
+  final VoidCallback? onPostsTap;
 
   const UserStatsCard({
     super.key,
     required this.scores,
-    this.initiallyExpanded = true,
+    this.followersCount = 0,
+    this.followingCount = 0,
+    this.postCount = 0,
+    this.initiallyExpanded = false,
+    this.showDetailedStats = true,
     this.onInfoPressed,
+    this.onFollowersTap,
+    this.onFollowingTap,
+    this.onPostsTap,
   });
 
   @override
@@ -30,123 +44,244 @@ class _UserStatsCardState extends State<UserStatsCard> {
 
   @override
   Widget build(BuildContext context) {
-    const matrixGreen = Color(0xFF00FF41);
+    const matrixGreen = ThemeColors.matrixGreen;
     final scores = widget.scores;
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: matrixGreen.withValues(alpha: 0.1),
-            blurRadius: 20,
-            spreadRadius: -5,
-          ),
+      child: Column(
+        children: [
+          _buildSocialStats(),
+          if (widget.showDetailedStats) ...[
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    border: Border.all(
+                      color: matrixGreen.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      // Corner Brackets
+                      Positioned(top: 0, left: 0, child: _buildCorner(matrixGreen, true, true)),
+                      Positioned(top: 0, right: 0, child: _buildCorner(matrixGreen, true, false)),
+                      Positioned(bottom: 0, left: 0, child: _buildCorner(matrixGreen, false, true)),
+                      Positioned(bottom: 0, right: 0, child: _buildCorner(matrixGreen, false, false)),
+
+                      // Content
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildHeader(),
+                            const SizedBox(height: 12),
+                            _buildMainStats(scores),
+                            
+                            AnimatedCrossFade(
+                              firstChild: const SizedBox.shrink(),
+                              secondChild: _buildExpandedContent(scores),
+                              crossFadeState: _isExpanded 
+                                  ? CrossFadeState.showSecond 
+                                  : CrossFadeState.showFirst,
+                              duration: const Duration(milliseconds: 300),
+                            ),
+                            
+                            const SizedBox(height: 8),
+                            _buildExpandToggle(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            padding: EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: _isExpanded ? 16 : 10,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: matrixGreen.withValues(alpha: 0.2),
-                width: 1,
-              ),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  matrixGreen.withValues(alpha: 0.05),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                AnimatedCrossFade(
-                  firstChild: const SizedBox.shrink(),
-                  secondChild: _buildExpandedContent(scores),
-                  crossFadeState: _isExpanded 
-                      ? CrossFadeState.showSecond 
-                      : CrossFadeState.showFirst,
-                  duration: const Duration(milliseconds: 300),
-                ),
-              ],
-            ),
-          ),
+    );
+  }
+
+  Widget _buildCorner(Color color, bool isTop, bool isLeft) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        border: Border(
+          top: isTop ? BorderSide(color: color, width: 2) : BorderSide.none,
+          bottom: !isTop ? BorderSide(color: color, width: 2) : BorderSide.none,
+          left: isLeft ? BorderSide(color: color, width: 2) : BorderSide.none,
+          right: !isLeft ? BorderSide(color: color, width: 2) : BorderSide.none,
         ),
       ),
     );
   }
 
   Widget _buildHeader() {
-    const matrixGreen = Color(0xFF00FF41);
-    
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _isExpanded = !_isExpanded;
-        });
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: matrixGreen.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.analytics_rounded,
-                color: matrixGreen,
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'STATS',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: matrixGreen,
-                fontFamily: 'monospace',
-                letterSpacing: 2.0,
-              ),
-            ),
-            const SizedBox(width: 4),
-            if (widget.onInfoPressed != null)
-              IconButton(
-                icon: Icon(
-                  Icons.help_outline_rounded,
-                  size: 16,
-                  color: matrixGreen.withValues(alpha: 0.5),
+    return Row(
+      children: [
+        const Text(
+          '[USER_ANALYTICS]',
+          style: TextStyle(
+            color: ThemeColors.matrixGreen,
+            fontFamily: 'monospace',
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+          ),
+        ),
+        const Spacer(),
+        if (widget.onInfoPressed != null)
+          IconButton(
+            icon: Icon(Icons.help_outline, color: ThemeColors.matrixGreen.withValues(alpha: 0.5), size: 14),
+            onPressed: widget.onInfoPressed,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSocialStats() {
+    return Row(
+      children: [
+        _buildSocialItem('POSTS', widget.postCount, widget.onPostsTap),
+        const SizedBox(width: 8),
+        _buildSocialItem('FOLLOWERS', widget.followersCount, widget.onFollowersTap),
+        const SizedBox(width: 8),
+        _buildSocialItem('FOLLOWING', widget.followingCount, widget.onFollowingTap),
+      ],
+    );
+  }
+
+  Widget _buildSocialItem(String label, int value, VoidCallback? onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.02),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  fontFamily: 'monospace',
+                  fontSize: 7,
+                  letterSpacing: 1,
+                  fontWeight: FontWeight.bold,
                 ),
-                onPressed: widget.onInfoPressed,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'Learn about stats',
               ),
-            const Spacer(),
+              const SizedBox(height: 2),
+              Text(
+                value.toString().padLeft(2, '0'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'monospace',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainStats(UserScores scores) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: ThemeColors.matrixGreen.withValues(alpha: 0.05),
+        border: Border.all(color: ThemeColors.matrixGreen.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _buildCoreStat('SCORE', scores.finalScore.toStringAsFixed(1), 'PTS'),
+          _buildCoreStat('VOTE_W', '${(scores.voteWeight * 100).toStringAsFixed(0)}', '%'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoreStat(String label, String value, String unit) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: ThemeColors.matrixGreen.withValues(alpha: 0.5),
+            fontFamily: 'monospace',
+            fontSize: 8,
+          ),
+        ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                color: ThemeColors.matrixGreen,
+                fontFamily: 'monospace',
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Text(
+              unit,
+              style: TextStyle(
+                color: ThemeColors.matrixGreen.withValues(alpha: 0.3),
+                fontFamily: 'monospace',
+                fontSize: 8,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExpandToggle() {
+    return InkWell(
+      onTap: () => setState(() => _isExpanded = !_isExpanded),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        width: double.infinity,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _isExpanded ? 'CLOSE_DETAILS' : 'EXPAND_PROTOCOLS',
+              style: TextStyle(
+                color: ThemeColors.matrixGreen.withValues(alpha: 0.4),
+                fontFamily: 'monospace',
+                fontSize: 8,
+                letterSpacing: 2,
+              ),
+            ),
             Icon(
-              _isExpanded ? Icons.unfold_less_rounded : Icons.unfold_more_rounded,
-              color: matrixGreen.withValues(alpha: 0.5),
-              size: 20,
+              _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+              color: ThemeColors.matrixGreen.withValues(alpha: 0.4),
+              size: 12,
             ),
           ],
         ),
@@ -158,256 +293,73 @@ class _UserStatsCardState extends State<UserStatsCard> {
     return Column(
       children: [
         const SizedBox(height: 20),
-        ScoreProgressBar(
-          label: 'SPOTTER',
-          score: scores.mapScore,
-          color: const Color(0xFF00FF41),
-          subtitle: 'Map contributions & upvotes',
-          isXP: true,
-          level: scores.mapLevel,
-          levelProgress: scores.mapLevelProgress,
-          xpForNextLevel: scores.mapXPForNextLevel,
+        _buildProgressBar(
+          'SPOTTER',
+          scores.mapScore,
+          Colors.blueAccent,
+          'LVL ${scores.mapLevel}',
+          scores.mapLevelProgress,
         ),
-        const SizedBox(height: 16),
-        ScoreProgressBar(
-          label: 'VERSUS',
-          score: scores.playerScore,
-          color: const Color(0xFF00E5FF),
-          subtitle: 'Battle performance & wins',
-          isXP: true,
-          level: scores.playerLevel,
-          levelProgress: scores.playerLevelProgress,
-          xpForNextLevel: scores.playerXPForNextLevel,
+        const SizedBox(height: 12),
+        _buildProgressBar(
+          'VERSUS',
+          scores.playerScore,
+          Colors.redAccent,
+          'LVL ${scores.playerLevel}',
+          scores.playerLevelProgress,
         ),
-        const SizedBox(height: 16),
-        ScoreProgressBar(
-          label: 'RANKING',
-          score: scores.rankingScore,
-          color: const Color(0xFFFFB300),
-          subtitle: 'Voting accuracy & community trust',
+        const SizedBox(height: 12),
+        _buildProgressBar(
+          'RANKING',
+          scores.rankingScore,
+          ThemeColors.matrixGreen,
+          scores.rankingScore.toStringAsFixed(0),
+          scores.rankingScore / 1000.0,
         ),
-        const SizedBox(height: 24),
-        _buildFinalScoreRow(scores),
       ],
     );
   }
 
-  Widget _buildFinalScoreRow(UserScores scores) {
-    const matrixGreen = Color(0xFF00FF41);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.05),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'OVERALL SCORE',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.white.withValues(alpha: 0.4),
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      scores.finalScore.toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        color: matrixGreen,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '/ 1000',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: matrixGreen.withValues(alpha: 0.3),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Container(
-            height: 40,
-            width: 1,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            color: Colors.white.withValues(alpha: 0.1),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'VOTE WEIGHT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.white.withValues(alpha: 0.4),
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${(scores.voteWeight * 100).toStringAsFixed(0)}%',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFFFB300),
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A reusable score progress bar widget
-class ScoreProgressBar extends StatelessWidget {
-  final String label;
-  final double score;
-  final Color color;
-  final String? subtitle;
-  final bool isXP;
-  final int? level;
-  final double? levelProgress;
-  final double? xpForNextLevel;
-
-  const ScoreProgressBar({
-    super.key,
-    required this.label,
-    required this.score,
-    required this.color,
-    this.subtitle,
-    this.isXP = false,
-    this.level,
-    this.levelProgress,
-    this.xpForNextLevel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final double progress;
-    final String displayValue;
-    String? progressSubtitle;
-    
-    if (isXP && level != null && levelProgress != null && xpForNextLevel != null) {
-      progress = levelProgress!;
-      displayValue = 'LVL $level';
-      final xpNeeded = (xpForNextLevel! - score).toStringAsFixed(0);
-      progressSubtitle = '$xpNeeded XP TO NEXT';
-    } else {
-      progress = score / 1000.0;
-      displayValue = score.toStringAsFixed(0);
-    }
-    
+  Widget _buildProgressBar(String label, double score, Color color, String value, double progress) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white.withValues(alpha: 0.9),
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle!,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.white.withValues(alpha: 0.4),
-                    ),
-                  ),
-                ],
-              ],
+            Text(
+              label,
+              style: TextStyle(
+                color: color.withValues(alpha: 0.7),
+                fontFamily: 'monospace',
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  displayValue,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: color,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-                if (progressSubtitle != null) ...[
-                  Text(
-                    progressSubtitle,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      color: color.withValues(alpha: 0.5),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ],
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontFamily: 'monospace',
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Stack(
           children: [
             Container(
-              height: 4,
+              height: 2,
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(2),
-              ),
+              color: Colors.white.withValues(alpha: 0.05),
             ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 1000),
-              curve: Curves.easeOutCubic,
-              height: 4,
-              width: (MediaQuery.of(context).size.width - 64) * progress.clamp(0.0, 1.0),
-              decoration: BoxDecoration(
+            FractionallySizedBox(
+              widthFactor: progress.clamp(0.0, 1.0),
+              child: Container(
+                height: 2,
                 color: color,
-                borderRadius: BorderRadius.circular(2),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.3),
-                    blurRadius: 4,
-                    spreadRadius: 1,
-                  ),
-                ],
               ),
             ),
           ],

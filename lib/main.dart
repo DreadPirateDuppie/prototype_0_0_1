@@ -13,7 +13,11 @@ import 'providers/navigation_provider.dart';
 import 'services/error_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/rewarded_ad_service.dart';
+import 'providers/rewards_provider.dart';
+import 'providers/map_provider.dart';
+import 'providers/battle_detail_provider.dart';
 import 'config/service_locator.dart';
+import 'widgets/matrix_rain_background.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +69,9 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => BattleProvider()),
         ChangeNotifierProvider(create: (_) => PostProvider()),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
+        ChangeNotifierProvider(create: (_) => RewardsProvider()),
+        ChangeNotifierProvider(create: (_) => MapProvider()),
+        ChangeNotifierProvider(create: (_) => BattleDetailProvider()),
       ],
       child: const MyApp(),
     ),
@@ -84,6 +91,19 @@ class MyApp extends StatelessWidget {
           darkTheme: themeProvider.getDarkTheme(),
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
           debugShowCheckedModeBanner: false,
+          builder: (context, child) {
+            return Stack(
+              children: [
+                const Positioned.fill(
+                  child: MatrixRainBackground(
+                    opacity: 0.1,
+                    speed: 0.5,
+                  ),
+                ),
+                if (child != null) child,
+              ],
+            );
+          },
           home: const AuthWrapper(),
         );
       },
@@ -103,17 +123,10 @@ class AuthWrapper extends StatelessWidget {
         // Check connection state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
-            backgroundColor: Colors.black,
+            backgroundColor: Colors.transparent, // Show global Matrix
             body: Container(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.center,
-                  radius: 1.5,
-                  colors: [
-                    const Color(0xFF1A1A1A),
-                    Colors.black,
-                  ],
-                ),
+              decoration: const BoxDecoration(
+                color: Colors.transparent,
               ),
               child: Center(
                 child: Column(

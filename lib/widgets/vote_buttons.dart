@@ -85,7 +85,14 @@ class _VoteButtonsState extends State<VoteButtons> {
 
     try {
       // Sync with server in background
-      await SupabaseService.votePost(widget.postId, voteType);
+      final user = SupabaseService.getCurrentUser();
+      if (user != null) {
+        await SupabaseService.votePost(
+          postId: widget.postId,
+          voterId: user.id,
+          voteType: voteType,
+        );
+      }
       
       // Success - trigger refresh to get real vote count from database
       widget.onVoteChanged();

@@ -8,6 +8,9 @@ import '../config/service_locator.dart';
 /// Service responsible for map post operations
 class PostService {
   final SupabaseClient? _injectedClient;
+  
+  /// Cache for user profile data to avoid redundant network requests
+  static final Map<String, Map<String, dynamic>> _profileCache = {};
 
   /// Creates a PostService with optional dependency injection
   PostService({SupabaseClient? client}) : _injectedClient = client;
@@ -32,11 +35,15 @@ class PostService {
     required double longitude,
     required String title,
     required String description,
-    String? photoUrl,
+    List<String> photoUrls = const [],
     String? userName,
     String? userEmail,
+    String? videoUrl,
     String category = 'Other',
     List<String> tags = const [],
+    double? qualityRating,
+    double? securityRating,
+    double? popularityRating,
   }) async {
     try {
       final response = await _client
@@ -51,9 +58,14 @@ class PostService {
             'description': description,
             'created_at': DateTime.now().toIso8601String(),
             'likes': 0,
-            'photo_url': photoUrl,
+            'photo_urls': photoUrls, // Use photo_urls for array
+            'photo_url': photoUrls.isNotEmpty ? photoUrls.first : null, // Keep legacy field populated
             'category': category,
             'tags': tags,
+            'video_url': videoUrl,
+            'quality_rating': qualityRating,
+            'security_rating': securityRating,
+            'popularity_rating': popularityRating,
           })
           .select()
           .single();
@@ -86,14 +98,22 @@ class PostService {
     }
   }
 
-  /// Get all map posts with optional filters
+  /// Get all map posts with optional filters and pagination
   Future<List<MapPost>> getAllMapPosts({
     String? category,
     String? tag,
     String? searchQuery,
+    String sortBy = 'newest',
+    int page = 1,
+    int pageSize = 20,
+    List<String>? userIds,
   }) async {
     try {
-      var query = _client.from('map_posts').select();
+      dynamic query = _client.from('map_posts').select('*');
+
+      if (userIds != null && userIds.isNotEmpty) {
+        query = query.filter('user_id', 'in', userIds);
+      }
 
       if (category != null && category != 'All') {
         query = query.eq('category', category);
@@ -108,11 +128,71 @@ class PostService {
             'title.ilike.%$searchQuery%,description.ilike.%$searchQuery%');
       }
 
-      final response = await query.order('created_at', ascending: false);
+      // Apply sorting
+      switch (sortBy) {
+        case 'oldest':
+          query = query.order('created_at', ascending: true);
+          break;
+        case 'popularity':
+          query = query.order('vote_score', ascending: false);
+          break;
+        case 'newest':
+        default:
+          query = query.order('created_at', ascending: false);
+      }
 
-      return (response as List).map((post) => MapPost.fromMap(post)).toList();
+      // Apply pagination
+      final from = (page - 1) * pageSize;
+      final to = from + pageSize - 1;
+      query = query.range(from, to);
+
+      final response = await query;
+      
+      final enrichedResponse = await _enrichPostsWithProfiles(response as List);
+
+      return enrichedResponse.map((post) => MapPost.fromMap(post)).toList();
     } catch (e) {
       developer.log('Error getting map posts: $e', name: 'PostService');
+      return [];
+    }
+  }
+
+  /// Get map posts from users that the specified user follows
+  Future<List<MapPost>> getFollowingMapPosts({
+    required String userId,
+    String? category,
+    String? tag,
+    String? searchQuery,
+    String sortBy = 'newest',
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      // 1. Get IDs of users being followed
+      final followsResponse = await _client
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', userId);
+      
+      final followingIds = (followsResponse as List)
+          .map((f) => f['following_id'] as String)
+          .toList();
+      
+      // Include current user's own posts in their following feed
+      followingIds.add(userId);
+
+      // 2. Fetch posts using the refactored getAllMapPosts
+      return getAllMapPosts(
+        userIds: followingIds,
+        category: category,
+        tag: tag,
+        searchQuery: searchQuery,
+        sortBy: sortBy,
+        page: page,
+        pageSize: pageSize,
+      );
+    } catch (e) {
+      developer.log('Error getting following posts: $e', name: 'PostService');
       return [];
     }
   }
@@ -122,11 +202,13 @@ class PostService {
     try {
       final response = await _client
           .from('map_posts')
-          .select()
+          .select('*')
           .or('title.ilike.%$query%,description.ilike.%$query%')
           .order('created_at', ascending: false);
 
-      return (response as List).map((post) => MapPost.fromMap(post)).toList();
+      final enrichedResponse = await _enrichPostsWithProfiles(response as List);
+
+      return enrichedResponse.map((post) => MapPost.fromMap(post)).toList();
     } catch (e) {
       developer.log('Error searching posts: $e', name: 'PostService');
       return [];
@@ -138,11 +220,13 @@ class PostService {
     try {
       final response = await _client
           .from('map_posts')
-          .select()
+          .select('*')
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      return (response as List).map((post) => MapPost.fromMap(post)).toList();
+      final enrichedResponse = await _enrichPostsWithProfiles(response as List);
+
+      return enrichedResponse.map((post) => MapPost.fromMap(post)).toList();
     } catch (e) {
       developer.log('Error getting user posts: $e', name: 'PostService');
       return [];
@@ -154,7 +238,8 @@ class PostService {
     required String postId,
     required String title,
     required String description,
-    String? photoUrl,
+    List<String>? photoUrls,
+    String? videoUrl,
     double? popularityRating,
     double? securityRating,
     double? qualityRating,
@@ -165,7 +250,9 @@ class PostService {
       final updateData = {
         'title': title,
         'description': description,
-        if (photoUrl != null) 'photo_url': photoUrl,
+        if (photoUrls != null) 'photo_urls': photoUrls,
+        if (photoUrls != null && photoUrls.isNotEmpty) 'photo_url': photoUrls.first,
+        if (videoUrl != null) 'video_url': videoUrl,
         if (popularityRating != null) 'popularity_rating': popularityRating,
         if (securityRating != null) 'security_rating': securityRating,
         if (qualityRating != null) 'quality_rating': qualityRating,
@@ -186,12 +273,26 @@ class PostService {
     }
   }
 
-  /// Delete a map post
-  Future<void> deleteMapPost(String postId) async {
+  /// Delete a map post with ownership verification
+  Future<void> deleteMapPost(String postId, String userId) async {
     try {
+      // Verify ownership
+      final post = await _client
+          .from('map_posts')
+          .select('user_id')
+          .eq('id', postId)
+          .maybeSingle();
+      
+      if (post == null) return;
+      
+      if (post['user_id'] != userId) {
+        throw Exception('You can only delete your own posts');
+      }
+
       await _client.from('map_posts').delete().eq('id', postId);
     } catch (e) {
       developer.log('Error deleting post: $e', name: 'PostService');
+      throw Exception('Failed to delete post: $e');
     }
   }
 
@@ -430,5 +531,63 @@ class PostService {
         originalError: e,
       );
     }
+  }
+  
+  /// Upload post video to Supabase storage
+  Future<String> uploadPostVideo(File videoFile, String userId) async {
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filename = 'post_video_${userId}_$timestamp.mp4';
+
+      final bytes = await videoFile.readAsBytes();
+      await _client.storage.from('post_videos').uploadBinary(
+            filename,
+            bytes,
+            fileOptions: const FileOptions(contentType: 'video/mp4'),
+          );
+
+      return _client.storage.from('post_videos').getPublicUrl(filename);
+    } catch (e) {
+      throw AppStorageException(
+        'Failed to upload video: $e',
+        userMessage: 'Video upload failed. Please try again.',
+        originalError: e,
+      );
+    }
+  }
+
+  /// Enriches posts with user profile data in a separate query to avoid join issues
+  Future<List<Map<String, dynamic>>> _enrichPostsWithProfiles(List<dynamic> posts) async {
+    if (posts.isEmpty) return [];
+    
+    final postList = posts.cast<Map<String, dynamic>>().toList();
+    final allUserIds = postList.map((p) => p['user_id'] as String).toSet().toList();
+    
+    // Identified user IDs not already in cache
+    final userIdsToFetch = allUserIds.where((id) => !_profileCache.containsKey(id)).toList();
+    
+    if (userIdsToFetch.isNotEmpty) {
+      try {
+        final profilesResponse = await _client
+            .from('user_profiles')
+            .select('id, avatar_url, is_verified')
+            .filter('id', 'in', userIdsToFetch);
+            
+        for (var p in profilesResponse as List) {
+          _profileCache[p['id'] as String] = p as Map<String, dynamic>;
+        }
+      } catch (e) {
+        developer.log('Error enriching posts with profiles: $e', name: 'PostService');
+      }
+    }
+    
+    for (var post in postList) {
+      final userId = post['user_id'] as String;
+      if (_profileCache.containsKey(userId)) {
+        post['user_profiles'] = _profileCache[userId];
+      }
+    }
+    
+    return postList;
   }
 }

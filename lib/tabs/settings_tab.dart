@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:ui'; // For ImageFilter
 import '../services/supabase_service.dart';
 import '../providers/theme_provider.dart';
 import '../screens/admin_dashboard.dart';
 import '../utils/error_helper.dart';
 import '../screens/premium_screen.dart';
+import '../config/theme_config.dart'; // For ThemeColors
+import '../screens/edit_username_dialog.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter/services.dart';
 
@@ -18,13 +22,28 @@ class SettingsTab extends StatefulWidget {
 class _SettingsTabState extends State<SettingsTab> {
   bool _notificationsEnabled = true;
   bool _isAdmin = false;
+  bool _isPrivate = false;
   bool _isLoadingAdminStatus = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _loadNotificationPreference();
+    _loadPrivacySettings();
     _checkAdminStatus();
+  }
+
+  Future<void> _loadPrivacySettings() async {
+    final user = SupabaseService.getCurrentUser();
+    if (user != null) {
+      final isPrivate = await SupabaseService.isUserPrivate(user.id);
+      if (mounted) {
+        setState(() {
+          _isPrivate = isPrivate;
+        });
+      }
+    }
   }
 
   Future<void> _checkAdminStatus() async {
@@ -97,6 +116,49 @@ class _SettingsTabState extends State<SettingsTab> {
     }
   }
 
+  Future<void> _showEditProfileDialog() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final profile = await SupabaseService.getUserProfile(user.id);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (profile == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Could not retrieve profile data.')),
+          );
+          return;
+        }
+        showDialog(
+          context: context,
+          builder: (context) => EditUsernameDialog(
+            currentUsername: profile['username'] ?? '',
+            currentBio: profile['bio'],
+            onSave: (newUsername, newBio) {
+              // Profile is updated in the database by the dialog itself
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Profile updated successfully.'),
+                  backgroundColor: ThemeColors.matrixGreen,
+                ),
+              );
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading profile: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _showFeedbackDialog() async {
     final feedbackController = TextEditingController();
     bool isSubmitting = false;
@@ -106,18 +168,46 @@ class _SettingsTabState extends State<SettingsTab> {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: const Text('Send Feedback'),
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: ThemeColors.matrixGreen, width: 1),
+            ),
+            title: Text(
+              '>_FEEDBACK_PROTO',
+              style: TextStyle(
+                color: ThemeColors.matrixGreen,
+                fontFamily: 'monospace',
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('We would love to hear your thoughts!'),
+                const Text(
+                  'Transmit your thoughts to the collective.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: feedbackController,
                   maxLines: 4,
-                  decoration: const InputDecoration(
-                    hintText: 'Type your feedback here...',
-                    border: OutlineInputBorder(),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Enter data pulse here...',
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: ThemeColors.matrixGreen.withValues(alpha: 0.3)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: ThemeColors.matrixGreen),
+                    ),
                   ),
                 ),
               ],
@@ -125,39 +215,32 @@ class _SettingsTabState extends State<SettingsTab> {
             actions: [
               TextButton(
                 onPressed: isSubmitting ? null : () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                child: const Text('ABORT', style: TextStyle(color: Colors.white54, fontFamily: 'monospace')),
               ),
-              ElevatedButton(
+              TextButton(
                 onPressed: isSubmitting
                     ? null
                     : () async {
                         final text = feedbackController.text.trim();
                         if (text.isEmpty) return;
 
-                        final navigator = Navigator.of(context);
-                        final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-                        setState(() {
-                          isSubmitting = true;
-                        });
+                        setState(() => isSubmitting = true);
 
                         try {
                           await SupabaseService.submitFeedback(text);
                           if (mounted) {
-                            navigator.pop();
-                            scaffoldMessenger.showSnackBar(
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Thank you for your feedback!'),
-                                backgroundColor: Colors.green,
+                                content: Text('Feedback transmitted successfully.'),
+                                backgroundColor: ThemeColors.matrixGreen,
                               ),
                             );
                           }
                         } catch (e) {
                           if (mounted) {
-                            setState(() {
-                              isSubmitting = false;
-                            });
-                            scaffoldMessenger.showSnackBar(
+                            setState(() => isSubmitting = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Error: $e'),
                                 backgroundColor: Colors.red,
@@ -167,12 +250,8 @@ class _SettingsTabState extends State<SettingsTab> {
                         }
                       },
                 child: isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Send'),
+                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: ThemeColors.matrixGreen))
+                    : Text('TRANSMIT', style: TextStyle(color: ThemeColors.matrixGreen, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
               ),
             ],
           );
@@ -187,17 +266,18 @@ class _SettingsTabState extends State<SettingsTab> {
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF000000),
+        backgroundColor: Colors.black,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFF00FF41), width: 2),
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: ThemeColors.matrixGreen, width: 1),
         ),
-        title: const Text(
-          'Donate Crypto',
+        title: Text(
+          '>_SUPPORT_PROTOCOL',
           style: TextStyle(
-            color: Color(0xFF00FF41),
+            color: ThemeColors.matrixGreen,
             fontFamily: 'monospace',
             fontWeight: FontWeight.bold,
+            fontSize: 16,
           ),
         ),
         content: SingleChildScrollView(
@@ -205,9 +285,9 @@ class _SettingsTabState extends State<SettingsTab> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Support the project with a Solana donation!',
+                'Support the architecture with a Solana donation.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(color: Colors.white70, fontSize: 13),
               ),
               const SizedBox(height: 20),
               Container(
@@ -223,26 +303,26 @@ class _SettingsTabState extends State<SettingsTab> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Wallet Address:',
-                style: TextStyle(color: Color(0xFF00FF41), fontSize: 12),
+              Text(
+                '[SOL_WALLET_ADDRESS]',
+                style: TextStyle(color: ThemeColors.matrixGreen.withValues(alpha: 0.5), fontSize: 10, fontFamily: 'monospace'),
               ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
+                  color: Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF00FF41).withValues(alpha: 0.3)),
+                  border: Border.all(color: ThemeColors.matrixGreen.withValues(alpha: 0.2)),
                 ),
                 child: Column(
                   children: [
-                    Text(
+                    const Text(
                       walletAddress,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 9,
                         fontFamily: 'monospace',
                       ),
                     ),
@@ -252,16 +332,15 @@ class _SettingsTabState extends State<SettingsTab> {
                         Clipboard.setData(const ClipboardData(text: walletAddress));
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Address copied to clipboard'),
-                            backgroundColor: Color(0xFF00FF41),
-                            duration: Duration(seconds: 2),
+                            content: Text('Address copied to system clipboard.'),
+                            backgroundColor: ThemeColors.matrixGreen,
                           ),
                         );
                       },
-                      icon: const Icon(Icons.copy, size: 16, color: Color(0xFF00FF41)),
-                      label: const Text(
-                        'Copy Address',
-                        style: TextStyle(color: Color(0xFF00FF41), fontSize: 12),
+                      icon: Icon(Icons.copy, size: 14, color: ThemeColors.matrixGreen),
+                      label: Text(
+                        'COPY_STRING',
+                        style: TextStyle(color: ThemeColors.matrixGreen, fontSize: 11, fontFamily: 'monospace'),
                       ),
                     ),
                   ],
@@ -273,7 +352,7 @@ class _SettingsTabState extends State<SettingsTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.white70)),
+            child: const Text('DISMISS', style: TextStyle(color: Colors.white54, fontFamily: 'monospace')),
           ),
         ],
       ),
@@ -282,39 +361,223 @@ class _SettingsTabState extends State<SettingsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final neonGreen = ThemeColors.matrixGreen;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: neonGreen),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          '>_SYSTEM_CONFIG',
+          style: TextStyle(
+            color: neonGreen,
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2,
+            fontSize: 18,
+          ),
+        ),
+      ),
       body: ListView(
-      children: [
-        const SizedBox(height: 16),
-        
-        // Premium Banner
-        Padding(
-         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.amber.shade600, Colors.amber.shade900],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.amber.shade900.withValues(alpha: 0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          const SizedBox(height: 16),
+          
+          // Premium Banner
+          _buildPremiumBanner(),
+          
+          const SizedBox(height: 24),
+          
+          _buildSectionHeader('PROTOCOL_PREFERENCES'),
+          _buildGlassCard(
+            child: Column(
+              children: [
+                _buildSwitchItem(
+                  'Notifications',
+                  'Push notifications [STATUS: PENDING]',
+                  _notificationsEnabled,
+                  (value) {
+                    setState(() => _notificationsEnabled = value);
+                    _saveNotificationPreference(value);
+                  },
+                ),
+                _buildDivider(),
+                _buildSwitchItem(
+                  'Private Account',
+                  'Only followers can see your posts & pins',
+                  _isPrivate,
+                  (value) async {
+                    setState(() => _isPrivate = value);
+                    try {
+                      await SupabaseService.setPrivacy(value);
+                    } catch (e) {
+                      if (mounted) {
+                         setState(() => _isPrivate = !value); // Revert on error
+                         ScaffoldMessenger.of(context).showSnackBar(
+                           SnackBar(content: Text('Error updating privacy: $e')),
+                         );
+                      }
+                    }
+                  },
+                ),
+                _buildDivider(),
+                _buildSwitchItem(
+                  'Dark Mode',
+                  'Enable dark theme encryption',
+                  context.watch<ThemeProvider>().isDarkMode,
+                  (value) => context.read<ThemeProvider>().toggleDarkMode(),
                 ),
               ],
             ),
+          ),
+
+          const SizedBox(height: 24),
+          
+          _buildSectionHeader('USER_ACCOUNT'),
+          _buildGlassCard(
+            child: Column(
+              children: [
+                _buildSettingsItem(
+                  'Edit Profile',
+                  Icons.person_outline,
+                  onTap: _showEditProfileDialog,
+                ),
+                _buildDivider(),
+                _buildSettingsItem(
+                  'Privacy Policy',
+                  Icons.privacy_tip_outlined,
+                  onTap: () => _showPolicyDialog('Privacy Policy', 'This app collects and stores:\n• Your email address for authentication\n• Location data for map posts\n• Photos you upload\n• Posts, ratings, and likes\n\nYour data is stored securely on Supabase servers.\n\nWe do not sell or share your personal information with third parties.'),
+                ),
+                _buildDivider(),
+                _buildSettingsItem(
+                  'Terms of Service',
+                  Icons.description_outlined,
+                  onTap: () => _showPolicyDialog('Terms of Service', 'By using this app, you agree to:\n1. Not post inappropriate, offensive, or illegal content\n2. Respect other users and their posts\n3. Not spam or abuse the platform\n4. Take responsibility for the content you post\n5. Respect intellectual property rights'),
+                ),
+                _buildDivider(),
+                _buildSettingsItem(
+                  'About System',
+                  Icons.info_outline,
+                  onTap: () => _showAboutDialog(),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          
+          _buildSectionHeader('SUPPORT_CHANNELS'),
+          _buildGlassCard(
+            child: Column(
+              children: [
+                _buildSettingsItem(
+                  'Send Feedback',
+                  Icons.feedback_outlined,
+                  onTap: _showFeedbackDialog,
+                ),
+                _buildDivider(),
+                _buildSettingsItem(
+                  'Donate Crypto',
+                  Icons.currency_bitcoin,
+                  iconColor: neonGreen,
+                  onTap: _showDonationDialog,
+                ),
+              ],
+            ),
+          ),
+
+          if (_isAdmin && !_isLoadingAdminStatus) ...[
+            const SizedBox(height: 24),
+            _buildSectionHeader('ADMINISTRATION_LEVEL_0'),
+            _buildGlassCard(
+              child: _buildSettingsItem(
+                'Admin Dashboard',
+                Icons.admin_panel_settings_outlined,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AdminDashboard()),
+                  );
+                },
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 32),
+          
+          // Sign Out Button
+          Container(
+            height: 50,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+              color: Colors.redAccent.withValues(alpha: 0.1),
+            ),
+            child: InkWell(
+              onTap: _handleSignOut,
+              borderRadius: BorderRadius.circular(8),
+              child: const Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.logout, color: Colors.redAccent, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'TERMINATE_SESSION',
+                      style: TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 48),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPremiumBanner() {
+    return Container(
+      padding: const EdgeInsets.all(1),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [
+            Colors.amber.withValues(alpha: 0.3),
+            Colors.amber.withValues(alpha: 0.05),
+          ],
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.star_rounded,
-                  color: Colors.white,
-                  size: 40,
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(Icons.star, color: Colors.amber.withValues(alpha: 0.2), size: 40),
+                    const Icon(Icons.bolt, color: Colors.amber, size: 24),
+                  ],
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -322,263 +585,209 @@ class _SettingsTabState extends State<SettingsTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Upgrade to Premium',
+                        'PREMIUM_ACCESS',
                         style: TextStyle(
                           color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1,
+                          fontFamily: 'monospace',
+                          fontSize: 14,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
-                        'Remove ads and unlock exclusive features',
+                        'Unlock all protocols & remove data interceptors.',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 13,
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 11,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton(
+                TextButton(
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => const PremiumScreen(),
-                      ),
+                      MaterialPageRoute(builder: (context) => const PremiumScreen()),
                     );
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.amber.shade900,
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.amber.withValues(alpha: 0.1),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(4),
+                      side: const BorderSide(color: Colors.amber, width: 1),
                     ),
                   ),
-                  child: const Text('Upgrade'),
+                  child: const Text(
+                    'UPGRADE',
+                    style: TextStyle(
+                      color: Colors.amber,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        
-        const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              'Preferences',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        '[$title]',
+        style: TextStyle(
+          color: ThemeColors.matrixGreen.withValues(alpha: 0.7),
+          fontFamily: 'monospace',
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlassCard({required Widget child}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsItem(String title, IconData icon, {VoidCallback? onTap, Color? iconColor}) {
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(icon, color: iconColor ?? Colors.white70, size: 20),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontFamily: 'monospace',
+        ),
+      ),
+      trailing: const Icon(Icons.chevron_right, color: Colors.white24, size: 16),
+      dense: true,
+    );
+  }
+
+  Widget _buildSwitchItem(String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
+    return SwitchListTile(
+      value: value,
+      onChanged: onChanged,
+      activeThumbColor: ThemeColors.matrixGreen,
+      title: Text(
+        title,
+        style: const TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace'),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+      ),
+      dense: true,
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(height: 1, color: Colors.white.withValues(alpha: 0.05), indent: 50);
+  }
+
+  void _showPolicyDialog(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.black,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: ThemeColors.matrixGreen, width: 1),
+        ),
+        title: Text(
+          '>_$title',
+          style: const TextStyle(
+            color: ThemeColors.matrixGreen,
+            fontFamily: 'monospace',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Text(
+            content,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 13,
+              height: 1.5,
             ),
           ),
-          SwitchListTile(
-            title: const Text('Notifications'),
-            subtitle: const Text('Push notifications (Coming Soon)'),
-            value: _notificationsEnabled,
-            onChanged: (value) {
-              setState(() {
-                _notificationsEnabled = value;
-              });
-              _saveNotificationPreference(value);
-            },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('DISMISS', style: TextStyle(color: ThemeColors.matrixGreen, fontFamily: 'monospace')),
           ),
-          SwitchListTile(
-            title: const Text('Dark Mode'),
-            subtitle: const Text('Enable dark theme'),
-            value: context.watch<ThemeProvider>().isDarkMode,
-            onChanged: (value) {
-              context.read<ThemeProvider>().toggleDarkMode();
-            },
+        ],
+      ),
+    );
+  }
+
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.black,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: ThemeColors.matrixGreen, width: 1),
+        ),
+        title: Text(
+          '>_SYSTEM_INFO',
+          style: TextStyle(
+            color: ThemeColors.matrixGreen,
+            fontFamily: 'monospace',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
           ),
-          const Divider(),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              'Account',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'PUSHINN_PROTOCOL',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip),
-            title: const Text('Privacy Policy'),
-            trailing: const Icon(Icons.open_in_new, size: 16),
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Privacy Policy'),
-                  content: const SingleChildScrollView(
-                    child: Text(
-                      'Privacy Policy\n\n'
-                      'This app collects and stores:\n'
-                      '• Your email address for authentication\n'
-                      '• Location data for map posts\n'
-                      '• Photos you upload\n'
-                      '• Posts, ratings, and likes\n\n'
-                      'Your data is stored securely on Supabase servers.\n\n'
-                      'We do not sell or share your personal information with third parties.\n\n'
-                      'You can delete your account and data at any time by contacting support.',
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.description),
-            title: const Text('Terms of Service'),
-            trailing: const Icon(Icons.open_in_new, size: 16),
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Terms of Service'),
-                  content: const SingleChildScrollView(
-                    child: Text(
-                      'Terms of Service\n\n'
-                      'By using this app, you agree to:\n\n'
-                      '1. Not post inappropriate, offensive, or illegal content\n'
-                      '2. Respect other users and their posts\n'
-                      '3. Not spam or abuse the platform\n'
-                      '4. Take responsibility for the content you post\n'
-                      '5. Respect intellectual property rights\n\n'
-                      'We reserve the right to:\n'
-                      '• Remove content that violates these terms\n'
-                      '• Suspend or ban users who violate these terms\n'
-                      '• Modify these terms at any time\n\n'
-                      'Use of this app is at your own risk.',
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.info),
-            title: const Text('About'),
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('About'),
-                  content: const SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Location Sharing App',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text('Version: 1.0.0+1'),
-                        SizedBox(height: 16),
-                        Text(
-                          'A social platform for discovering and sharing amazing locations with your community.',
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'Features:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text('• Interactive map with location pins'),
-                        Text('• Photo sharing'),
-                        Text('• Rating system'),
-                        Text('• Social feed'),
-                        Text('• User profiles'),
-                        SizedBox(height: 16),
-                        Text(
-                          'Built with Flutter & Supabase',
-                          style: TextStyle(
-                            fontStyle: FontStyle.italic,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const Divider(),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              'Support',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            const SizedBox(height: 4),
+            Text(
+              'v1.0.0_stable_build',
+              style: TextStyle(color: ThemeColors.matrixGreen.withValues(alpha: 0.7), fontSize: 11, fontFamily: 'monospace'),
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.feedback),
-            title: const Text('Send Feedback'),
-            subtitle: const Text('Report bugs or suggest features'),
-            onTap: _showFeedbackDialog,
-          ),
-          ListTile(
-            leading: const Icon(Icons.currency_bitcoin, color: Color(0xFF00FF41)),
-            title: const Text('Donate Crypto'),
-            subtitle: const Text('Support the developer'),
-            onTap: _showDonationDialog,
-          ),
-          if (_isAdmin && !_isLoadingAdminStatus) ...[
-            const Divider(),
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                'Administration',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+            const SizedBox(height: 16),
+            Text(
+              'A decentralized geographic intelligence network for the community.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
             ),
-            ListTile(
-              leading: const Icon(Icons.admin_panel_settings),
-              title: const Text('Admin Dashboard'),
-              subtitle: const Text('Content moderation'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AdminDashboard(),
-                  ),
-                );
-              },
-            ),
-            const Divider(),
           ],
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton.icon(
-              onPressed: _handleSignOut,
-              icon: const Icon(Icons.logout),
-              label: const Text('Sign Out'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-            ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('ACKNOWLEDGE', style: TextStyle(color: ThemeColors.matrixGreen, fontFamily: 'monospace')),
           ),
         ],
       ),

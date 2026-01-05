@@ -17,7 +17,6 @@ class QuickMatchLobbyDialog extends StatefulWidget {
 
 class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
   
   Timer? _timer;
   Timer? _matchmakingTimer;
@@ -43,10 +42,6 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-    
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
 
     _loadUserData();
     // Removed immediate queue join and timer starts

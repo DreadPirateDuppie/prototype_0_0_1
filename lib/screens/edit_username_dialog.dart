@@ -3,12 +3,14 @@ import '../services/supabase_service.dart';
 
 class EditUsernameDialog extends StatefulWidget {
   final String currentUsername;
-  final Function(String) onUsernameSaved;
+  final String? currentBio;
+  final Function(String username, String? bio) onSave;
 
   const EditUsernameDialog({
     super.key,
     required this.currentUsername,
-    required this.onUsernameSaved,
+    this.currentBio,
+    required this.onSave,
   });
 
   @override
@@ -17,6 +19,7 @@ class EditUsernameDialog extends StatefulWidget {
 
 class _EditUsernameDialogState extends State<EditUsernameDialog> {
   late TextEditingController _usernameController;
+  late TextEditingController _bioController;
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
@@ -26,11 +29,13 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
     super.initState();
     _usernameController =
         TextEditingController(text: widget.currentUsername.isNotEmpty ? widget.currentUsername : '');
+    _bioController = TextEditingController(text: widget.currentBio ?? '');
   }
 
   @override
   void dispose() {
     _usernameController.dispose();
+    _bioController.dispose();
     super.dispose();
   }
 
@@ -102,7 +107,7 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
           });
 
           // Call callback and close after a short delay
-          widget.onUsernameSaved(username);
+          widget.onSave(username, _bioController.text.trim().isEmpty ? null : _bioController.text.trim());
           
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted) {
@@ -166,6 +171,29 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
                 enabled: !_isLoading,
               ),
               maxLength: 20,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _bioController,
+              style: const TextStyle(color: matrixGreen),
+              decoration: InputDecoration(
+                hintText: 'Enter your bio (optional)',
+                hintStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.3)),
+                helperText: 'Tell others about yourself',
+                helperStyle: TextStyle(color: matrixGreen.withValues(alpha: 0.5), fontSize: 11),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen.withValues(alpha: 0.5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: matrixGreen, width: 2),
+                ),
+                enabled: !_isLoading,
+              ),
+              maxLines: 3,
+              maxLength: 150,
             ),
             const SizedBox(height: 12),
             if (_errorMessage != null)

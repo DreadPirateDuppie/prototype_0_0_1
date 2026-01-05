@@ -22,8 +22,8 @@ class _SkateLobbyScreenState extends State<SkateLobbyScreen> {
   static const Color matrixDark = Color(0xFF0A0A0A);
 
   Map<String, dynamic>? _lobby;
-  List<Map<String, dynamic>> _players = [];
-  List<Map<String, dynamic>> _events = [];
+  final List<Map<String, dynamic>> _players = [];
+  final List<Map<String, dynamic>> _events = [];
   String? _currentUserId;
   StreamSubscription? _lobbySub;
   StreamSubscription? _playersSub;
@@ -73,7 +73,8 @@ class _SkateLobbyScreenState extends State<SkateLobbyScreen> {
       // BETTER: Let's just update the local state.
       if (mounted) {
         setState(() {
-          _players = data;
+          _players.clear();
+          _players.addAll(data);
         });
       }
     });
@@ -82,7 +83,7 @@ class _SkateLobbyScreenState extends State<SkateLobbyScreen> {
     _eventsSub = SupabaseService.streamLobbyEvents(widget.lobbyId).listen((data) {
       if (mounted) {
         setState(() {
-          _events = data;
+          _events.insert(0, data);
         });
         // Scroll to bottom of chat/log
         if (_scrollController.hasClients) {
@@ -134,7 +135,7 @@ class _SkateLobbyScreenState extends State<SkateLobbyScreen> {
 
   Future<void> _updateLetters(String letters) async {
     try {
-      await SupabaseService.updatePlayerLetters(widget.lobbyId, letters);
+      await SupabaseService.updatePlayerLetters(widget.lobbyId, letters.split(''));
     } catch (e) {
       if (mounted) ErrorHelper.showError(context, 'Failed to update score');
     }
@@ -142,7 +143,7 @@ class _SkateLobbyScreenState extends State<SkateLobbyScreen> {
 
   Future<void> _sendEvent(String type, String data) async {
     try {
-      await SupabaseService.sendLobbyEvent(widget.lobbyId, type, data);
+      await SupabaseService.sendLobbyEvent(widget.lobbyId, type, {'content': data});
     } catch (e) {
       // Ignore
     }

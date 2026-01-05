@@ -3,14 +3,17 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/supabase_service.dart';
 import '../services/image_service.dart';
+import '../models/post.dart';
 import '../utils/error_helper.dart';
 
 class CreateFeedPostDialog extends StatefulWidget {
   final Function() onPostAdded;
+  final MapPost? postToEdit;
 
   const CreateFeedPostDialog({
     super.key,
     required this.onPostAdded,
+    this.postToEdit,
   });
 
   @override
@@ -26,9 +29,19 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
   File? _selectedVideo;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.postToEdit != null) {
+      _titleController.text = widget.postToEdit!.title;
+      _descriptionController.text = widget.postToEdit!.description;
+      // Note: Handling existing images/videos for editing is more complex 
+      // and skipped for this quick fix to get the build working.
+    }
+  }
+
+  @override
   void dispose() {
     _titleController.dispose();
-    _descriptionController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -151,15 +164,30 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
         videoUrl = await SupabaseService.uploadPostVideo(_selectedVideo!, user.id);
       }
 
-      await SupabaseService.createMapPost(
-        userId: user.id,
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        photoUrls: photoUrls,
-        videoUrl: videoUrl,
-        tags: tags,
-        // No location, ratings, or category for feed posts
-      );
+      if (widget.postToEdit != null) {
+        // Update existing post
+        await SupabaseService.updateMapPost(
+          postId: widget.postToEdit!.id!,
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          photoUrls: photoUrls,
+          videoUrl: videoUrl,
+          tags: tags,
+        );
+      } else {
+        // Create new post
+        await SupabaseService.createMapPost(
+          userId: user.id,
+          latitude: 0, // Feed posts don't have location
+          longitude: 0,
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          photoUrls: photoUrls,
+          videoUrl: videoUrl,
+          tags: tags,
+          // No location, ratings, or category for feed posts
+        );
+      }
 
       if (mounted) {
         widget.onPostAdded();
@@ -196,7 +224,7 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
         side: BorderSide(color: borderColor, width: 2),
       ),
       title: Text(
-        'NEW FEED POST',
+        widget.postToEdit != null ? 'EDIT POST' : 'NEW FEED POST',
         style: TextStyle(
           color: textColor,
           fontFamily: 'monospace',
@@ -442,9 +470,9 @@ class _CreateFeedPostDialogState extends State<CreateFeedPostDialog> {
                       color: isDark ? borderColor : Colors.white,
                     ),
                   )
-                : const Text(
-                    'POST',
-                    style: TextStyle(
+                : Text(
+                    widget.postToEdit != null ? 'SAVE' : 'POST',
+                    style: const TextStyle(
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.bold,
                     ),

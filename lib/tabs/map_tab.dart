@@ -14,6 +14,7 @@ import '../screens/location_privacy_dialog.dart';
 import '../widgets/ad_banner.dart';
 import '../utils/error_helper.dart';
 import '../providers/navigation_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MapTab extends StatefulWidget {
   const MapTab({super.key});
@@ -603,120 +604,138 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
             );
           }
         },
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            if (isFriend)
-              // Friend Icon: Precise Pin
-              Icon(
-                Icons.person_pin_circle,
-                color: color,
-                size: 36,
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              )
-            else if (!isUserLocation) ...[
-              // Outer glow effect (only for pins, not user location)
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.4),
-                      blurRadius: 12,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-              ),
-              // Pin background
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: post != null ? const Color(0xFF00FF41) : color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: activePushers > 0 ? Colors.red : Colors.black, // Red highlight for active spots
-                    width: activePushers > 0 ? 2.5 : 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: post != null
-                          ? const Color(0xFF00FF41).withValues(alpha: 0.5)
-                          : color.withValues(alpha: 0.4),
-                      blurRadius: 8,
-                      spreadRadius: 2,
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      post != null ? Icons.location_on_rounded : Icons.location_on,
-                      color: Colors.black,
-                      size: 20,
-                    ),
-                    if (activePushers > 0)
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 12,
-                            minHeight: 12,
-                          ),
-                          child: Text(
-                            '$activePushers',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
+        child: Builder(
+          builder: (context) {
+            final isMvp = post != null && post.mvpUserId != null && post.mvpUserId == SupabaseService.getCurrentUser()?.id;
+            final borderColor = isMvp ? Colors.amber : (activePushers > 0 ? Colors.red : Colors.black);
+            final borderWidth = isMvp ? 3.0 : (activePushers > 0 ? 2.5 : 1.5);
+
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                if (isFriend)
+                  // Friend Icon: Precise Pin
+                  Icon(
+                    Icons.person_pin_circle,
+                    color: color,
+                    size: 36,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
-                  ],
-                ),
-              ),
-            ] else
-              // User location: GPS crosshair icon
-              Icon(
-                Icons.my_location,
-                color: const Color(0xFF00FF41),
-                size: 32,
-                shadows: [
-                  Shadow(
-                    color: const Color(0xFF00FF41).withValues(alpha: 0.8),
-                    blurRadius: 8,
+                    ],
+                  )
+                else if (!isUserLocation) ...[
+                  // Outer glow effect (only for pins, not user location)
+                  Container(
+                    width: isMvp ? 48 : 40,
+                    height: isMvp ? 48 : 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: isMvp ? Colors.amber.withValues(alpha: 0.6) : color.withValues(alpha: 0.4),
+                          blurRadius: isMvp ? 16 : 12,
+                          spreadRadius: isMvp ? 4 : 2,
+                        ),
+                      ],
+                    ),
                   ),
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                  // Pin background
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: post != null ? const Color(0xFF00FF41) : color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: borderColor,
+                        width: borderWidth,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: post != null
+                              ? const Color(0xFF00FF41).withValues(alpha: 0.5)
+                              : color.withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          spreadRadius: 2,
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          post != null ? Icons.location_on_rounded : Icons.location_on,
+                          color: Colors.black,
+                          size: 20,
+                        ),
+                        if (isMvp)
+                          const Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Icon(
+                              Icons.emoji_events,
+                              color: Colors.amber,
+                              size: 16,
+                            ),
+                          ),
+                        if (activePushers > 0 && !isMvp)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 12,
+                                minHeight: 12,
+                              ),
+                              child: Text(
+                                '$activePushers',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-          ],
+                ] else
+                  // User location: GPS crosshair icon
+                  Icon(
+                    Icons.my_location,
+                    color: const Color(0xFF00FF41),
+                    size: 32,
+                    shadows: [
+                      Shadow(
+                        color: const Color(0xFF00FF41).withValues(alpha: 0.8),
+                        blurRadius: 8,
+                      ),
+                      Shadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+              ],
+            );
+          }
         ),
       ),
     );
@@ -779,7 +798,7 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: Colors.transparent, // Show global Matrix
                 border: Border(
                   bottom: BorderSide(
                     color: const Color(0xFF00FF41).withValues(alpha: 0.3),
@@ -827,9 +846,8 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
                     ),
                     children: [
                       TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.prototype_0_0_1',
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.pushinn.app',
                         maxZoom: 19,
                       ),
                       MarkerLayer(markers: nonClusterMarkers), // Add non-clustered markers (user location)
@@ -876,7 +894,7 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Colors.black.withValues(alpha: 0.8), // Darkened for readability
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const CircularProgressIndicator(),
@@ -1036,6 +1054,36 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
                           },
                         ),
                       ],
+                    ),
+                  ),
+                  
+                  // OpenStreetMap Attribution (Required by ODbL License)
+                  Positioned(
+                    bottom: 4,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: GestureDetector(
+                        onTap: () async {
+                          // Open OSM copyright page
+                          final uri = Uri.parse('https://www.openstreetmap.org/copyright');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        child: const Text(
+                          '© OpenStreetMap contributors',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.black87,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                   

@@ -1,23 +1,22 @@
-import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
-import 'dart:math';
-import 'dart:developer' as developer;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/battle.dart';
 import '../models/battle_trick.dart';
 import '../models/user_scores.dart';
-import 'supabase_service.dart';
-import 'points_service.dart';
-import 'messaging_service.dart';
-import 'notification_service.dart';
-import 'error_types.dart';
+import 'battle_matchmaking_service.dart';
+import 'battle_action_service.dart';
+import 'battle_state_service.dart';
+import 'battle_analytics_service.dart';
+import 'battle_lobby_service.dart';
 
+/// Facade for battle-related services.
+/// Delegates to specialized services for implementation.
 class BattleService {
-  static final SupabaseClient _client = Supabase.instance.client;
+  
+  // ==================== STATE SERVICE DELEGATES ====================
 
-  // Create a new battle
-    static Future<Battle?> createBattle({
+  static Future<Battle?> createBattle({
     required String player1Id,
     required String player2Id,
     required GameMode gameMode,
@@ -25,1257 +24,232 @@ class BattleService {
     int wagerAmount = 0,
     int betAmount = 0,
     bool isQuickfire = false,
-  }) async {
-    try {
-      // Check if player has enough points for bet
-      if (betAmount > 0) {
-        final balance = await SupabaseService.getUserPoints(player1Id);
-        if (balance < betAmount) {
-          throw Exception('Insufficient points for bet');
-        }
-        
-        // Deduct bet from player 1 (player 2 must match to accept)
-        await SupabaseService.awardPoints(
-          player1Id, 
-          -betAmount.toDouble(), 
-          'bet_entry', 
-          description: 'Bet for battle vs $player2Id'
-        );
-      }
-
-      // Calculate turn deadline
-      final Duration timerDuration = isQuickfire 
-          ? const Duration(minutes: 4, seconds: 20)
-          : const Duration(hours: 24);
-      // final turnDeadline = DateTime.now().add(timerDuration); // Unused
-
-        // Randomly assign setter
-      // Create battle record
-      // Start with no setter/attempter for RPS
-      final battle = Battle(
-        player1Id: player1Id,
-        player2Id: player2Id,
-        gameMode: gameMode,
-        customLetters: customLetters ?? '',
-        createdAt: DateTime.now(),
-        currentTurnPlayerId: '', // Empty string indicates waiting for RPS
-        wagerAmount: wagerAmount,
-        betAmount: betAmount,
-        isQuickfire: isQuickfire,
-        turnDeadline: DateTime.now().add(timerDuration), // Initial deadline for RPS
-        betAccepted: betAmount == 0, // Auto-accept if no bet
-        setterId: null, // No setter initially for RPS
-        attempterId: null, // No attempter initially for RPS
-      );
-
-      final response = await _client
-          .from('battles')
-          .insert(battle.toMap())
-          .select()
-          .single();
-
-      final createdBattle = Battle.fromMap(response);
-
-      // Send notification message
-      try {
-        final conversationId = await MessagingService.getOrCreateDirectConversation(player2Id);
-        if (conversationId != null) {
-          await MessagingService.sendMessage(
-            conversationId: conversationId,
-            content: 'Battle started! Check it out here: [Battle Link]',
-          );
-        }
-      } catch (e) {
-        // Ignore message failure
-        developer.log('Failed to send battle start notification: $e', name: 'BattleService');
-      }
-
-      return createdBattle;
-    } on SocketException catch (e) {
-      throw AppNetworkException(
-        'Network error while creating battle',
-        originalError: e,
-      );
-    } on PostgrestException catch (e) {
-      throw AppServerException(
-        'Database error: ${e.message}',
-        userMessage: 'Unable to create battle. Please try again.',
-        originalError: e,
-      );
-    } catch (e) {
-      if (e.toString().contains('Insufficient points')) {
-        throw AppValidationException(
-          'Insufficient points for bet',
-          userMessage: 'You don\'t have enough points for this bet.',
-          originalError: e,
-        );
-      }
-      throw AppServerException(
-        'Failed to create battle: $e',
-        userMessage: 'Unable to create battle. Please try again later.',
-        originalError: e,
-      );
-    }
-  }
-  // Opponent accepts bet
-  static Future<void> acceptBet({
-    required String battleId,
-    required String opponentId,
-    required int betAmount,
-  }) async {
-    try {
-      // Verify opponent has enough points
-      final balance = await SupabaseService.getUserPoints(opponentId);
-      if (balance < betAmount) {
-        throw Exception('Opponent has insufficient points for bet');
-      }
-      // Deduct bet from opponent
-      await SupabaseService.awardPoints(
-        opponentId,
-        -betAmount.toDouble(),
-        'bet_entry',
-        description: 'Bet match for battle $battleId',
-      );
-      // Update battle to mark bet accepted
-      await _client.from('battles').update({
-        'bet_accepted': true,
-      }).eq('id', battleId);
-    } catch (e) {
-      throw Exception('Failed to accept bet: $e');
-    }
+  }) {
+    return BattleStateService.createBattle(
+      player1Id: player1Id,
+      player2Id: player2Id,
+      gameMode: gameMode,
+      customLetters: customLetters,
+      wagerAmount: wagerAmount,
+      betAmount: betAmount,
+      isQuickfire: isQuickfire,
+    );
   }
 
-
-  // Get all battles for a user
-  static Future<List<Battle>> getUserBattles(String userId) async {
-    try {
-      // Check for expired turns first
-      await checkExpiredTurns(userId);
-
-      final response = await _client
-          .from('battles')
-          .select()
-          .or('player1_id.eq.$userId,player2_id.eq.$userId')
-          .order('created_at', ascending: false);
-
-      return (response as List)
-          .map((battle) => Battle.fromMap(battle))
-          .toList();
-    } catch (e) {
-      return [];
-    }
+  static Future<List<Battle>> getUserBattles(String userId) {
+    return BattleStateService.getUserBattles(userId);
   }
 
-  // Get active battles for a user (not completed)
-  static Future<List<Battle>> getActiveBattles(String userId) async {
-    try {
-      final response = await _client
-          .from('battles')
-          .select()
-          .or('player1_id.eq.$userId,player2_id.eq.$userId')
-          .filter('winner_id', 'is', 'null')
-          .order('created_at', ascending: false);
-
-      return (response as List)
-          .map((battle) => Battle.fromMap(battle))
-          .toList();
-    } catch (e) {
-      return [];
-    }
+  static Future<List<Battle>> getActiveBattles(String userId) {
+    return BattleStateService.getActiveBattles(userId);
   }
 
-  // Get a specific battle
-  static Future<Battle?> getBattle(String battleId) async {
-    try {
-      final response = await _client
-          .from('battles')
-          .select()
-          .eq('id', battleId)
-          .single();
-
-      return Battle.fromMap(response);
-    } on SocketException catch (e) {
-      throw AppNetworkException(
-        'Network error while fetching battle',
-        originalError: e,
-      );
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST116') {
-        throw AppNotFoundException(
-          'Battle not found',
-          userMessage: 'This battle no longer exists.',
-          originalError: e,
-        );
-      }
-      throw AppServerException(
-        'Database error: ${e.message}',
-        userMessage: 'Unable to load battle details.',
-        originalError: e,
-      );
-    } catch (e) {
-      throw AppServerException(
-        'Failed to fetch battle: $e',
-        userMessage: 'Unable to load battle. Please try again.',
-        originalError: e,
-      );
-    }
+  static Future<Battle?> getBattle(String battleId) {
+    return BattleStateService.getBattle(battleId);
   }
 
-  // Upload trick video to storage
-  static Future<String> uploadTrickVideo(
-    File videoFile,
-    String battleId,
-    String playerId,
-    String type, // 'set' or 'attempt'
-  ) async {
-    try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final filename = '${type}_${battleId}_${playerId}_$timestamp.mp4';
-
-      final bytes = await videoFile.readAsBytes();
-      await _client.storage
-          .from('battle_videos')
-          .uploadBinary(
-            filename,
-            bytes,
-            fileOptions: const FileOptions(contentType: 'video/mp4'),
-          );
-
-      final publicUrl = _client.storage
-          .from('battle_videos')
-          .getPublicUrl(filename);
-      return publicUrl;
-    } catch (e) {
-      throw Exception('Failed to upload video: $e');
-    }
-  }
-
-  // Upload set trick
-  static Future<Battle?> uploadSetTrick({
-    required String battleId,
-    required String videoUrl,
-    String? trickName,
-  }) async {
-    try {
-      final battle = await getBattle(battleId);
-      if (battle == null) return null;
-
-      // FIX: Do NOT swap roles here. The setter remains the setter until the trick is attempted.
-      // The turn passes to the attempter (opponent) to try the trick.
-      final nextTurnPlayerId = battle.attempterId;
-
-      // Calculate new deadline
-      final Duration timerDuration = battle.isQuickfire
-          ? const Duration(minutes: 4, seconds: 20)
-          : const Duration(hours: 24);
-      final newDeadline = DateTime.now().add(timerDuration);
-
-      final response = await _client
-          .from('battles')
-          .update({
-            'set_trick_video_url': videoUrl,
-            'trick_name': trickName,
-            'current_turn_player_id': nextTurnPlayerId, // Pass turn to opponent
-            'turn_deadline': newDeadline.toIso8601String(),
-          })
-          .eq('id', battleId)
-          .select()
-          .single();
-
-      // Cancel existing notification
-      await NotificationService.cancelBattleNotification(battleId);
-      
-      // Schedule new notification for deadline
-      await NotificationService.scheduleBattleTurnExpiryNotification(
-        battleId, 
-        newDeadline
-      );
-
-      return Battle.fromMap(response);
-    } catch (e) {
-      throw Exception('Failed to upload set trick: $e');
-    }
-  }
-
-  // Upload attempt
-  // Upload attempt
-  static Future<Battle?> uploadAttempt({
-    required String battleId,
-    required String videoUrl,
-  }) async {
-    try {
-      final response = await _client
-          .from('battles')
-          .update({
-            'attempt_video_url': videoUrl,
-            'verification_status': VerificationStatus.quickFireVoting
-                .toString()
-                .split('.')
-                .last,
-            // Reset votes for new round
-            'setter_vote': null,
-            'attempter_vote': null,
-            'turn_deadline': DateTime.now().add(const Duration(hours: 24)).toIso8601String(),
-          })
-          .eq('id', battleId)
-          .select()
-          .single();
-
-      // Cancel existing notification
-      await NotificationService.cancelBattleNotification(battleId);
-      
-      // Schedule new notification for deadline (24h for voting)
-      await NotificationService.scheduleBattleTurnExpiryNotification(
-        battleId, 
-        DateTime.now().add(const Duration(hours: 24))
-      );
-
-      return Battle.fromMap(response);
-    } catch (e) {
-      throw Exception('Failed to upload attempt: $e');
-    }
-  }
-
-  // Assign letter to player
   static Future<Battle?> assignLetter({
     required String battleId,
     required String playerId,
-  }) async {
-    try {
-      final battle = await getBattle(battleId);
-      if (battle == null) return null;
-
-      final targetLetters = battle.getGameLetters();
-      String updatedLetters;
-
-      if (battle.player1Id == playerId) {
-        final currentLetters = battle.player1Letters;
-        final nextIndex = currentLetters.length;
-        if (nextIndex < targetLetters.length) {
-          updatedLetters = currentLetters + targetLetters[nextIndex];
-
-          final response = await _client
-              .from('battles')
-              .update({'player1_letters': updatedLetters})
-              .eq('id', battleId)
-              .select()
-              .single();
-
-          final updatedBattle = Battle.fromMap(response);
-
-          // Check if game is complete
-          if (updatedBattle.isComplete()) {
-            await completeBattle(
-              battleId: battleId,
-              winnerId: battle.player2Id, // Other player wins
-            );
-          }
-
-          return updatedBattle;
-        }
-      } else if (battle.player2Id == playerId) {
-        final currentLetters = battle.player2Letters;
-        final nextIndex = currentLetters.length;
-        if (nextIndex < targetLetters.length) {
-          updatedLetters = currentLetters + targetLetters[nextIndex];
-
-          final response = await _client
-              .from('battles')
-              .update({'player2_letters': updatedLetters})
-              .eq('id', battleId)
-              .select()
-              .single();
-
-          final updatedBattle = Battle.fromMap(response);
-
-          // Check if game is complete
-          if (updatedBattle.isComplete()) {
-            await completeBattle(
-              battleId: battleId,
-              winnerId: battle.player1Id, // Other player wins
-            );
-          }
-
-          return updatedBattle;
-        }
-      }
-
-      return battle;
-    } catch (e) {
-      throw Exception('Failed to assign letter: $e');
-    }
+  }) {
+    return BattleStateService.assignLetter(battleId: battleId, playerId: playerId);
   }
 
   static Future<Battle?> forfeitTurn({
     required String battleId,
     required String playerId,
-  }) async {
-    try {
-      // 1. Assign letter to the forfeiting player
-      final battle = await assignLetter(battleId: battleId, playerId: playerId);
-      if (battle == null || battle.isComplete()) return battle;
-
-      // 2. Reset turn to Setter (since Attempter missed/skipped)
-      // Calculate new deadline
-      final Duration timerDuration = battle.isQuickfire
-          ? const Duration(minutes: 4, seconds: 20)
-          : const Duration(hours: 24);
-      final newDeadline = DateTime.now().add(timerDuration);
-
-      final response = await _client
-          .from('battles')
-          .update({
-            'current_turn_player_id': battle.setterId,
-            'turn_deadline': newDeadline.toIso8601String(),
-            'set_trick_video_url': null,
-            'attempt_video_url': null,
-            'trick_name': null,
-            'setter_vote': null,
-            'attempter_vote': null,
-            'verification_status': 'none',
-          })
-          .eq('id', battleId)
-          .select()
-          .single();
-
-      // Cancel existing notification
-      await NotificationService.cancelBattleNotification(battleId);
-      
-      // Schedule new notification for deadline
-      await NotificationService.scheduleBattleTurnExpiryNotification(
-        battleId, 
-        newDeadline
-      );
-
-      return Battle.fromMap(response);
-    } catch (e) {
-      throw Exception('Failed to forfeit turn: $e');
-    }
+  }) {
+    return BattleStateService.forfeitTurn(battleId: battleId, playerId: playerId);
   }
 
-  // Complete battle
   static Future<Battle?> completeBattle({
     required String battleId,
     required String winnerId,
-  }) async {
-    try {
-      final response = await _client
-          .from('battles')
-          .update({
-            'winner_id': winnerId,
-            'completed_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', battleId)
-          .select()
-          .single();
-
-      // Cancel existing notification
-      await NotificationService.cancelBattleNotification(battleId);
-
-      final battle = Battle.fromMap(response);
-
-      // Update player scores
-      await updatePlayerScoreForBattle(battle);
-      
-      // Handle Wager Payout
-      if (battle.betAmount > 0) {
-        // Winner gets their bet back (no doubling)
-        await SupabaseService.awardPoints(
-          winnerId,
-          battle.betAmount.toDouble(),
-          'battle_win', 
-          referenceId: battleId, 
-          description: 'Won battle wager'
-        );
-      }
-
-      return battle;
-    } catch (e) {
-      throw Exception('Failed to complete battle: $e');
-    }
+  }) {
+    return BattleStateService.completeBattle(battleId: battleId, winnerId: winnerId);
   }
 
-  // Update player score based on battle outcome
-  static Future<void> updatePlayerScoreForBattle(Battle battle) async {
-    try {
-      final pointsService = PointsService();
-      
-      // Get current scores for both players
-      final winner = await getUserScores(battle.winnerId!);
-      final loser = await getUserScores(
-        battle.player1Id == battle.winnerId
-            ? battle.player2Id
-            : battle.player1Id,
-      );
-
-      // Winner gains points
-      final newWinnerScore = (winner.playerScore + 10).clamp(0.0, 1000.0);
-      await pointsService.updatePlayerScore(
-        battle.winnerId!, 
-        newWinnerScore, 
-        reason: 'Won battle ${battle.id}'
-      );
-
-      // Loser loses points based on letters collected
-      final loserId = battle.player1Id == battle.winnerId
-          ? battle.player2Id
-          : battle.player1Id;
-      final loserLetters = battle.player1Id == battle.winnerId
-          ? battle.player2Letters
-          : battle.player1Letters;
-
-      // Fewer letters = better performance = less point loss
-      final pointsLost = 5 + (loserLetters.length * 2);
-      final newLoserScore = (loser.playerScore - pointsLost).clamp(0.0, 1000.0);
-      await pointsService.updatePlayerScore(
-        loserId, 
-        newLoserScore, 
-        reason: 'Lost battle ${battle.id}'
-      );
-    } catch (e) {
-      // Silently fail score updates
-      developer.log('Failed to update battle scores: $e', name: 'BattleService');
-    }
+  static Future<Battle?> switchTurn(String battleId) {
+    return BattleStateService.switchTurn(battleId);
   }
 
-  // Get user scores
-  static Future<UserScores> getUserScores(String userId) async {
-    try {
-      final response = await _client
-          .from('user_scores')
-          .select()
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      if (response != null) {
-        return UserScores.fromMap(response);
-      } else {
-        // Return default scores if not found
-        return UserScores(userId: userId);
-      }
-    } catch (e) {
-      return UserScores(userId: userId);
-    }
+  static Future<void> checkExpiredTurns(String userId) {
+    return BattleStateService.checkExpiredTurns(userId);
   }
 
-  // Update player score
-  static Future<void> updatePlayerScore(String userId, double newScore) async {
-    await PointsService().updatePlayerScore(userId, newScore);
-  }
-
-  // Update ranking score
-  static Future<void> updateRankingScore(String userId, double adjustment) async {
-    final scores = await getUserScores(userId);
-    final newScore = (scores.rankingScore + adjustment).clamp(0.0, 1000.0);
-    await PointsService().updateRankingScore(userId, newScore);
-  }
-
-  // Update map score
-  static Future<void> updateMapScore(String userId, double newScore) async {
-    await PointsService().updateMapScore(userId, newScore);
-  }
-
-  // Switch turn to next player
-  static Future<Battle?> switchTurn(String battleId) async {
-    try {
-      final battle = await getBattle(battleId);
-      if (battle == null) return null;
-
-      final nextPlayer = battle.currentTurnPlayerId == battle.player1Id
-          ? battle.player2Id
-          : battle.player1Id;
-
-      // Calculate new deadline
-      final Duration timerDuration = battle.isQuickfire
-          ? const Duration(minutes: 4, seconds: 20)
-          : const Duration(hours: 24);
-      final newDeadline = DateTime.now().add(timerDuration);
-
-      final response = await _client
-          .from('battles')
-          .update({
-            'current_turn_player_id': nextPlayer,
-            'verification_status': VerificationStatus.pending
-                .toString()
-                .split('.')
-                .last,
-            'turn_deadline': newDeadline.toIso8601String(),
-          })
-          .eq('id', battleId)
-          .select()
-          .single();
-
-      return Battle.fromMap(response);
-    } catch (e) {
-      throw Exception('Failed to switch turn: $e');
-    }
-  }
-
-  // Check for expired turns and auto-assign letters
-  static Future<void> checkExpiredTurns(String userId) async {
-    try {
-      developer.log('Checking expired turns for user: $userId', name: 'BattleService');
-      final now = DateTime.now().toIso8601String();
-      
-      // Find active battles where deadline has passed and NOT in voting
-      final response = await _client
-          .from('battles')
-          .select()
-          .or('player1_id.eq.$userId,player2_id.eq.$userId')
-          .filter('winner_id', 'is', 'null')
-          .lt('turn_deadline', now);
-          // Removed verification_status filter to handle voting timeouts too
-
-      final expiredBattles = (response as List).map((b) => Battle.fromMap(b)).toList();
-
-      developer.log('Found ${expiredBattles.length} expired battles', name: 'BattleService');
-
-      for (final battle in expiredBattles) {
-        developer.log('Processing expired battle: ${battle.id}', name: 'BattleService');
-        
-        // Calculate new deadline
-        final Duration timerDuration = battle.isQuickfire
-            ? const Duration(minutes: 4, seconds: 20)
-            : const Duration(hours: 24);
-        final newDeadline = DateTime.now().add(timerDuration);
-
-        // 1. RPS PHASE TIMEOUT (No setter assigned yet)
-        if (battle.setterId == null) {
-          developer.log('RPS Timeout', name: 'BattleService');
-          if (battle.player1RpsMove != null && battle.player2RpsMove == null) {
-            // Player 1 moved, Player 2 didn't -> Player 1 wins RPS
-            await _client.from('battles').update({
-              'setter_id': battle.player1Id,
-              'attempter_id': battle.player2Id,
-              'current_turn_player_id': battle.player1Id,
-              'turn_deadline': newDeadline.toIso8601String(),
-            }).eq('id', battle.id!);
-            
-            // Schedule notification for new deadline
-            await NotificationService.scheduleBattleTurnExpiryNotification(
-              battle.id!, 
-              newDeadline
-            );
-          } else if (battle.player2RpsMove != null && battle.player1RpsMove == null) {
-            // Player 2 moved, Player 1 didn't -> Player 2 wins RPS
-            await _client.from('battles').update({
-              'setter_id': battle.player2Id,
-              'attempter_id': battle.player1Id,
-              'current_turn_player_id': battle.player2Id,
-              'turn_deadline': newDeadline.toIso8601String(),
-            }).eq('id', battle.id!);
-
-            // Schedule notification for new deadline
-            await NotificationService.scheduleBattleTurnExpiryNotification(
-              battle.id!, 
-              newDeadline
-            );
-          } else {
-            // Neither moved -> Randomly assign winner
-            final random = Random();
-            final player1Wins = random.nextBool();
-            
-            if (player1Wins) {
-              // Player 1 wins RPS
-              await _client.from('battles').update({
-                'setter_id': battle.player1Id,
-                'attempter_id': battle.player2Id,
-                'current_turn_player_id': battle.player1Id,
-                'turn_deadline': newDeadline.toIso8601String(),
-              }).eq('id', battle.id!);
-
-              // Schedule notification for new deadline
-              await NotificationService.scheduleBattleTurnExpiryNotification(
-                battle.id!, 
-                newDeadline
-              );
-            } else {
-              // Player 2 wins RPS
-              await _client.from('battles').update({
-                'setter_id': battle.player2Id,
-                'attempter_id': battle.player1Id,
-                'current_turn_player_id': battle.player2Id,
-                'turn_deadline': newDeadline.toIso8601String(),
-              }).eq('id', battle.id!);
-
-              // Schedule notification for new deadline
-              await NotificationService.scheduleBattleTurnExpiryNotification(
-                battle.id!, 
-                newDeadline
-              );
-            }
-          }
-          continue;
-        }
-
-        // 2. ACTIVE BATTLE TIMEOUT
-        final isSetter = battle.currentTurnPlayerId == battle.setterId;
-        developer.log('Active Battle Timeout. Is Setter Turn: $isSetter', name: 'BattleService');
-        
-        if (isSetter) {
-          // SETTER TIMEOUT: Failed to upload trick
-          // - Assign letter to Setter
-          // - Swap roles: Attempter becomes new Setter
-          developer.log('Assigning letter to SETTER: ${battle.setterId}', name: 'BattleService');
-          
-          await assignLetter(
-            battleId: battle.id!,
-            playerId: battle.setterId!,
-          );
-
-          // Check if battle ended from letter assignment
-          final updatedBattle = await getBattle(battle.id!);
-          if (updatedBattle != null && !updatedBattle.isComplete()) {
-            final newSetterId = battle.attempterId!;
-            final newAttempterId = battle.setterId!;
-            
-            await _client.from('battles').update({
-              'setter_id': newSetterId,
-              'attempter_id': newAttempterId,
-              'current_turn_player_id': newSetterId,
-              'turn_deadline': newDeadline.toIso8601String(),
-              'set_trick_video_url': null,
-              'attempt_video_url': null,
-              'trick_name': null,
-              'setter_vote': null,
-              'attempter_vote': null,
-              'verification_status': 'none', // Reset status
-            }).eq('id', battle.id!);
-
-            // Schedule notification for new deadline
-            await NotificationService.scheduleBattleTurnExpiryNotification(
-              battle.id!, 
-              newDeadline
-            );
-          }
-        } else {
-          // ATTEMPTER TIMEOUT: Failed to upload attempt
-          // - Assign letter to Attempter
-          // - Setter keeps control
-          developer.log('Assigning letter to attempter: ${battle.attempterId}', name: 'BattleService');
-          await assignLetter(
-            battleId: battle.id!,
-            playerId: battle.attempterId!,
-          );
-          
-          // Check if battle ended from letter assignment
-          final updatedBattle = await getBattle(battle.id!);
-          if (updatedBattle != null && !updatedBattle.isComplete()) {
-            // Reset for next trick (Setter sets again)
-            await _client.from('battles').update({
-              'current_turn_player_id': battle.setterId,
-              'turn_deadline': newDeadline.toIso8601String(),
-              'set_trick_video_url': null,
-              'attempt_video_url': null,
-              'trick_name': null,
-              'setter_vote': null,
-              'attempter_vote': null,
-              'verification_status': 'none',
-            }).eq('id', battle.id!);
-
-            // Schedule notification for new deadline
-            await NotificationService.scheduleBattleTurnExpiryNotification(
-              battle.id!, 
-              newDeadline
-            );
-          }
-        }
-
-        // 3. VOTING PHASE TIMEOUT
-        if (battle.verificationStatus == VerificationStatus.quickFireVoting) {
-          developer.log('Voting Timeout', name: 'BattleService');
-          if (battle.setterVote != null && battle.attempterVote == null) {
-            await _client.from('battles').update({'attempter_vote': battle.setterVote}).eq('id', battle.id!);
-            await resolveVotes(battle.id!);
-          } else if (battle.attempterVote != null && battle.setterVote == null) {
-            await _client.from('battles').update({'setter_vote': battle.attempterVote}).eq('id', battle.id!);
-            await resolveVotes(battle.id!);
-          } else {
-            // Neither voted - default to missed
-            await _client.from('battles').update({
-              'setter_vote': 'missed',
-              'attempter_vote': 'missed'
-            }).eq('id', battle.id!);
-            await resolveVotes(battle.id!);
-          }
-        }
-      }
-    } catch (e) {
-      // Silently fail to avoid blocking UI
-      debugPrint('Error checking expired turns: $e');
-    }
-  }
-  // Forfeit battle
   static Future<Battle?> forfeitBattle({
     required String battleId,
     required String forfeitingUserId,
-  }) async {
-    try {
-      final battle = await getBattle(battleId);
-      if (battle == null) return null;
-
-      // Determine winner (the other player)
-      final winnerId = battle.player1Id == forfeitingUserId
-          ? battle.player2Id
-          : battle.player1Id;
-
-      // Complete battle with the other player as winner
-      // This handles score updates and wager payouts
-      return await completeBattle(
-        battleId: battleId,
-        winnerId: winnerId,
-      );
-    } catch (e) {
-      throw Exception('Failed to forfeit battle: $e');
-    }
+  }) {
+    return BattleStateService.forfeitBattle(battleId: battleId, forfeitingUserId: forfeitingUserId);
   }
 
-  // Submit RPS move
+  static Future<List<BattleTrick>> getBattleTricks(String battleId) {
+    return BattleStateService.getBattleTricks(battleId);
+  }
+
+  // ==================== ACTION SERVICE DELEGATES ====================
+
+  static Future<String> uploadTrickVideo(
+    File videoFile,
+    String battleId,
+    String playerId,
+    String type,
+  ) {
+    return BattleActionService.uploadTrickVideo(videoFile, battleId, playerId, type);
+  }
+
+  static Future<Battle?> uploadSetTrick({
+    required String battleId,
+    required String videoUrl,
+    String? trickName,
+  }) {
+    return BattleActionService.uploadSetTrick(battleId: battleId, videoUrl: videoUrl, trickName: trickName);
+  }
+
+  static Future<Battle?> uploadAttempt({
+    required String battleId,
+    required String videoUrl,
+  }) {
+    return BattleActionService.uploadAttempt(battleId: battleId, videoUrl: videoUrl);
+  }
+
   static Future<void> submitRpsMove({
     required String battleId,
     required String userId,
-    required String move, // 'rock', 'paper', 'scissors'
-  }) async {
-    try {
-      final battle = await getBattle(battleId);
-      if (battle == null) return;
-
-      final isPlayer1 = userId == battle.player1Id;
-      final field = isPlayer1 ? 'player1_rps_move' : 'player2_rps_move';
-
-      await _client.from('battles').update({
-        field: move,
-      }).eq('id', battleId);
-
-      // Check if both have moved
-      final updatedBattle = await getBattle(battleId);
-      if (updatedBattle != null &&
-          updatedBattle.player1RpsMove != null &&
-          updatedBattle.player2RpsMove != null) {
-        await _resolveRps(updatedBattle);
-      }
-    } catch (e) {
-      throw Exception('Failed to submit RPS move: $e');
-    }
+    required String move,
+  }) {
+    return BattleActionService.submitRpsMove(battleId: battleId, userId: userId, move: move);
   }
 
-  // Resolve RPS outcome
-  static Future<void> _resolveRps(Battle battle) async {
-    final p1Move = battle.player1RpsMove!;
-    final p2Move = battle.player2RpsMove!;
-
-    String? winnerId;
-
-    if (p1Move == p2Move) {
-      // Tie - Reset moves
-      await _client.from('battles').update({
-        'player1_rps_move': null,
-        'player2_rps_move': null,
-      }).eq('id', battle.id!);
-      return;
-    }
-
-    // Determine winner
-    if ((p1Move == 'rock' && p2Move == 'scissors') ||
-        (p1Move == 'paper' && p2Move == 'rock') ||
-        (p1Move == 'scissors' && p2Move == 'paper')) {
-      winnerId = battle.player1Id;
-    } else {
-      winnerId = battle.player2Id;
-    }
-
-    final loserId = winnerId == battle.player1Id ? battle.player2Id : battle.player1Id;
-
-    // Winner becomes Setter, Loser becomes Attempter
-    // Winner gets the first turn
-    await _client.from('battles').update({
-      'setter_id': winnerId,
-      'attempter_id': loserId,
-      'current_turn_player_id': winnerId,
-      // Optional: Clear RPS moves or keep them for history
-      // 'player1_rps_move': null, 
-      // 'player2_rps_move': null,
-    }).eq('id', battle.id!);
-  }
-
-  // Submit vote
   static Future<void> submitVote({
     required String battleId,
     required String userId,
-    required String vote, // 'landed' or 'missed'
-  }) async {
-    try {
-      final battle = await getBattle(battleId);
-      if (battle == null) return;
-
-      final isSetter = userId == battle.setterId;
-      final field = isSetter ? 'setter_vote' : 'attempter_vote';
-
-      await _client.from('battles').update({
-        field: vote,
-      }).eq('id', battleId);
-
-      await resolveVotes(battleId);
-    } catch (e) {
-      throw Exception('Failed to submit vote: $e');
-    }
+    required String vote,
+  }) {
+    return BattleActionService.submitVote(battleId: battleId, userId: userId, vote: vote);
   }
 
-  // Get battle tricks history
-  static Future<List<BattleTrick>> getBattleTricks(String battleId) async {
-    try {
-      final response = await _client
-          .from('battle_tricks')
-          .select()
-          .eq('battle_id', battleId)
-          .order('created_at', ascending: false);
-
-      return (response as List)
-          .map((trick) => BattleTrick.fromMap(trick))
-          .toList();
-    } catch (e) {
-      // If table doesn't exist or error, return empty list
-      return [];
-    }
+  static Future<void> resolveVotes(String battleId) {
+    return BattleActionService.resolveVotes(battleId);
   }
 
-  // Resolve votes
-  static Future<void> resolveVotes(String battleId) async {
-    try {
-      final battle = await getBattle(battleId);
-      if (battle == null) return;
-
-      // Check if both voted
-      if (battle.setterVote == null || battle.attempterVote == null) return;
-
-      // Check consensus
-      if (battle.setterVote == battle.attempterVote) {
-        final isLanded = battle.setterVote == 'landed';
-
-        // ARCHIVE TRICK
-        if (battle.setTrickVideoUrl != null && battle.attemptVideoUrl != null) {
-          try {
-            final trick = BattleTrick(
-              battleId: battleId,
-              setterId: battle.setterId!,
-              attempterId: battle.attempterId!,
-              trickName: battle.trickName ?? 'Unnamed Trick',
-              setTrickVideoUrl: battle.setTrickVideoUrl!,
-              attemptVideoUrl: battle.attemptVideoUrl!,
-              outcome: isLanded ? 'landed' : 'missed',
-              lettersGiven: !isLanded ? (battle.gameMode == GameMode.skate ? 'SKATE' : 'SK8') : '', // Simplified logic, ideally calculate actual letter
-              createdAt: DateTime.now(),
-            );
-            
-            await _client.from('battle_tricks').insert(trick.toMap());
-          } catch (e) {
-            // Silently fail archiving if table doesn't exist
-            debugPrint('Failed to archive trick: $e');
-          }
-        }
-
-        // Calculate new deadline
-        final Duration timerDuration = battle.isQuickfire
-            ? const Duration(minutes: 4, seconds: 20)
-            : const Duration(hours: 24);
-        final newDeadline = DateTime.now().add(timerDuration);
-
-        // Standard Logic for ALL modes (SKATE, SK8, Custom)
-        // Rule: "Make it, Keep it" - Setter retains control unless they timeout (handled elsewhere)
-        
-        if (isLanded) {
-          // Attempter landed it -> Setter KEEPS control
-          await _client.from('battles').update({
-            'set_trick_video_url': null,
-            'attempt_video_url': null,
-            'setter_vote': null,
-            'attempter_vote': null,
-            'trick_name': null, // Clear trick name
-            'verification_status': VerificationStatus.pending.toString().split('.').last,
-            'current_turn_player_id': battle.setterId, // Setter keeps control
-            'turn_deadline': newDeadline.toIso8601String(),
-          }).eq('id', battleId);
-        } else {
-          // Attempter missed -> They get a letter, Setter stays Setter
-          await assignLetter(battleId: battleId, playerId: battle.attempterId!);
-
-          // Check if battle ended from letter assignment
-          final updatedBattle = await getBattle(battleId);
-          if (updatedBattle != null && !updatedBattle.isComplete()) {
-             await _client.from('battles').update({
-              'set_trick_video_url': null,
-              'attempt_video_url': null,
-              'setter_vote': null,
-              'attempter_vote': null,
-              'trick_name': null, // Clear trick name
-              'verification_status': VerificationStatus.pending.toString().split('.').last,
-              'current_turn_player_id': battle.setterId, // Setter goes again
-              'turn_deadline': newDeadline.toIso8601String(),
-            }).eq('id', battleId);
-          }
-        }
-      } else {
-        // Disagreement -> Community Verification
-        await _client.from('battles').update({
-          'verification_status': VerificationStatus.communityVerification.toString().split('.').last,
-        }).eq('id', battleId);
-      }
-    } catch (e) {
-      throw Exception('Failed to resolve votes: $e');
-    }
+  static Future<void> acceptBet({
+    required String battleId,
+    required String opponentId,
+    required int betAmount,
+  }) {
+    return BattleActionService.acceptBet(battleId: battleId, opponentId: opponentId, betAmount: betAmount);
   }
 
-  // Get user analytics (W/L ratio, favorite trick)
-  static Future<Map<String, dynamic>> getUserAnalytics(String userId) async {
-    try {
-      // 1. Get Win/Loss stats from battles table
-      final battlesResponse = await _client
-          .from('battles')
-          .select('winner_id, player1_id, player2_id')
-          .or('player1_id.eq.$userId,player2_id.eq.$userId')
-          .eq('status', 'completed');
+  // ==================== ANALYTICS SERVICE DELEGATES ====================
 
-      int wins = 0;
-      int losses = 0;
-
-      for (final battle in (battlesResponse as List)) {
-        if (battle['winner_id'] == userId) {
-          wins++;
-        } else if (battle['winner_id'] != null) {
-          losses++;
-        }
-      }
-
-      // 2. Get Favorite Trick from battle_tricks table
-      // We look for tricks where the user was the setter and the outcome was 'landed'
-      final tricksResponse = await _client
-          .from('battle_tricks')
-          .select('trick_name')
-          .eq('setter_id', userId)
-          .eq('outcome', 'landed');
-
-      String favoriteTrick = 'None';
-      if ((tricksResponse as List).isNotEmpty) {
-        final Map<String, int> trickCounts = {};
-        for (final trick in tricksResponse) {
-          final name = trick['trick_name'] as String;
-          trickCounts[name] = (trickCounts[name] ?? 0) + 1;
-        }
-
-        favoriteTrick = trickCounts.entries
-            .reduce((a, b) => a.value > b.value ? a : b)
-            .key;
-      }
-
-      return {
-        'wins': wins,
-        'losses': losses,
-        'favoriteTrick': favoriteTrick,
-      };
-    } catch (e) {
-      developer.log('Error fetching user analytics: $e', name: 'BattleService');
-      return {
-        'wins': 0,
-        'losses': 0,
-        'favoriteTrick': 'None',
-      };
-    }
+  static Future<void> updatePlayerScoreForBattle(Battle battle) {
+    return BattleAnalyticsService.updatePlayerScoreForBattle(battle);
   }
 
-  // ==================== MATCHMAKING QUEUE ====================
+  static Future<UserScores> getUserScores(String userId) {
+    return BattleAnalyticsService.getUserScores(userId);
+  }
 
-  /// Join the matchmaking queue for Quick Match
+  static Future<void> updatePlayerScore(String userId, double newScore) {
+    return BattleAnalyticsService.updatePlayerScore(userId, newScore);
+  }
+
+  static Future<void> updateRankingScore(String userId, double adjustment) {
+    return BattleAnalyticsService.updateRankingScore(userId, adjustment);
+  }
+
+  static Future<void> updateMapScore(String userId, double newScore) {
+    return BattleAnalyticsService.updateMapScore(userId, newScore);
+  }
+
+  static Future<Map<String, dynamic>> getUserAnalytics(String userId) {
+    return BattleAnalyticsService.getUserAnalytics(userId);
+  }
+
+  Future<List<Map<String, dynamic>>> getTopBattlePlayers({int limit = 10}) {
+    return BattleAnalyticsService.getTopBattlePlayers(limit: limit);
+  }
+
+  // ==================== MATCHMAKING SERVICE DELEGATES ====================
+
   static Future<void> joinMatchmakingQueue({
     required GameMode gameMode,
     bool isQuickfire = true,
     int betAmount = 0,
-  }) async {
-    try {
-      final userId = _client.auth.currentUser!.id;
-      final userScores = await getUserScores(userId);
-      
-      // Verify user has enough points for bet
-      if (betAmount > 0) {
-        final balance = await SupabaseService.getUserPoints(userId);
-        if (balance < betAmount) {
-          throw Exception('Insufficient points for bet');
-        }
-      }
-      
-      // Upsert to queue (replace existing entry if any)
-      await _client.from('matchmaking_queue').upsert({
-        'user_id': userId,
-        'game_mode': gameMode.toString().split('.').last,
-        'is_quickfire': isQuickfire,
-        'bet_amount': betAmount,
-        'ranking_score': userScores.rankingScore,
-        'status': 'waiting',
-        'joined_at': DateTime.now().toIso8601String(),
-        'matched_with': null,
-        'battle_id': null,
-      }, onConflict: 'user_id');
-      
-      developer.log('Joined matchmaking queue with ranking: ${userScores.rankingScore}', name: 'BattleService');
-    } catch (e) {
-      developer.log('Error joining matchmaking queue: $e', name: 'BattleService');
-      rethrow;
-    }
+  }) {
+    return BattleMatchmakingService.joinMatchmakingQueue(
+      gameMode: gameMode, 
+      isQuickfire: isQuickfire, 
+      betAmount: betAmount
+    );
   }
 
-  /// Leave the matchmaking queue
-  static Future<void> leaveMatchmakingQueue() async {
-    try {
-      final userId = _client.auth.currentUser!.id;
-      await _client.from('matchmaking_queue').delete().eq('user_id', userId);
-      developer.log('Left matchmaking queue', name: 'BattleService');
-    } catch (e) {
-      developer.log('Error leaving matchmaking queue: $e', name: 'BattleService');
-    }
+  static Future<void> leaveMatchmakingQueue() {
+    return BattleMatchmakingService.leaveMatchmakingQueue();
   }
 
-  /// Find a match in the queue (skill-based)
   static Future<Map<String, dynamic>?> findMatch({
     required double myRankingScore,
     required String gameMode,
     required bool isQuickfire,
     int betAmount = 0,
     int expandedRange = 100,
-  }) async {
-    try {
-      final userId = _client.auth.currentUser!.id;
-      
-      // Find opponents within ranking range who want similar bet, oldest first
-      final results = await _client
-          .from('matchmaking_queue')
-          .select()
-          .neq('user_id', userId)
-          .eq('game_mode', gameMode)
-          .eq('is_quickfire', isQuickfire)
-          .eq('status', 'waiting')
-          .gte('ranking_score', myRankingScore - expandedRange)
-          .lte('ranking_score', myRankingScore + expandedRange)
-          .order('joined_at', ascending: true)
-          .limit(1);
-      
-      if (results.isNotEmpty) {
-        final match = results.first;
-        // Check bet compatibility - either both 0 or within 20% of each other
-        final matchBet = match['bet_amount'] as int;
-        final betCompatible = (betAmount == 0 && matchBet == 0) ||
-            (betAmount > 0 && matchBet > 0 && 
-             (matchBet - betAmount).abs() <= (betAmount * 0.2).round());
-        
-        if (betCompatible) {
-          return match;
-        }
-      }
-      return null;
-    } catch (e) {
-      developer.log('Error finding match: $e', name: 'BattleService');
-      return null;
-    }
+  }) {
+    return BattleMatchmakingService.findMatch(
+      myRankingScore: myRankingScore, 
+      gameMode: gameMode, 
+      isQuickfire: isQuickfire, 
+      betAmount: betAmount, 
+      expandedRange: expandedRange
+    );
   }
 
-  /// Get current queue entry for user
-  static Future<Map<String, dynamic>?> getQueueEntry() async {
-    try {
-      final userId = _client.auth.currentUser!.id;
-      final result = await _client
-          .from('matchmaking_queue')
-          .select()
-          .eq('user_id', userId)
-          .maybeSingle();
-      return result;
-    } catch (e) {
-      return null;
-    }
+  static Future<Map<String, dynamic>?> getQueueEntry() {
+    return BattleMatchmakingService.getQueueEntry();
   }
 
-  /// Subscribe to queue changes for real-time match detection
   static RealtimeChannel subscribeToQueueUpdates(
     String userId,
     Function(Map<String, dynamic>) onMatch,
   ) {
-    return _client
-        .channel('matchmaking:$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
-          table: 'matchmaking_queue',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
-          callback: (payload) {
-            if (payload.newRecord['status'] == 'matched') {
-              onMatch(payload.newRecord);
-            }
-          },
-        )
-        .subscribe();
+    return BattleMatchmakingService.subscribeToQueueUpdates(userId, onMatch);
   }
 
-  /// Create battle from a matched queue entry
   static Future<Battle?> createBattleFromMatch({
     required String opponentId,
     required GameMode gameMode,
     bool isQuickfire = true,
     int betAmount = 0,
-  }) async {
-    try {
-      final userId = _client.auth.currentUser!.id;
-      
-      // Update both queue entries to 'matched'
-      await _client.from('matchmaking_queue').update({
-        'status': 'matched',
-        'matched_with': opponentId,
-      }).eq('user_id', userId);
-      
-      await _client.from('matchmaking_queue').update({
-        'status': 'matched',
-        'matched_with': userId,
-      }).eq('user_id', opponentId);
-      
-      // Create the battle
-      final battle = await createBattle(
-        player1Id: userId,
-        player2Id: opponentId,
-        gameMode: gameMode,
-        betAmount: betAmount,
-        isQuickfire: isQuickfire,
-      );
-      
-      // Update queue entries with battle ID
-      if (battle != null) {
-        await _client.from('matchmaking_queue').update({
-          'battle_id': battle.id,
-        }).or('user_id.eq.$userId,user_id.eq.$opponentId');
-      }
-      
-      // Clean up queue entries after a delay
-      Future.delayed(const Duration(seconds: 5), () {
-        _client.from('matchmaking_queue').delete().eq('user_id', userId);
-        _client.from('matchmaking_queue').delete().eq('user_id', opponentId);
-      });
-      
-      return battle;
-    } catch (e) {
-      developer.log('Error creating battle from match: $e', name: 'BattleService');
-      rethrow;
-    }
+  }) {
+    return BattleMatchmakingService.createBattleFromMatch(
+      opponentId: opponentId, 
+      gameMode: gameMode, 
+      isQuickfire: isQuickfire, 
+      betAmount: betAmount
+    );
   }
 
-  /// Get count of players currently in queue
-  static Future<int> getQueueCount() async {
-    try {
-      final result = await _client
-          .from('matchmaking_queue')
-          .select('id')
-          .eq('status', 'waiting');
-      return (result as List).length;
-    } catch (e) {
-      return 0;
-    }
+  static Future<int> getQueueCount() {
+    return BattleMatchmakingService.getQueueCount();
   }
+
+  // ==================== LOBBY METHODS ====================
+
+  static Future<String> createLobby() => BattleLobbyService.createLobby();
+
+  static Future<String> joinLobby(String code) => BattleLobbyService.joinLobby(code);
+
+  static Stream<Map<String, dynamic>> streamLobby(String lobbyId) => BattleLobbyService.streamLobby(lobbyId);
+
+  static Stream<List<Map<String, dynamic>>> streamLobbyPlayers(String lobbyId) => BattleLobbyService.streamLobbyPlayers(lobbyId);
+
+  static Stream<Map<String, dynamic>> streamLobbyEvents(String lobbyId) => BattleLobbyService.streamLobbyEvents(lobbyId);
+
+  static Future<void> leaveLobby(String lobbyId) => BattleLobbyService.leaveLobby(lobbyId);
+
+  static Future<void> updatePlayerLetters(String lobbyId, List<String> letters) => BattleLobbyService.updatePlayerLetters(lobbyId, letters);
+
+  static Future<void> sendLobbyEvent(String lobbyId, String type, Map<String, dynamic> data) => BattleLobbyService.sendLobbyEvent(lobbyId, type, data);
 }

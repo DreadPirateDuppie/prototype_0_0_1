@@ -1,13 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'dart:developer' as developer;
-import 'dart:async' as async;
-import 'error_types.dart';
 import '../config/service_locator.dart';
+import '../models/user_scores.dart';
+import 'auth_service.dart';
 
 /// Service responsible for user profile operations
 class UserService {
   final SupabaseClient? _injectedClient;
+  final AuthService _authService = getIt<AuthService>();
 
   /// Creates a UserService with optional dependency injection
   UserService({SupabaseClient? client}) : _injectedClient = client;
@@ -18,22 +19,17 @@ class UserService {
     if (injected != null) {
       return injected;
     }
-    // Try getIt first, but fallback to Supabase.instance if not registered
     if (getIt.isRegistered<SupabaseClient>()) {
       return getIt<SupabaseClient>();
     }
     return Supabase.instance.client;
   }
 
-  /// Get current user
-  User? getCurrentUser() {
-    return _client.auth.currentUser;
-  }
+  /// Get current user - delegated to AuthService
+  User? getCurrentUser() => _authService.getCurrentUser();
 
-  /// Get current session
-  Session? getCurrentSession() {
-    return _client.auth.currentSession;
-  }
+  /// Get current session - delegated to AuthService
+  Session? getCurrentSession() => _authService.getCurrentSession();
 
   /// Get user display name
   Future<String?> getUserDisplayName(String userId) async {
@@ -55,19 +51,16 @@ class UserService {
     final user = getCurrentUser();
     if (user == null) return null;
 
-    // Try to get from user metadata first
     var displayName = user.userMetadata?['display_name'] as String?;
     if (displayName != null && displayName.isNotEmpty) {
       return displayName;
     }
 
-    // Try to get from user_profiles table
     displayName = await getUserDisplayName(user.id);
     if (displayName != null && displayName.isNotEmpty) {
       return displayName;
     }
 
-    // Fallback to email prefix
     return user.email?.split('@').first ?? 'User';
   }
 
@@ -99,16 +92,34 @@ class UserService {
     }
   }
 
-  /// Check if username is available
+  /// Check if username is available (excluding current user's current username if they own it)
   Future<bool> isUsernameAvailable(String username) async {
     try {
       final response = await _client
           .from('user_profiles')
           .select('id')
-          .eq('username', username);
+          .eq('username', username.toLowerCase().trim());
       return (response as List).isEmpty;
     } catch (e) {
-      return true; // Assume available if query fails
+      return true;
+    }
+  }
+
+  /// Check if username is available for a specific user (allowing them to keep their own)
+  Future<bool> isUsernameAvailableForUser(String username, String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('id')
+          .eq('username', username.toLowerCase().trim());
+      
+      final results = response as List;
+      if (results.isEmpty) return true;
+      
+      // If the only person with this username is the user themselves
+      return results.length == 1 && results.first['id'] == userId;
+    } catch (e) {
+      return true;
     }
   }
 
@@ -139,7 +150,6 @@ class UserService {
         'display_name': username.trim(),
       });
 
-      // Update all posts by this user
       await _client
           .from('map_posts')
           .update({'user_name': username.trim()})
@@ -149,84 +159,6 @@ class UserService {
     } catch (e) {
       throw Exception('Failed to save username: $e');
     }
-  }
-
-  /// Sign up with email and password
-  Future<AuthResponse> signUp(
-    String email,
-    String password, {
-    String? displayName,
-  }) async {
-    final response = await _client.auth.signUp(
-      email: email,
-      password: password,
-    );
-
-    if (displayName != null && response.user != null) {
-      await saveUserDisplayName(response.user!.id, displayName);
-    }
-
-    return response;
-  }
-
-  /// Sign in with email and password
-  Future<AuthResponse> signIn(String email, String password) async {
-    try {
-      return await _client.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-    } on AuthException catch (e) {
-      throw AppAuthException(
-        'Authentication failed: ${e.message}',
-        userMessage: 'Invalid email or password. Please try again.',
-        originalError: e,
-      );
-    } on SocketException catch (e) {
-      throw AppNetworkException(
-        'Network error during sign in',
-        originalError: e,
-      );
-    } on async.TimeoutException catch (e) {
-      throw AppTimeoutException(
-        'Sign in request timed out',
-        originalError: e,
-      );
-    } catch (e) {
-      throw AppAuthException(
-        'Sign in failed: $e',
-        userMessage: 'Unable to sign in. Please check your credentials.',
-        originalError: e,
-      );
-    }
-  }
-
-  /// Sign in with Google via Supabase
-  Future<bool> signInWithGoogle() async {
-    try {
-      return await _client.auth.signInWithOAuth(OAuthProvider.google);
-    } on SocketException catch (e) {
-      throw AppNetworkException(
-        'Network error during Google sign in',
-        originalError: e,
-      );
-    } catch (e) {
-      throw AppAuthException(
-        'Google Sign-In failed: $e',
-        userMessage: 'Unable to sign in with Google. Please try again.',
-        originalError: e,
-      );
-    }
-  }
-
-  /// Sign out
-  Future<void> signOut() async {
-    await _client.auth.signOut();
-  }
-
-  /// Listen to auth state changes
-  Stream<AuthState> authStateChanges() {
-    return _client.auth.onAuthStateChange;
   }
 
   /// Upload profile image
@@ -246,7 +178,6 @@ class UserService {
       final publicUrl =
           _client.storage.from('post_images').getPublicUrl(filename);
 
-      // Update user profile with new avatar URL
       await _client.from('user_profiles').upsert({
         'id': userId,
         'avatar_url': publicUrl,
@@ -318,5 +249,222 @@ class UserService {
       developer.log('Error submitting feedback: $e', name: 'UserService');
       throw Exception('Failed to submit feedback');
     }
+  }
+
+  /// Get user bio
+  Future<String?> getUserBio(String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('bio')
+          .eq('id', userId)
+          .maybeSingle();
+      return response?['bio'] as String?;
+    } catch (e) {
+      developer.log('Error fetching user bio: $e', name: 'UserService');
+      return null;
+    }
+  }
+
+  /// Save user bio
+  Future<void> saveUserBio(String userId, String bio) async {
+    try {
+      await _client.from('user_profiles').upsert({
+        'id': userId,
+        'bio': bio.trim(),
+      });
+    } catch (e) {
+      throw Exception('Failed to save bio: $e');
+    }
+  }
+
+  /// Set user privacy status
+  Future<void> setPrivacy(String userId, bool isPrivate) async {
+    try {
+      await _client.from('user_profiles').upsert({
+        'id': userId,
+        'is_private': isPrivate,
+      });
+    } catch (e) {
+      developer.log('Error setting privacy: $e', name: 'UserService');
+      throw Exception('Failed to set privacy');
+    }
+  }
+
+  /// Check if user is private
+  Future<bool> isUserPrivate(String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('is_private')
+          .eq('id', userId)
+          .maybeSingle();
+      return response?['is_private'] as bool? ?? false;
+    } catch (e) {
+      developer.log('Error checking privacy: $e', name: 'UserService');
+      return false; // Default to public on error
+    }
+  }
+
+  /// Get user age
+  Future<int?> getUserAge(String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select('age')
+          .eq('id', userId)
+          .maybeSingle();
+      return response?['age'] as int?;
+    } catch (e) {
+      developer.log('Error fetching user age: $e', name: 'UserService');
+      return null;
+    }
+  }
+
+  /// Save user age
+  Future<void> saveUserAge(String userId, int age) async {
+    try {
+      await _client.from('user_profiles').upsert({
+        'id': userId,
+        'age': age,
+      });
+    } catch (e) {
+      throw Exception('Failed to save age: $e');
+    }
+  }
+
+  /// Get user profile by ID
+  Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    try {
+      final response = await _client
+          .from('user_profiles')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      developer.log('Error getting user profile: $e', name: 'UserService');
+      return null;
+    }
+  }
+
+  /// Get user scores (delegates to PointService implementation usually, but here as a bridge)
+  Future<UserScores?> getUserScores(String userId) async {
+    try {
+      final response = await _client
+          .from('user_scores')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+      
+      if (response != null) {
+        return UserScores.fromMap(response);
+      }
+      return UserScores(userId: userId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Get profile media (gallery images + media from posts)
+  Future<List<Map<String, dynamic>>> getProfileMedia(String userId) async {
+    try {
+      // 1. Fetch media directly uploaded to profile gallery
+      final galleryFuture = _client
+          .from('profile_media')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+      
+      // 2. Fetch posts with media
+      final postsFuture = _client
+          .from('map_posts')
+          .select('id, created_at, photo_urls, photo_url, video_url, title, description')
+          .eq('user_id', userId)
+          .or('video_url.neq.null,photo_url.neq.null,photo_urls.neq.[]')
+          .order('created_at', ascending: false);
+
+      final results = await Future.wait([galleryFuture, postsFuture]);
+      final galleryMedia = (results[0] as List).cast<Map<String, dynamic>>();
+      final posts = (results[1] as List).cast<Map<String, dynamic>>();
+
+      final List<Map<String, dynamic>> allMedia = [...galleryMedia];
+
+      // 3. Map posts to media structure
+      for (var post in posts) {
+        // Handle Video
+        if (post['video_url'] != null) {
+          allMedia.add({
+            'id': 'post_video_${post['id']}',
+            'user_id': userId,
+            'media_url': post['video_url'],
+            'media_type': 'video',
+            'caption': post['title'] ?? post['description'],
+            'created_at': post['created_at'],
+            'source': 'post',
+            'post_id': post['id'],
+          });
+        }
+
+        // Handle Images (Priority to photo_urls list, fallback to photo_url)
+        List<String> images = [];
+        if (post['photo_urls'] != null && (post['photo_urls'] as List).isNotEmpty) {
+           images = (post['photo_urls'] as List).cast<String>();
+        } else if (post['photo_url'] != null) {
+           images = [post['photo_url'] as String];
+        }
+
+        for (int i = 0; i < images.length; i++) {
+          allMedia.add({
+            'id': 'post_image_${post['id']}_$i',
+            'user_id': userId,
+            'media_url': images[i],
+            'media_type': 'image',
+            'caption': post['title'] ?? post['description'],
+            'created_at': post['created_at'],
+            'source': 'post',
+            'post_id': post['id'],
+          });
+        }
+      }
+
+      // 4. Sort combined list by created_at descending
+      allMedia.sort((a, b) {
+        final dateA = DateTime.parse(a['created_at']);
+        final dateB = DateTime.parse(b['created_at']);
+        return dateB.compareTo(dateA);
+      });
+      
+      return allMedia;
+    } catch (e) {
+      developer.log('Error fetching profile media: $e', name: 'UserService');
+      return [];
+    }
+  }
+
+  /// Upload media to profile storage
+  Future<String> uploadProfileMedia(File file, String userId, String mediaType) async {
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
+    final bucket = mediaType == 'video' ? 'profile_videos' : 'profile_media';
+    final path = '$userId/gallery/$fileName';
+
+    await _client.storage.from(bucket).upload(path, file);
+    return _client.storage.from(bucket).getPublicUrl(path);
+  }
+
+  /// Create a profile media record in the database
+  Future<void> createProfileMedia({
+    required String userId, 
+    required String mediaUrl, 
+    required String mediaType,
+    String? caption,
+  }) async {
+    await _client.from('profile_media').insert({
+      'user_id': userId,
+      'media_url': mediaUrl,
+      'media_type': mediaType,
+      'caption': caption,
+      'created_at': DateTime.now().toIso8601String(),
+    });
   }
 }

@@ -15,6 +15,9 @@ class UserScores {
 
   // Calculate Final Score as average of the three scores
   double get finalScore => (mapScore + playerScore + rankingScore) / 3;
+  
+  // Total points (sum of map and player score for display)
+  int get totalPoints => (mapScore + playerScore).round();
 
   // Calculate vote weight (0-1) based on Final Score
   double get voteWeight => finalScore / 1000;

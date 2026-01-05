@@ -431,7 +431,9 @@ class _LocationPrivacyDialogState extends State<LocationPrivacyDialog> {
             ),
             Radio<String>(
               value: value,
+              // ignore: deprecated_member_use
               groupValue: _sharingMode,
+              // ignore: deprecated_member_use
               onChanged: (val) => setState(() => _sharingMode = val!),
               activeColor: const Color(0xFF00FF41),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

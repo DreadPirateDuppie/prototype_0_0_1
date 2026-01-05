@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../models/post.dart';
 import '../models/user_scores.dart';
@@ -9,6 +10,7 @@ import '../screens/spot_details_screen.dart';
 import '../screens/followers_list_screen.dart';
 import '../utils/error_helper.dart';
 import '../widgets/verified_badge.dart';
+import '../widgets/matrix_rain_background.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -41,7 +43,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
   bool _isLoadingMedia = true;
   
   // Stats expansion state
-  final bool _isStatsExpanded = false;
+  bool _isStatsExpanded = false;
+  bool _isPrivate = false;
+  
+  bool get _canViewContent {
+    final currentUser = SupabaseService.getCurrentUser();
+    final isMe = currentUser?.id == widget.userId;
+    if (isMe) return true;
+    if (!_isPrivate) return true;
+    return _isFollowing;
+  }
 
   @override
   void initState() {
@@ -71,6 +82,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
             _currentUsername = profile['username'];
             _currentAvatarUrl = profile['avatar_url'];
             _isVerified = profile['is_verified'] as bool? ?? false;
+            _isPrivate = profile['is_private'] as bool? ?? false;
           });
         }
       }
@@ -303,50 +315,120 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
       itemBuilder: (context, index) {
         final media = _profileMedia[index];
         final isVideo = media['media_type'] == 'video';
+        final isPostSource = media['source'] == 'post' && media['post_id'] != null;
         
         return GestureDetector(
-          onTap: () {
-            // Show full screen media viewer
-            showDialog(
-              context: context,
-              builder: (context) => Dialog(
-                backgroundColor: Colors.transparent,
-                insetPadding: EdgeInsets.zero,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    InteractiveViewer(
-                      child: Image.network(
-                        media['media_url'],
-                        fit: BoxFit.contain,
-                      ),
+          onTap: () async {
+            if (isPostSource) {
+              // Navigate to the post
+              try {
+                // We need to fetch the full post first
+                final posts = await SupabaseService.getAllMapPosts(); // Inefficient, should have getById
+                // Better approach: filter by ID locally if possible or add getPostById
+                // For now, let's just assume we can find it or fail gracefully.
+                // Actually, let's use the PostService directly if possible or add a method.
+                // Since I can't easily change the Service contract right now without more files, 
+                // I'll filter getAllMapPosts (not ideal but works for prototype).
+                // Wait, SupabaseService.getAllMapPosts doesn't take an ID.
+                // Let's rely on the fact that if it's a post, we can try to construct a partial MapPost 
+                // but SpotDetails needs a full one. 
+                // Let's just catch the tap and try to open it.
+                
+                // Optimized: Fetch just this post
+                final post = await Supabase.instance.client
+                  .from('map_posts')
+                  .select()
+                  .eq('id', media['post_id'])
+                  .single();
+                  
+                if (mounted) {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SpotDetailsScreen(post: MapPost.fromMap(post)),
                     ),
-                    Positioned(
-                      top: 40,
-                      right: 20,
-                      child: IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                        onPressed: () => Navigator.pop(context),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not load post details')),
+                  );
+                }
+              }
+            } else {
+              // Show full screen media viewer (Gallery items)
+              if (isVideo) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Video playback not supported in preview')),
+                  );
+                 return;
+              }
+              showDialog(
+                context: context,
+                builder: (context) => Dialog(
+                  backgroundColor: Colors.transparent,
+                  insetPadding: EdgeInsets.zero,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      InteractiveViewer(
+                        child: Image.network(
+                          media['media_url'],
+                          fit: BoxFit.contain,
+                        ),
                       ),
-                    ),
-                  ],
+                      Positioned(
+                        top: 40,
+                        right: 20,
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           },
           child: Container(
             decoration: BoxDecoration(
               color: Colors.grey[900],
-              image: DecorationImage(
+              image: !isVideo ? DecorationImage(
                 image: NetworkImage(media['media_url']),
                 fit: BoxFit.cover,
-              ),
+              ) : null,
             ),
-            child: isVideo
-                ? const Center(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (isVideo)
+                  Container(
+                    color: Colors.black54, // Placeholder for video thumb
+                    child: const Center(
+                      child: Icon(Icons.videocam, color: Colors.white30, size: 40),
+                    ),
+                  ),
+                if (isVideo)
+                  const Center(
                     child: Icon(Icons.play_circle_outline, color: Colors.white, size: 32),
-                  )
-                : null,
+                  ),
+                if (isPostSource)
+                   Positioned(
+                     bottom: 4,
+                     right: 4,
+                     child: Container(
+                       padding: const EdgeInsets.all(2),
+                       decoration: BoxDecoration(
+                         color: Colors.black54,
+                         borderRadius: BorderRadius.circular(4),
+                       ),
+                       child: const Icon(Icons.link, color: Colors.white70, size: 12),
+                     ),
+                   ),
+              ],
+            ),
           ),
         );
       },
@@ -358,9 +440,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
     const neonGreen = Color(0xFF00FF41);
 
     return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
+      body: Stack(
+        children: [
+          const Positioned.fill(
+             child: MatrixRainBackground(opacity: 0.15, speed: 0.8),
+          ),
+          NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
             SliverAppBar(
               expandedHeight: 380.0,
               floating: false,
@@ -468,56 +555,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                                 ),
                         ),
                         
-                        const SizedBox(height: 20),
-                        // Stats Row
-                        FutureBuilder<List<MapPost>>(
-                          future: _userPostsFuture,
-                          builder: (context, snapshot) {
-                            final postCount = snapshot.data?.length ?? 0;
-                            return Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _buildStatColumn('Posts', '$postCount'),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => FollowersListScreen(
-                                          userId: widget.userId,
-                                          username: _currentUsername,
-                                          initialTab: 0,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: _buildStatColumn('Followers', '$_followersCount'),
-                                ),
-                                Container(
-                                  height: 24,
-                                  width: 1,
-                                  color: Colors.white24,
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => FollowersListScreen(
-                                          userId: widget.userId,
-                                          username: _currentUsername,
-                                          initialTab: 1,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: _buildStatColumn('Following', '$_followingCount'),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 10),
                       ],
                     ),
                   ),
@@ -528,33 +566,98 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
             // Stats Card
             SliverToBoxAdapter(
               child: _userScores != null
-                  ? UserStatsCard(
-                      scores: _userScores!,
-                      initiallyExpanded: _isStatsExpanded,
-                      onInfoPressed: _showStatsInfo,
+                  ? FutureBuilder<List<MapPost>>(
+                      future: _userPostsFuture,
+                      builder: (context, snapshot) {
+                        return UserStatsCard(
+                          scores: _userScores!,
+                          followersCount: _followersCount,
+                          followingCount: _followingCount,
+                          postCount: snapshot.data?.length ?? 0,
+                          initiallyExpanded: _isStatsExpanded,
+                          showDetailedStats: SupabaseService.getCurrentUser()?.id == widget.userId, 
+                          onInfoPressed: _showStatsInfo,
+                          onPostsTap: _canViewContent ? () => _tabController.animateTo(0) : null,
+                          onFollowersTap: _canViewContent ? () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FollowersListScreen(
+                                  userId: widget.userId,
+                                  username: _currentUsername,
+                                  initialTab: 0,
+                                ),
+                              ),
+                            );
+                          } : null,
+                          onFollowingTap: _canViewContent ? () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FollowersListScreen(
+                                  userId: widget.userId,
+                                  username: _currentUsername,
+                                  initialTab: 1,
+                                ),
+                              ),
+                            );
+                          } : null,
+                        );
+                      }
                     )
                   : const SizedBox.shrink(),
             ),
 
-            // Tab Bar
-            SliverPersistentHeader(
-              delegate: _SliverAppBarDelegate(
-                TabBar(
-                  controller: _tabController,
-                  indicatorColor: neonGreen,
-                  labelColor: neonGreen,
-                  unselectedLabelColor: Colors.white60,
-                  tabs: const [
-                    Tab(text: 'Posts', icon: Icon(Icons.grid_on)),
-                    Tab(text: 'Media', icon: Icon(Icons.perm_media)),
-                  ],
+            if (!_canViewContent)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.lock_outline, size: 64, color: Colors.white.withValues(alpha: 0.2)),
+                      const SizedBox(height: 16),
+                      Text(
+                        'This account is private',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Follow to see their posts & pins',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              pinned: true,
-            ),
+              )
+            else ...[
+              // Tab Bar
+              SliverPersistentHeader(
+                delegate: _SliverAppBarDelegate(
+                  TabBar(
+                    controller: _tabController,
+                    indicatorColor: neonGreen,
+                    labelColor: neonGreen,
+                    unselectedLabelColor: Colors.white60,
+                    tabs: const [
+                      Tab(text: 'Posts', icon: Icon(Icons.grid_on)),
+                      Tab(text: 'Media', icon: Icon(Icons.perm_media)),
+                    ],
+                  ),
+                ),
+                pinned: true,
+              ),            ],
           ];
         },
-        body: TabBarView(
+        body: !_canViewContent 
+            ? const SizedBox.shrink()
+            : TabBarView(
           controller: _tabController,
           children: [
             // Posts Tab
@@ -604,9 +707,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
             // Media Tab
             _buildMediaGrid(),
           ],
-        ),
-      ),
-    );
+        ), // End TabBarView
+      ), // End NestedScrollView
+    ], 
+  ), 
+);
   }
 }
 

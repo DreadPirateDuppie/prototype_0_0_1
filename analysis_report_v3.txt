@@ -1,0 +1,15 @@
+Analyzing prototype_0_0_1...                                    
+
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/create_battle_dialog.dart:296:49 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/create_battle_dialog.dart:309:47 • use_build_context_synchronously
+   info • 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre • lib/screens/create_battle_dialog.dart:526:19 • deprecated_member_use
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre • lib/screens/location_privacy_dialog.dart:434:15 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre • lib/screens/location_privacy_dialog.dart:435:15 • deprecated_member_use
+  error • The method 'unsavePost' isn't defined for the type 'SupabaseService' • lib/screens/post_detail_screen.dart:55:31 • undefined_method
+  error • The method 'savePost' isn't defined for the type 'SupabaseService' • lib/screens/post_detail_screen.dart:57:31 • undefined_method
+   info • 'Share' is deprecated and shouldn't be used. Use SharePlus instead • lib/screens/post_detail_screen.dart:86:5 • deprecated_member_use
+   info • 'share' is deprecated and shouldn't be used. Use SharePlus.instance.share() instead • lib/screens/post_detail_screen.dart:86:11 • deprecated_member_use
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/tabs/profile_tab.dart:967:67 • use_build_context_synchronously
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre • lib/widgets/post_card.dart:186:21 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre • lib/widgets/post_card.dart:188:21 • deprecated_member_use
+

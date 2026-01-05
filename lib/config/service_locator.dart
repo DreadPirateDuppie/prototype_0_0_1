@@ -4,6 +4,11 @@ import '../services/post_service.dart';
 import '../services/user_service.dart';
 import '../services/points_service.dart';
 import '../services/admin_service.dart';
+import '../services/auth_service.dart';
+import '../services/social_service.dart';
+import '../services/location_service.dart';
+
+import '../services/ghost_line_service.dart';
 
 /// Global service locator instance
 final getIt = GetIt.instance;
@@ -31,6 +36,24 @@ void setupServiceLocator() {
 
   getIt.registerLazySingleton<AdminService>(
     () => AdminService(client: getIt<SupabaseClient>()),
+  );
+
+  getIt.registerLazySingleton<AuthService>(
+    () => AuthService(client: getIt<SupabaseClient>()),
+  );
+
+  getIt.registerLazySingleton<SocialService>(
+    () => SocialService(client: getIt<SupabaseClient>()),
+  );
+
+  getIt.registerLazySingleton<LocationService>(
+    () => LocationService(client: getIt<SupabaseClient>()),
+  );
+
+
+
+  getIt.registerLazySingleton<GhostLineService>(
+    () => GhostLineService(client: getIt<SupabaseClient>()),
   );
 }
 
@@ -60,6 +83,24 @@ Future<void> setupServiceLocatorForTesting({SupabaseClient? mockSupabaseClient})
 
   getIt.registerLazySingleton<AdminService>(
     () => AdminService(client: mockSupabaseClient),
+  );
+
+  getIt.registerLazySingleton<AuthService>(
+    () => AuthService(client: mockSupabaseClient),
+  );
+
+  getIt.registerLazySingleton<SocialService>(
+    () => SocialService(client: mockSupabaseClient),
+  );
+
+  getIt.registerLazySingleton<LocationService>(
+    () => LocationService(client: mockSupabaseClient),
+  );
+
+
+
+  getIt.registerLazySingleton<GhostLineService>(
+    () => GhostLineService(client: mockSupabaseClient),
   );
 }
 
