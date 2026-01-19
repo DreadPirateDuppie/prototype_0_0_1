@@ -609,6 +609,15 @@ class AdminService {
       return [];
     }
   }
+
+  /// Subscribe to real-time error logs
+  Stream<List<Map<String, dynamic>>> subscribeToErrorLogs() {
+    return _client
+        .from('error_logs')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .limit(100);
+  }
   /// Get app settings by key
   Future<Map<String, dynamic>?> getAppSettings(String key) async {
     try {

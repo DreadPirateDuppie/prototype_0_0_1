@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/post.dart';
 import '../services/admin_service.dart';
@@ -33,7 +34,11 @@ class AdminProvider with ChangeNotifier {
   List<Map<String, dynamic>> _reports = [];
   List<MapPost> _unverifiedPosts = [];
   List<Map<String, dynamic>> _pendingVideos = [];
+  List<Map<String, dynamic>> _errorLogs = [];
   Map<String, dynamic> _appSettings = {};
+  
+  // Realtime subscription
+  StreamSubscription? _errorsSubscription;
 
   // Getters
   bool get isLoading => _isLoading;
@@ -44,6 +49,7 @@ class AdminProvider with ChangeNotifier {
   List<Map<String, dynamic>> get reports => _reports;
   List<MapPost> get unverifiedPosts => _unverifiedPosts;
   List<Map<String, dynamic>> get pendingVideos => _pendingVideos;
+  List<Map<String, dynamic>> get errorLogs => _errorLogs;
   Map<String, dynamic> get appSettings => _appSettings;
   
   List<Map<String, dynamic>> get dailyPostStats => _dailyPostStats;
@@ -89,7 +95,9 @@ class AdminProvider with ChangeNotifier {
         loadUnverifiedPosts(),
         loadPendingVideos(),
         loadAppSettings(),
+        loadErrorLogs(),
       ]);
+      _subscribeToErrors();
     } catch (e) {
       _error = 'Failed to load dashboard data: $e';
     } finally {
@@ -381,8 +389,35 @@ class AdminProvider with ChangeNotifier {
     }
   }
   
+  // Error Log Actions
+  Future<void> loadErrorLogs() async {
+    try {
+      _errorLogs = await _adminService.getErrorLogs(limit: 50);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading error logs: $e');
+    }
+  }
+
+  void _subscribeToErrors() {
+    _errorsSubscription?.cancel();
+    _errorsSubscription = _adminService.subscribeToErrorLogs().listen(
+      (logs) {
+        _errorLogs = logs;
+        notifyListeners();
+      },
+      onError: (e) => debugPrint('Error subscription failed: $e'),
+    );
+  }
+
   // Helper to load transaction history for a specific user
   Future<List<Map<String, dynamic>>> getUserTransactionHistory(String userId) async {
     return await _adminService.getPointTransactions(userId);
+  }
+
+  @override
+  void dispose() {
+    _errorsSubscription?.cancel();
+    super.dispose();
   }
 }

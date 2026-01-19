@@ -130,6 +130,14 @@ class AdminAnalyticsTab extends StatelessWidget {
                 delay: 200,
               ),
               const SizedBox(height: 16),
+              _CyberMetricCard(
+                label: 'SYSTEM_ERRORS',
+                value: provider.errorLogs.length.toString(),
+                icon: Icons.bug_report_outlined,
+                color: Colors.redAccent,
+                delay: 400,
+              ),
+              const SizedBox(height: 16),
               // Add more operational tiles here if needed like "Server Status", "API Latency" etc.
             ],
           ),

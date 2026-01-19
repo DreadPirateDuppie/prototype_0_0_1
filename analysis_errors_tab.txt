@@ -1,0 +1,24 @@
+Analyzing prototype_0_0_1...                                    
+
+   info • The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/screens/admin_dashboard.dart:5:8 • unnecessary_import
+warning • The declaration '_buildHeaderInfo' isn't referenced • lib/screens/battle_mode_selection_screen.dart:152:10 • unused_element
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/create_battle_screen.dart:201:20 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/create_battle_screen.dart:204:29 • use_build_context_synchronously
+   info • Use interpolation to compose strings and values • lib/screens/post_detail_screen.dart:153:32 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/screens/post_detail_screen.dart:153:100 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/screens/post_detail_screen.dart:154:83 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/screens/spot_details_screen.dart:476:29 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/screens/spot_details_screen.dart:476:97 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/screens/spot_details_screen.dart:477:80 • prefer_interpolation_to_compose_strings
+   info • The private field _isStatsExpanded could be 'final' • lib/screens/user_profile_screen.dart:46:8 • prefer_final_fields
+warning • The declaration '_buildStatColumn' isn't referenced • lib/screens/user_profile_screen.dart:224:10 • unused_element
+warning • The value of the local variable 'posts' isn't used • lib/screens/user_profile_screen.dart:326:23 • unused_local_variable
+warning • Dead code • lib/services/admin_service.dart:362:36 • dead_code
+warning • The left operand can't be null, so the right operand is never executed • lib/services/admin_service.dart:362:39 • dead_null_aware_expression
+warning • The value of the field '_isLoading' isn't used • lib/tabs/settings_tab.dart:27:8 • unused_field
+   info • Use interpolation to compose strings and values • lib/widgets/post_card.dart:299:23 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/widgets/post_card.dart:299:91 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/widgets/post_card.dart:300:74 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/widgets/post_card.dart:301:75 • prefer_interpolation_to_compose_strings
+   info • Unnecessary use of string interpolation • lib/widgets/user_stats_card.dart:217:36 • unnecessary_string_interpolations
+

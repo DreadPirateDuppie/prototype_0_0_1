@@ -7,6 +7,7 @@ import '../widgets/admin/admin_analytics_tab.dart';
 import '../widgets/admin/admin_users_tab.dart';
 import '../widgets/admin/admin_reports_tab.dart';
 import '../widgets/admin/admin_settings_tab.dart';
+import '../widgets/admin/admin_errors_tab.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -72,7 +73,7 @@ class _AdminDashboardContent extends StatelessWidget {
         }
 
         return DefaultTabController(
-          length: 4,
+          length: 5,
           child: Scaffold(
             backgroundColor: Colors.black,
             appBar: AppBar(
@@ -97,6 +98,7 @@ class _AdminDashboardContent extends StatelessWidget {
                   Tab(icon: Icon(Icons.analytics_outlined, size: 20), text: 'METRICS'),
                   Tab(icon: Icon(Icons.people_outline, size: 20), text: 'NODES'),
                   Tab(icon: Icon(Icons.gavel_outlined, size: 20), text: 'MOD'),
+                  Tab(icon: Icon(Icons.terminal_outlined, size: 20), text: 'LOGS'),
                   Tab(icon: Icon(Icons.settings_outlined, size: 20), text: 'CORE'),
                 ],
               ),
@@ -116,6 +118,7 @@ class _AdminDashboardContent extends StatelessWidget {
                     AdminAnalyticsTab(),
                     AdminUsersTab(),
                     AdminReportsTab(),
+                    AdminErrorsTab(),
                     AdminSettingsTab(),
                   ],
                 ),
