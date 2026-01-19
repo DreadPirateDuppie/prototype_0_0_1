@@ -341,20 +341,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                   .eq('id', media['post_id'])
                   .single();
                   
-                if (mounted) {
-                   Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SpotDetailsScreen(post: MapPost.fromMap(post)),
-                    ),
-                  );
-                }
+                if (!context.mounted) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SpotDetailsScreen(post: MapPost.fromMap(post)),
+                  ),
+                );
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Could not load post details')),
-                  );
-                }
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not load post details')),
+                );
               }
             } else {
               // Show full screen media viewer (Gallery items)

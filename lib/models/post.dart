@@ -70,6 +70,7 @@ class MapPost {
       'created_at': createdAt.toIso8601String(),
       'likes': likes,
       'photo_urls': photoUrls,
+      'photo_url': photoUrl, // Legacy field
       'video_url': videoUrl,
       'popularity_rating': popularityRating,
       'security_rating': securityRating,

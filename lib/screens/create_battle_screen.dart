@@ -197,13 +197,11 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
         isQuickfire: _isQuickfire,
       );
 
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
+      if (!context.mounted) return;
+      Navigator.of(context).pop(true);
     } catch (e) {
-      if (mounted) {
-        ErrorHelper.showError(context, 'Error creating battle: $e');
-      }
+      if (!context.mounted) return;
+      ErrorHelper.showError(context, 'Error creating battle: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -1,7 +1,15 @@
 import 'package:flutter/foundation.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/service_locator.dart';
+import 'dart:developer' as developer;
 
 class ErrorService {
+  static SupabaseClient get _client {
+    if (getIt.isRegistered<SupabaseClient>()) {
+      return getIt<SupabaseClient>();
+    }
+    return Supabase.instance.client;
+  }
 
   /// Initialize error tracking
   static void initialize() {
@@ -33,23 +41,25 @@ class ErrorService {
     String errorType,
   ) async {
     try {
-      // TODO: Create error_logs table in database to enable error logging
-      // final user = _client.auth.currentUser;
-      // await _client.from('error_logs').insert({
-      //   'user_id': user?.id,
-      //   'error_message': error.substring(0, error.length > 500 ? 500 : error.length),
-      //   'stack_trace': stackTrace.substring(0, stackTrace.length > 2000 ? 2000 : stackTrace.length),
-      //   'error_type': errorType,
-      //   'created_at': DateTime.now().toIso8601String(),
-      // });
+      final user = _client.auth.currentUser;
       
-      // For now, just log to console in debug mode
+      // Log to console in debug mode
       if (kDebugMode) {
+        developer.log('Error tracked: $error', name: 'ErrorService', error: error, stackTrace: StackTrace.fromString(stackTrace));
       }
+
+      await _client.from('error_logs').insert({
+        'user_id': user?.id,
+        'error_message': error.substring(0, error.length > 1000 ? 1000 : error.length),
+        'stack_trace': stackTrace.substring(0, stackTrace.length > 4000 ? 4000 : stackTrace.length),
+        'error_type': errorType,
+        'created_at': DateTime.now().toIso8601String(),
+        'severity': 'error',
+      });
+      
     } catch (e) {
       // Fail silently to avoid infinite error loops
-      if (kDebugMode) {
-      }
+      developer.log('Failed to log error to Supabase: $e', name: 'ErrorService');
     }
   }
 

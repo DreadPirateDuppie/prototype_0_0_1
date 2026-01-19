@@ -228,25 +228,23 @@ class _SettingsTabState extends State<SettingsTab> {
 
                         try {
                           await SupabaseService.submitFeedback(text);
-                          if (mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Feedback transmitted successfully.'),
-                                backgroundColor: ThemeColors.matrixGreen,
-                              ),
-                            );
-                          }
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Feedback transmitted successfully.'),
+                              backgroundColor: ThemeColors.matrixGreen,
+                            ),
+                          );
                         } catch (e) {
-                          if (mounted) {
-                            setState(() => isSubmitting = false);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
+                          if (!context.mounted) return;
+                          setState(() => isSubmitting = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
                         }
                       },
                 child: isSubmitting
@@ -416,12 +414,11 @@ class _SettingsTabState extends State<SettingsTab> {
                     try {
                       await SupabaseService.setPrivacy(value);
                     } catch (e) {
-                      if (mounted) {
-                         setState(() => _isPrivate = !value); // Revert on error
-                         ScaffoldMessenger.of(context).showSnackBar(
-                           SnackBar(content: Text('Error updating privacy: $e')),
-                         );
-                      }
+                      if (!context.mounted) return;
+                      setState(() => _isPrivate = !value); // Revert on error
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error updating privacy: $e')),
+                      );
                     }
                   },
                 ),

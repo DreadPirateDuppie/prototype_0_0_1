@@ -1,10 +1,23 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prototype_0_0_1/services/user_service.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:prototype_0_0_1/services/auth_service.dart';
+import 'package:prototype_0_0_1/config/service_locator.dart';
+
+class MockAuthService extends Mock implements AuthService {}
 
 void main() {
   group('UserService', () {
-    setUp(() {
-      // No setup needed
+    late MockAuthService mockAuthService;
+
+    setUp(() async {
+      await setupServiceLocatorForTesting();
+      mockAuthService = MockAuthService();
+      // Unregister the lazy singleton registered by setupServiceLocatorForTesting if we want to provide a mock
+      if (getIt.isRegistered<AuthService>()) {
+        getIt.unregister<AuthService>();
+      }
+      getIt.registerSingleton<AuthService>(mockAuthService);
     });
 
     group('UserService instantiation', () {
