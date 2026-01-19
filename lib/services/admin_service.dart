@@ -359,7 +359,7 @@ class AdminService {
       final response = await orderedBuilder.range(start, end).count(CountOption.exact);
       
       final users = (response.data as List).cast<Map<String, dynamic>>();
-      final count = response.count ?? 0;
+      final count = response.count;
 
       if (users.isEmpty) {
         return {'users': <Map<String, dynamic>>[], 'count': count};
@@ -569,21 +569,27 @@ class AdminService {
     }
   }
 
-  /// Get app statistics for admin dashboard
   Future<Map<String, dynamic>> getAppStats() async {
     try {
       // Get counts from various tables
-      final postsCount = await _client.from('map_posts').select('id');
-      final usersCount = await _client.from('user_profiles').select('id');
+      final postsCount = await _client.from('map_posts').select('id').count(CountOption.exact);
+      final usersCount = await _client.from('user_profiles').select('id').count(CountOption.exact);
       final reportsCount = await _client
           .from('post_reports')
           .select('id')
-          .eq('status', 'pending');
+          .eq('status', 'pending')
+          .count(CountOption.exact);
+      final battlesCount = await _client
+          .from('battles')
+          .select('id')
+          .not('winner_id', 'is', null)
+          .count(CountOption.exact);
 
       return {
-        'total_posts': (postsCount as List).length,
-        'total_users': (usersCount as List).length,
-        'pending_reports': (reportsCount as List).length,
+        'total_posts': postsCount.count,
+        'total_users': usersCount.count,
+        'pending_reports': reportsCount.count,
+        'total_battles': battlesCount.count,
       };
     } catch (e) {
       developer.log('Error getting app stats: $e', name: 'AdminService');
@@ -591,6 +597,44 @@ class AdminService {
         'total_posts': 0,
         'total_users': 0,
         'pending_reports': 0,
+        'total_battles': 0,
+      };
+    }
+  }
+
+  /// Get detailed battle and spot stats
+  Future<Map<String, dynamic>> getDetailedBattleStats() async {
+    try {
+      // 1. Biggest wager settled
+      final maxWagerResponse = await _client
+          .from('battles')
+          .select('wager_amount')
+          .not('winner_id', 'is', null)
+          .order('wager_amount', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      
+      final maxWager = (maxWagerResponse?['wager_amount'] as num?)?.toInt() ?? 0;
+
+      // 2. Most competitive spots (Top 5 by MVP score)
+      final topSpotsResponse = await _client
+          .from('map_posts')
+          .select('id, title, mvp_score, mvp_user_id')
+          .not('mvp_score', 'is', null)
+          .order('mvp_score', ascending: false)
+          .limit(5);
+      
+      final competitiveSpots = (topSpotsResponse as List).cast<Map<String, dynamic>>();
+
+      return {
+        'max_wager': maxWager,
+        'competitive_spots': competitiveSpots,
+      };
+    } catch (e) {
+      developer.log('Error getting detailed battle stats: $e', name: 'AdminService');
+      return {
+        'max_wager': 0,
+        'competitive_spots': [],
       };
     }
   }

@@ -38,11 +38,35 @@ class AdminAnalyticsTab extends StatelessWidget {
                   const SizedBox(width: 16),
                   Expanded(
                     child: _TrendCard(
-                      label: 'DATA FLOW',
+                      label: 'TOTAL SPOTS',
                       value: provider.stats['total_posts']?.toString() ?? '0',
                       trend: _calculateTrend(provider.dailyPostStats),
-                      icon: Icons.hub_outlined,
+                      icon: Icons.place_outlined,
                       color: const Color(0xFF00E5FF),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _TrendCard(
+                      label: 'BATTLES SETTLED',
+                      value: provider.stats['total_battles']?.toString() ?? '0',
+                      trend: 0.0,
+                      icon: Icons.sports_kabaddi_outlined,
+                      color: Colors.orangeAccent,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _TrendCard(
+                      label: 'MAX WAGER',
+                      value: provider.maxWager.toString(),
+                      trend: 0.0,
+                      icon: Icons.currency_bitcoin_outlined,
+                      color: Colors.pinkAccent,
                     ),
                   ),
                 ],
@@ -137,6 +161,50 @@ class AdminAnalyticsTab extends StatelessWidget {
                 color: Colors.redAccent,
                 delay: 400,
               ),
+              const SizedBox(height: 24),
+
+              // 6. Competitive Spots List
+              if (provider.competitiveSpots.isNotEmpty) ...[
+                const Text(
+                  'COMPETITIVE_ZONES [TOP_RANKED]',
+                  style: TextStyle(
+                    color: ThemeColors.matrixGreen,
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    border: Border.all(color: ThemeColors.matrixGreen.withValues(alpha: 0.3)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: provider.competitiveSpots.map((spot) {
+                      return ListTile(
+                        leading: const Icon(Icons.location_on, color: ThemeColors.matrixGreen, size: 16),
+                        title: Text(
+                          spot['title'] ?? 'UNKNOWN SPOT', 
+                          style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 12),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.flash_on, color: Colors.amberAccent, size: 12),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${spot['mvp_score'] ?? 0}',
+                              style: const TextStyle(color: ThemeColors.matrixGreen, fontFamily: 'monospace', fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               // Add more operational tiles here if needed like "Server Status", "API Latency" etc.
             ],

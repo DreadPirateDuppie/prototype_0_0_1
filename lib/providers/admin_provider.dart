@@ -22,6 +22,10 @@ class AdminProvider with ChangeNotifier {
   // Time-Series Analytics Data
   List<Map<String, dynamic>> _dailyPostStats = [];
   List<Map<String, dynamic>> _userGrowthStats = [];
+  
+  // Battle & Spot Specific Metrics
+  int _maxWager = 0;
+  List<Map<String, dynamic>> _competitiveSpots = [];
 
   // User Management State
   List<Map<String, dynamic>> _users = [];
@@ -57,6 +61,8 @@ class AdminProvider with ChangeNotifier {
   
   bool get hasNextPage => _hasNextPage;
   int get totalUsers => _totalUsers;
+  int get maxWager => _maxWager;
+  List<Map<String, dynamic>> get competitiveSpots => _competitiveSpots;
 
   // Initialization
   Future<void> init() async {
@@ -96,6 +102,7 @@ class AdminProvider with ChangeNotifier {
         loadPendingVideos(),
         loadAppSettings(),
         loadErrorLogs(),
+        loadDetailedBattleStats(),
       ]);
       _subscribeToErrors();
     } catch (e) {
@@ -113,6 +120,17 @@ class AdminProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading stats: $e');
+    }
+  }
+
+  Future<void> loadDetailedBattleStats() async {
+    try {
+      final results = await _adminService.getDetailedBattleStats();
+      _maxWager = results['max_wager'] as int;
+      _competitiveSpots = results['competitive_spots'] as List<Map<String, dynamic>>;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading detailed battle stats: $e');
     }
   }
 
