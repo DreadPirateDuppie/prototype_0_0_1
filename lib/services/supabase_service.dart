@@ -4,6 +4,8 @@ import 'dart:developer' as developer;
 import '../config/service_locator.dart';
 import '../models/post.dart';
 import '../models/user_scores.dart';
+import '../models/trick_definition.dart';
+import '../models/spot_video.dart';
 import 'auth_service.dart';
 import 'points_service.dart';
 import 'social_service.dart';
@@ -12,6 +14,7 @@ import 'user_service.dart';
 import 'admin_service.dart';
 import 'post_service.dart';
 import 'battle_service.dart';
+import 'trick_service.dart';
 
 /// Legacy service that delegates to specialized services.
 /// @deprecated Use specific services (AuthService, SocialService, etc.) instead.
@@ -24,6 +27,7 @@ class SupabaseService {
   static final PostService _postService = getIt<PostService>();
   static final BattleService _battleService = getIt<BattleService>();
   static final PointsService _pointsService = getIt<PointsService>();
+  static final TrickService _trickService = getIt<TrickService>();
 
   // ========== AUTH DELEGATION ==========
   static User? getCurrentUser() => _authService.getCurrentUser();
@@ -242,6 +246,38 @@ class SupabaseService {
     mediaType: mediaType,
     caption: caption,
   );
+  
+  static Future<List<TrickDefinition>> getTrickSuggestions(String query) => _trickService.getTrickSuggestions(query);
+  
+  static Future<void> submitTrick({
+    required String spotId,
+    required String userId,
+    required String url,
+    required String trickName,
+    String? skaterName,
+    String? description,
+    required bool isOwnClip,
+    required String stance,
+    double difficultyMultiplier = 1.0,
+    List<String> tags = const [],
+  }) => _trickService.submitTrick(
+    spotId: spotId,
+    userId: userId,
+    url: url,
+    trickName: trickName,
+    skaterName: skaterName,
+    description: description,
+    isOwnClip: isOwnClip,
+    stance: stance,
+    difficultyMultiplier: difficultyMultiplier,
+    tags: tags,
+  );
+
+  static Future<List<SpotVideo>> getSpotArchive(String spotId, {String? searchQuery, String? category}) => 
+      _trickService.getSpotArchive(spotId, searchQuery: searchQuery, category: category);
+
+  static Future<List<SpotVideo>> getSpotHighlights(String spotId, {int limit = 3}) => 
+      _trickService.getSpotHighlights(spotId, limit: limit);
 
   // ========== AUTH EXTRA DELEGATION ==========
   static Future<bool> signInWithGoogle() => _authService.signInWithGoogle();

@@ -845,10 +845,19 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
                       },
                     ),
                     children: [
-                      TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.pushinn.app',
-                        maxZoom: 19,
+                      ColorFiltered(
+                        colorFilter: const ColorFilter.matrix([
+                          0.1, 0, 0, 0, 0,
+                          0, 2.2, 0, 0, 10,
+                          0, 0, 0.1, 0, 0,
+                          0, 0, 0, 1, 0,
+                        ]),
+                        child: TileLayer(
+                          urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                          subdomains: const ['a', 'b', 'c', 'd'],
+                          userAgentPackageName: 'com.pushinn.app',
+                          maxZoom: 19,
+                        ),
                       ),
                       MarkerLayer(markers: nonClusterMarkers), // Add non-clustered markers (user location)
                       MarkerClusterLayerWidget(

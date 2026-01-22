@@ -123,10 +123,10 @@ class AuthWrapper extends StatelessWidget {
         // Check connection state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
-            backgroundColor: Colors.transparent, // Show global Matrix
+            backgroundColor: Colors.black,
             body: Container(
               decoration: const BoxDecoration(
-                color: Colors.transparent,
+                color: Colors.black,
               ),
               child: Center(
                 child: Column(

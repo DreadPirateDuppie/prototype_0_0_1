@@ -13,6 +13,7 @@ import '../providers/navigation_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:latlong2/latlong.dart';
 import '../widgets/verified_badge.dart';
+import 'trick_archive_screen.dart';
 
 class SpotDetailsScreen extends StatefulWidget {
   final MapPost post;
@@ -920,12 +921,12 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                   Divider(color: isDark ? Colors.white24 : Colors.black12),
                   const SizedBox(height: 16),
                   
-                  // Trick History Header
+                  // Trick Archive Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'TRICK HISTORY',
+                        'TRICK ARCHIVE',
                         style: TextStyle(
                           color: matrixGreen,
                           fontSize: 18,
@@ -934,41 +935,42 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                           letterSpacing: 1.2,
                         ),
                       ),
-                      PopupMenuButton<String>(
-                        initialValue: _sortBy,
-                        icon: Icon(Icons.sort, color: matrixGreen),
-                        color: matrixDark,
-                        onSelected: (value) {
-                          setState(() => _sortBy = value);
-                          _loadTricks();
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TrickArchiveScreen(spot: currentPost),
+                            ),
+                          );
                         },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'recent',
-                            child: Text('Most Recent'),
-                          ),
-                          const PopupMenuItem(
-                            value: 'popular',
-                            child: Text('Most Popular'),
-                          ),
-                        ],
+                        icon: Icon(Icons.arrow_forward, color: matrixGreen, size: 16),
+                        label: Text(
+                          'OPEN FULL ARCHIVE',
+                          style: TextStyle(color: matrixGreen, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   
-                  // Tag Filter Bar
+                  // Spot Highlights Preview (Top 3)
                   if (_tricks.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: Container(
-                        height: 40,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            _buildTagFilter('All'),
-                            ..._getAllTags().map((tag) => _buildTagFilter(tag)),
-                          ],
+                    Column(
+                      children: [
+                        ..._tricks.take(3).map((trick) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildTrickItem(trick),
+                        )).toList(),
+                      ],
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          'ARCHIVE IS EMPTY',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontFamily: 'monospace'),
                         ),
                       ),
                     ),
@@ -977,58 +979,6 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
             ),
           ),
 
-          // Trick List
-          if (_isLoadingTricks)
-            SliverToBoxAdapter(
-              child: Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: CircularProgressIndicator(color: matrixGreen),
-                ),
-              ),
-            )
-          else if (_tricks.isEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  children: [
-                    Icon(Icons.skateboarding, size: 64, color: Colors.white.withValues(alpha: 0.2)),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No tricks landed yet.',
-                      style: TextStyle(color: secondaryTextColor),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Be the first to claim this spot!',
-                      style: TextStyle(color: secondaryTextColor.withValues(alpha: 0.6), fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final filteredTricks = _selectedTag == 'All' 
-                      ? _tricks 
-                      : _tricks.where((t) => t.tags.contains(_selectedTag)).toList();
-                  
-                  if (index >= filteredTricks.length) return null;
-                  
-                  final trick = filteredTricks[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    child: _buildTrickItem(trick),
-                  );
-                },
-                childCount: (_selectedTag == 'All' 
-                    ? _tricks 
-                    : _tricks.where((t) => t.tags.contains(_selectedTag)).toList()).length,
-              ),
-            ),
             
           // Bottom Padding for FAB
           const SliverToBoxAdapter(child: SizedBox(height: 80)),

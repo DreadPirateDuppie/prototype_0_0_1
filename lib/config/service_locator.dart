@@ -7,6 +7,7 @@ import '../services/admin_service.dart';
 import '../services/auth_service.dart';
 import '../services/social_service.dart';
 import '../services/location_service.dart';
+import '../services/trick_service.dart';
 
 import '../services/ghost_line_service.dart';
 
@@ -50,7 +51,9 @@ void setupServiceLocator() {
     () => LocationService(client: getIt<SupabaseClient>()),
   );
 
-
+  getIt.registerLazySingleton<TrickService>(
+    () => TrickService(client: getIt<SupabaseClient>()),
+  );
 
   getIt.registerLazySingleton<GhostLineService>(
     () => GhostLineService(client: getIt<SupabaseClient>()),
@@ -97,7 +100,9 @@ Future<void> setupServiceLocatorForTesting({SupabaseClient? mockSupabaseClient})
     () => LocationService(client: mockSupabaseClient),
   );
 
-
+  getIt.registerLazySingleton<TrickService>(
+    () => TrickService(client: mockSupabaseClient),
+  );
 
   getIt.registerLazySingleton<GhostLineService>(
     () => GhostLineService(client: mockSupabaseClient),

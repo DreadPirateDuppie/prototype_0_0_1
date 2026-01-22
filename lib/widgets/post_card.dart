@@ -366,18 +366,7 @@ class _PostCardState extends State<PostCard> {
                   ),
                   Row(
                     children: [
-                      TextButton.icon(
-                        onPressed: _showDetails,
-                        icon: const Icon(Icons.history, size: 18, color: ThemeColors.neonGreen),
-                        label: const Text(
-                          'History',
-                          style: TextStyle(
-                            color: ThemeColors.neonGreen,
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+
                       IconButton(
                         icon: const Icon(Icons.share, color: matrixGreen),
                         onPressed: _sharePost,

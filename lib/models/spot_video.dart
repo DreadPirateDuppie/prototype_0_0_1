@@ -15,6 +15,9 @@ class SpotVideo {
   final int? userVote; // Current user's vote: 1, -1, or null
   final String? thumbnailUrl;
   final List<String> tags;
+  final bool isOwnClip;
+  final String stance;
+  final double difficultyMultiplier;
 
   SpotVideo({
     required this.id,
@@ -33,6 +36,9 @@ class SpotVideo {
     this.userVote,
     this.thumbnailUrl,
     this.tags = const [],
+    this.isOwnClip = true,
+    this.stance = 'regular',
+    this.difficultyMultiplier = 1.0,
   });
 
   factory SpotVideo.fromMap(Map<String, dynamic> map) {
@@ -55,6 +61,9 @@ class SpotVideo {
       userVote: map['user_vote'] as int?,
       thumbnailUrl: map['thumbnail_url'] as String?,
       tags: (map['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
+      isOwnClip: map['is_own_clip'] as bool? ?? true,
+      stance: map['stance'] as String? ?? 'regular',
+      difficultyMultiplier: (map['difficulty_multiplier'] as num?)?.toDouble() ?? 1.0,
     );
   }
 
@@ -75,6 +84,9 @@ class SpotVideo {
       'approved_by': approvedBy,
       'thumbnail_url': thumbnailUrl,
       'tags': tags,
+      'is_own_clip': isOwnClip,
+      'stance': stance,
+      'difficulty_multiplier': difficultyMultiplier,
     };
   }
 

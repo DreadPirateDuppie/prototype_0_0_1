@@ -19,10 +19,19 @@ BEGIN
     END IF;
 
     -- Calculate the new MVP for the spot
-    -- We sum upvotes for each user on this spot
+    -- Weighted Scoring: SUM( (10 * difficulty_multiplier) * (stance_bonus) * (upvotes + 1) )
     SELECT 
         submitted_by, 
-        SUM(upvotes) as total_votes
+        SUM(
+          (10 * COALESCE(difficulty_multiplier, 1.0)) * 
+          (CASE 
+            WHEN stance = 'switch' THEN 1.7
+            WHEN stance = 'nollie' THEN 1.4
+            WHEN stance = 'fakie' THEN 1.2
+            ELSE 1.0
+          END) *
+          (upvotes + 1)
+        ) as total_weighted_score
     INTO 
         new_mvp_id, 
         new_mvp_score
@@ -31,10 +40,11 @@ BEGIN
     WHERE 
         spot_id = target_spot_id
         AND status = 'approved' -- Only count approved videos
+        AND is_own_clip = TRUE -- External/Pro clips don't count towards MVP
     GROUP BY 
         submitted_by
     ORDER BY 
-        total_votes DESC
+        total_weighted_score DESC
     LIMIT 1;
 
     -- If no videos or votes, reset MVP
