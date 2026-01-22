@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AdBanner extends StatefulWidget {
-  const AdBanner({super.key});
+  final int initialIndex;
+  const AdBanner({super.key, this.initialIndex = 0});
 
   @override
   State<AdBanner> createState() => _AdBannerState();
@@ -16,7 +17,7 @@ class _AdBannerState extends State<AdBanner> {
   AdSize? _adSize;
   
   // Fallback banner state
-  int _currentAdIndex = 0;
+  late int _currentAdIndex;
   Timer? _adTimer;
 
   // Test Ad Unit IDs
@@ -43,6 +44,7 @@ class _AdBannerState extends State<AdBanner> {
   @override
   void initState() {
     super.initState();
+    _currentAdIndex = widget.initialIndex % _advertisements.length;
     _startAdRotation();
   }
 

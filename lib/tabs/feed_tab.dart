@@ -358,13 +358,20 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
                     SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                          final post = _posts[index];
+                          if (index.isOdd) {
+                            return AdBanner(initialIndex: index ~/ 2);
+                          }
+                          
+                          final postIndex = index ~/ 2;
+                          if (postIndex >= _posts.length) return null;
+                          
+                          final post = _posts[postIndex];
                           return PostCard(
                             post: post,
                             onDelete: () => _loadPosts(refresh: true),
                           );
                         },
-                        childCount: _posts.length,
+                        childCount: _posts.length * 2,
                       ),
                     ),
                     if (_isLoadingMore)
@@ -374,7 +381,6 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
                           child: Center(child: CircularProgressIndicator(color: matrixGreen)),
                         ),
                       ),
-                    const SliverToBoxAdapter(child: AdBanner()),
                     const SliverToBoxAdapter(child: SizedBox(height: 100)), // Padding for bottom nav bar
                   ],
                 ],
