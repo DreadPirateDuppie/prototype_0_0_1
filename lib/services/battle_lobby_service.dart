@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import '../config/service_locator.dart';
 import 'auth_service.dart';
 
@@ -31,10 +31,10 @@ class BattleLobbyService {
         'is_host': true,
       });
 
-      developer.log('Lobby created: $code ($lobbyId)', name: 'BattleLobbyService');
+      AppLogger.log('Lobby created: $code ($lobbyId)', name: 'BattleLobbyService');
       return lobbyId;
     } catch (e) {
-      developer.log('Error creating lobby: $e', name: 'BattleLobbyService');
+      AppLogger.log('Error creating lobby: $e', name: 'BattleLobbyService');
       rethrow;
     }
   }
@@ -64,10 +64,10 @@ class BattleLobbyService {
         'is_host': false,
       });
 
-      developer.log('User ${user.id} joined lobby $code', name: 'BattleLobbyService');
+      AppLogger.log('User ${user.id} joined lobby $code', name: 'BattleLobbyService');
       return lobbyId;
     } catch (e) {
-      developer.log('Error joining lobby: $e', name: 'BattleLobbyService');
+      AppLogger.log('Error joining lobby: $e', name: 'BattleLobbyService');
       rethrow;
     }
   }
@@ -128,7 +128,7 @@ class BattleLobbyService {
           .eq('user_id', user.id);
 
     } catch (e) {
-      developer.log('Error leaving lobby: $e', name: 'BattleLobbyService');
+      AppLogger.log('Error leaving lobby: $e', name: 'BattleLobbyService');
     }
   }
 
@@ -144,7 +144,7 @@ class BattleLobbyService {
           .eq('lobby_id', lobbyId)
           .eq('user_id', user.id);
     } catch (e) {
-      developer.log('Error updating letters: $e', name: 'BattleLobbyService');
+      AppLogger.log('Error updating letters: $e', name: 'BattleLobbyService');
     }
   }
 
@@ -161,7 +161,7 @@ class BattleLobbyService {
         'data': data.toString(), // Convert to string as per schema (TEXT)
       });
     } catch (e) {
-      developer.log('Error sending lobby event: $e', name: 'BattleLobbyService');
+      AppLogger.log('Error sending lobby event: $e', name: 'BattleLobbyService');
     }
   }
 

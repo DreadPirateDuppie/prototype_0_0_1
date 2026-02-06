@@ -1,4 +1,4 @@
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/post.dart';
@@ -237,7 +237,7 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
         }
       });
     } catch (e) {
-      developer.log('Error loading online friends: $e', name: 'FeedTab');
+      AppLogger.log('Error loading online friends: $e', name: 'FeedTab');
     }
   }
 

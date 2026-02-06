@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import '../models/trick_definition.dart';
 import '../models/spot_video.dart';
 import '../config/service_locator.dart';
@@ -31,7 +31,7 @@ class TrickService {
           .map((data) => TrickDefinition.fromMap(data))
           .toList();
     } catch (e) {
-      developer.log('Error getting trick suggestions: $e', name: 'TrickService');
+      AppLogger.log('Error getting trick suggestions: $e', name: 'TrickService');
       
       // Fallback simple search if RPC fails
       try {
@@ -82,7 +82,7 @@ class TrickService {
       // If it's a new trick name not in our registry, we could optionally add it to a 'community_tricks' table
       // for review, but for now we just store it in spot_videos.
     } catch (e) {
-      developer.log('Error submitting trick: $e', name: 'TrickService');
+      AppLogger.log('Error submitting trick: $e', name: 'TrickService');
       rethrow;
     }
   }
@@ -102,7 +102,7 @@ class TrickService {
       
       return (response as List).map((data) => SpotVideo.fromMap(data)).toList();
     } catch (e) {
-      developer.log('Error getting spot archive: $e', name: 'TrickService');
+      AppLogger.log('Error getting spot archive: $e', name: 'TrickService');
       return [];
     }
   }
@@ -119,7 +119,7 @@ class TrickService {
           
       return (response as List).map((data) => SpotVideo.fromMap(data)).toList();
     } catch (e) {
-      developer.log('Error getting spot highlights: $e', name: 'TrickService');
+      AppLogger.log('Error getting spot highlights: $e', name: 'TrickService');
       return [];
     }
   }

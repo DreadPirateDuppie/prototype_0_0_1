@@ -213,7 +213,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _buildCoreStat('SCORE', scores.finalScore.toStringAsFixed(1), 'PTS'),
+          _buildCoreStat('POINTS', scores.points.toStringAsFixed(0), 'P'),
           _buildCoreStat('VOTE_W', '${(scores.voteWeight * 100).toStringAsFixed(0)}', '%'),
         ],
       ),

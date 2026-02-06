@@ -37,6 +37,7 @@ class UserProvider extends ChangeNotifier {
     _currentUser = SupabaseService.getCurrentUser();
     if (_currentUser != null) {
       await loadUserProfile();
+      await SupabaseService.updateLastActive();
     }
     notifyListeners();
   }

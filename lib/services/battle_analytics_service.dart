@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 
 import '../models/battle.dart';
 import '../models/user_scores.dart';
@@ -47,7 +47,7 @@ class BattleAnalyticsService {
       );
     } catch (e) {
       // Silently fail score updates
-      developer.log('Failed to update battle scores: $e', name: 'BattleAnalyticsService');
+      AppLogger.log('Failed to update battle scores: $e', name: 'BattleAnalyticsService');
     }
   }
 
@@ -60,11 +60,22 @@ class BattleAnalyticsService {
           .eq('user_id', userId)
           .maybeSingle();
 
+      // Fetch wallet balance separately
+      final walletResponse = await _client
+          .from('user_wallets')
+          .select('balance')
+          .eq('user_id', userId)
+          .maybeSingle();
+      
+      final points = (walletResponse?['balance'] as num?)?.toDouble() ?? 0.0;
+
       if (response != null) {
-        return UserScores.fromMap(response);
+        final scoresMap = Map<String, dynamic>.from(response);
+        scoresMap['points'] = points;
+        return UserScores.fromMap(scoresMap);
       } else {
         // Return default scores if not found
-        return UserScores(userId: userId);
+        return UserScores(userId: userId, points: points);
       }
     } catch (e) {
       return UserScores(userId: userId);
@@ -136,7 +147,7 @@ class BattleAnalyticsService {
         'favoriteTrick': favoriteTrick,
       };
     } catch (e) {
-      developer.log('Error fetching user analytics: $e', name: 'BattleAnalyticsService');
+      AppLogger.log('Error fetching user analytics: $e', name: 'BattleAnalyticsService');
       return {
         'wins': 0,
         'losses': 0,
@@ -154,7 +165,7 @@ class BattleAnalyticsService {
 
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error fetching battle leaderboard: $e', name: 'BattleAnalyticsService');
+      AppLogger.log('Error fetching battle leaderboard: $e', name: 'BattleAnalyticsService');
       return [];
     }
   }

@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import '../config/service_locator.dart';
 import '../models/user_scores.dart';
 import 'auth_service.dart';
@@ -41,7 +41,7 @@ class UserService {
           .maybeSingle();
       return response?['display_name'];
     } catch (e) {
-      developer.log('Error getting display name: $e', name: 'UserService');
+      AppLogger.log('Error getting display name: $e', name: 'UserService');
       return null;
     }
   }
@@ -131,7 +131,7 @@ class UserService {
         'display_name': displayName,
       });
     } catch (e) {
-      developer.log('Error saving display name: $e', name: 'UserService');
+      AppLogger.log('Error saving display name: $e', name: 'UserService');
     }
   }
 
@@ -155,7 +155,7 @@ class UserService {
           .update({'user_name': username.trim()})
           .eq('user_id', userId);
 
-      developer.log('Updated username for user $userId', name: 'UserService');
+      AppLogger.log('Updated username for user $userId', name: 'UserService');
     } catch (e) {
       throw Exception('Failed to save username: $e');
     }
@@ -212,7 +212,7 @@ class UserService {
           .update({'is_read': true})
           .eq('id', notificationId);
     } catch (e) {
-      developer.log('Error marking notification read: $e', name: 'UserService');
+      AppLogger.log('Error marking notification read: $e', name: 'UserService');
     }
   }
 
@@ -234,7 +234,7 @@ class UserService {
         'created_at': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      developer.log('Error creating notification: $e', name: 'UserService');
+      AppLogger.log('Error creating notification: $e', name: 'UserService');
     }
   }
 
@@ -246,7 +246,7 @@ class UserService {
         'feedback_text': feedbackText,
       });
     } catch (e) {
-      developer.log('Error submitting feedback: $e', name: 'UserService');
+      AppLogger.log('Error submitting feedback: $e', name: 'UserService');
       throw Exception('Failed to submit feedback');
     }
   }
@@ -261,7 +261,7 @@ class UserService {
           .maybeSingle();
       return response?['bio'] as String?;
     } catch (e) {
-      developer.log('Error fetching user bio: $e', name: 'UserService');
+      AppLogger.log('Error fetching user bio: $e', name: 'UserService');
       return null;
     }
   }
@@ -286,7 +286,7 @@ class UserService {
         'is_private': isPrivate,
       });
     } catch (e) {
-      developer.log('Error setting privacy: $e', name: 'UserService');
+      AppLogger.log('Error setting privacy: $e', name: 'UserService');
       throw Exception('Failed to set privacy');
     }
   }
@@ -301,7 +301,7 @@ class UserService {
           .maybeSingle();
       return response?['is_private'] as bool? ?? false;
     } catch (e) {
-      developer.log('Error checking privacy: $e', name: 'UserService');
+      AppLogger.log('Error checking privacy: $e', name: 'UserService');
       return false; // Default to public on error
     }
   }
@@ -316,7 +316,7 @@ class UserService {
           .maybeSingle();
       return response?['age'] as int?;
     } catch (e) {
-      developer.log('Error fetching user age: $e', name: 'UserService');
+      AppLogger.log('Error fetching user age: $e', name: 'UserService');
       return null;
     }
   }
@@ -343,7 +343,7 @@ class UserService {
           .maybeSingle();
       return response;
     } catch (e) {
-      developer.log('Error getting user profile: $e', name: 'UserService');
+      AppLogger.log('Error getting user profile: $e', name: 'UserService');
       return null;
     }
   }
@@ -357,10 +357,21 @@ class UserService {
           .eq('user_id', userId)
           .maybeSingle();
       
+      // Fetch wallet balance separately
+      final walletResponse = await _client
+          .from('user_wallets')
+          .select('balance')
+          .eq('user_id', userId)
+          .maybeSingle();
+      
+      final points = (walletResponse?['balance'] as num?)?.toDouble() ?? 0.0;
+
       if (response != null) {
-        return UserScores.fromMap(response);
+        final scoresMap = Map<String, dynamic>.from(response);
+        scoresMap['points'] = points;
+        return UserScores.fromMap(scoresMap);
       }
-      return UserScores(userId: userId);
+      return UserScores(userId: userId, points: points);
     } catch (e) {
       return null;
     }
@@ -381,7 +392,7 @@ class UserService {
           .from('map_posts')
           .select('id, created_at, photo_urls, photo_url, video_url, title, description')
           .eq('user_id', userId)
-          .or('video_url.neq.null,photo_url.neq.null,photo_urls.neq.[]')
+          .or('video_url.neq.null,photo_url.neq.null,photo_urls.neq.{}')
           .order('created_at', ascending: false);
 
       final results = await Future.wait([galleryFuture, postsFuture]);
@@ -437,7 +448,7 @@ class UserService {
       
       return allMedia;
     } catch (e) {
-      developer.log('Error fetching profile media: $e', name: 'UserService');
+      AppLogger.log('Error fetching profile media: $e', name: 'UserService');
       return [];
     }
   }

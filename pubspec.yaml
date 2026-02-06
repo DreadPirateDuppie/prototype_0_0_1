@@ -122,7 +122,7 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/pushinn_logo.png"
+  image_path: "assets/images/pushinn_icon_padded.png"
   adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/images/pushinn_logo.png"
+  adaptive_icon_foreground: "assets/images/pushinn_icon_padded.png"
 

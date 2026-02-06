@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 
 class NowPaymentsService {
   static const String _baseUrl = 'https://api.nowpayments.io/v1';
@@ -47,11 +47,11 @@ class NowPaymentsService {
         // or the actual invoice URL if available.
         return data['invoice_url'] ?? 'https://nowpayments.io/payment/?iid=${data['payment_id']}';
       } else {
-        developer.log('NOWPayments Error: ${response.statusCode} - ${response.body}', name: 'NowPaymentsService');
+        AppLogger.log('NOWPayments Error: ${response.statusCode} - ${response.body}', name: 'NowPaymentsService');
         return null;
       }
     } catch (e) {
-      developer.log('NOWPayments Exception: $e', name: 'NowPaymentsService', error: e);
+      AppLogger.log('NOWPayments Exception: $e', name: 'NowPaymentsService', error: e);
       return null;
     }
   }
@@ -72,7 +72,7 @@ class NowPaymentsService {
       }
       return null;
     } catch (e) {
-      developer.log('NOWPayments Status Exception: $e', name: 'NowPaymentsService', error: e);
+      AppLogger.log('NOWPayments Status Exception: $e', name: 'NowPaymentsService', error: e);
       return null;
     }
   }

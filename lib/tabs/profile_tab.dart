@@ -71,6 +71,17 @@ class _ProfileTabContentState extends State<_ProfileTabContent> {
                     pinned: true,
                     backgroundColor: Colors.transparent, // Show global Matrix
                     elevation: 0,
+                    centerTitle: true,
+                    title: const Text(
+                      '> PUSHINN_',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: ThemeColors.matrixGreen,
+                        letterSpacing: 2,
+                        fontSize: 20,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
                     flexibleSpace: const FlexibleSpaceBar(
                       background: SizedBox.expand(),
                     ),

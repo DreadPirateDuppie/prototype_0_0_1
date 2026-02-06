@@ -21,6 +21,7 @@ class MapProvider extends ChangeNotifier {
   StreamSubscription<Position>? _locationSubscription;
   Timer? _autoDisableTimer;
   List<Map<String, dynamic>> _onlineFriendsFeed = [];
+  String _selectedCategory = 'All';
   String? _error;
 
   // Getters
@@ -34,7 +35,13 @@ class MapProvider extends ChangeNotifier {
   bool get hasLocationPermission => _hasLocationPermission;
   String get sharingMode => _sharingMode;
   List<Map<String, dynamic>> get onlineFriendsFeed => _onlineFriendsFeed;
+  String get selectedCategory => _selectedCategory;
   String? get error => _error;
+
+  void setSelectedCategory(String category) {
+    _selectedCategory = category;
+    loadUserPosts();
+  }
 
   void setError(String? error) {
     _error = error;
@@ -47,10 +54,11 @@ class MapProvider extends ChangeNotifier {
     await loadUserPosts();
   }
 
-  Future<void> loadUserPosts({String? selectedCategory}) async {
+  Future<void> loadUserPosts({String? category}) async {
     try {
+      final targetCategory = category ?? _selectedCategory;
       final posts = await SupabaseService.getAllMapPosts(
-        category: selectedCategory == 'All' ? null : selectedCategory,
+        category: targetCategory == 'All' ? null : targetCategory,
       );
       
       final friends = await SupabaseService.getMutualFollowers();

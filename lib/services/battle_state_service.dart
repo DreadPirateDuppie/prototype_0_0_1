@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 
 import '../models/battle.dart';
 import '../models/battle_trick.dart';
@@ -77,16 +77,17 @@ class BattleStateService {
 
       // Send notification message
       try {
+        final p1Name = await SupabaseService.getUserUsername(player1Id) ?? 'Someone';
         final conversationId = await MessagingService.getOrCreateDirectConversation(player2Id);
         if (conversationId != null) {
           await MessagingService.sendMessage(
             conversationId: conversationId,
-            content: 'Battle started! Check it out here: [Battle Link]',
+            content: '$p1Name has challenged you to a battle! Tap to engage.',
           );
         }
       } catch (e) {
         // Ignore message failure
-        developer.log('Failed to send battle start notification: $e', name: 'BattleStateService');
+        AppLogger.log('Failed to send battle start notification: $e', name: 'BattleStateService');
       }
 
       return createdBattle;
@@ -390,7 +391,7 @@ class BattleStateService {
   // Check for expired turns and auto-assign letters
   static Future<void> checkExpiredTurns(String userId) async {
     try {
-      developer.log('Checking expired turns for user: $userId', name: 'BattleStateService');
+      AppLogger.log('Checking expired turns for user: $userId', name: 'BattleStateService');
       final now = DateTime.now().toIso8601String();
       
       // Find active battles where deadline has passed and NOT in voting
@@ -404,10 +405,10 @@ class BattleStateService {
 
       final expiredBattles = (response as List).map((b) => Battle.fromMap(b)).toList();
 
-      developer.log('Found ${expiredBattles.length} expired battles', name: 'BattleStateService');
+      AppLogger.log('Found ${expiredBattles.length} expired battles', name: 'BattleStateService');
 
       for (final battle in expiredBattles) {
-        developer.log('Processing expired battle: ${battle.id}', name: 'BattleStateService');
+        AppLogger.log('Processing expired battle: ${battle.id}', name: 'BattleStateService');
         
         // Calculate new deadline
         final Duration timerDuration = battle.isQuickfire
@@ -417,7 +418,7 @@ class BattleStateService {
 
         // 1. RPS PHASE TIMEOUT (No setter assigned yet)
         if (battle.setterId == null) {
-          developer.log('RPS Timeout', name: 'BattleStateService');
+          AppLogger.log('RPS Timeout', name: 'BattleStateService');
           if (battle.player1RpsMove != null && battle.player2RpsMove == null) {
             // Player 1 moved, Player 2 didn't -> Player 1 wins RPS
             await _client.from('battles').update({
@@ -486,13 +487,13 @@ class BattleStateService {
 
         // 2. ACTIVE BATTLE TIMEOUT
         final isSetter = battle.currentTurnPlayerId == battle.setterId;
-        developer.log('Active Battle Timeout. Is Setter Turn: $isSetter', name: 'BattleStateService');
+        AppLogger.log('Active Battle Timeout. Is Setter Turn: $isSetter', name: 'BattleStateService');
         
         if (isSetter) {
           // SETTER TIMEOUT: Failed to upload trick
           // - Assign letter to Setter
           // - Swap roles: Attempter becomes new Setter
-          developer.log('Assigning letter to SETTER: ${battle.setterId}', name: 'BattleStateService');
+          AppLogger.log('Assigning letter to SETTER: ${battle.setterId}', name: 'BattleStateService');
           
           await assignLetter(
             battleId: battle.id!,
@@ -528,7 +529,7 @@ class BattleStateService {
           // ATTEMPTER TIMEOUT: Failed to upload attempt
           // - Assign letter to Attempter
           // - Setter keeps control
-          developer.log('Assigning letter to attempter: ${battle.attempterId}', name: 'BattleStateService');
+          AppLogger.log('Assigning letter to attempter: ${battle.attempterId}', name: 'BattleStateService');
           await assignLetter(
             battleId: battle.id!,
             playerId: battle.attempterId!,
@@ -559,7 +560,7 @@ class BattleStateService {
 
         // 3. VOTING PHASE TIMEOUT
         if (battle.verificationStatus == VerificationStatus.quickFireVoting) {
-          developer.log('Voting Timeout', name: 'BattleStateService');
+          AppLogger.log('Voting Timeout', name: 'BattleStateService');
           if (battle.setterVote != null && battle.attempterVote == null) {
             await _client.from('battles').update({'attempter_vote': battle.setterVote}).eq('id', battle.id!);
             await BattleService.resolveVotes(battle.id!);

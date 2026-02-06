@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../screens/create_feed_post_dialog.dart';
+import '../../screens/add_post_dialog.dart';
 import '../../screens/notifications_screen.dart';
 import '../../screens/messaging_screen.dart';
 
@@ -44,10 +44,12 @@ class FeedAppBar extends StatelessWidget implements PreferredSizeWidget {
       leading: IconButton(
         icon: const Icon(Icons.add_box_outlined, color: matrixGreen),
         onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) => CreateFeedPostDialog(
-              onPostAdded: onPostAdded,
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (context) => AddPostDialog(
+                onPostAdded: onPostAdded,
+              ),
             ),
           );
         },
@@ -58,6 +60,8 @@ class FeedAppBar extends StatelessWidget implements PreferredSizeWidget {
           fontWeight: FontWeight.bold,
           color: matrixGreen,
           letterSpacing: 2,
+          fontSize: 20,
+          fontFamily: 'monospace',
         ),
       ),
       centerTitle: true,

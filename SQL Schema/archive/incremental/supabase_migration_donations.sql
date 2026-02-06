@@ -20,6 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_donations_status ON public.donations(status);
 CREATE INDEX IF NOT EXISTS idx_donations_order_id ON public.donations(order_id);
 
 -- Policies
+DROP POLICY IF EXISTS "Users can view their own donations" ON public.donations;
 CREATE POLICY "Users can view their own donations"
     ON public.donations FOR SELECT
     USING (auth.uid() = user_id);

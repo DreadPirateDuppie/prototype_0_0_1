@@ -94,6 +94,13 @@ class BattleActionService {
     required String videoUrl,
   }) async {
     try {
+      // Calculate deadline for voting
+      final battle = await BattleService.getBattle(battleId);
+      final isQuickfire = battle?.isQuickfire ?? false;
+      final votingDeadline = isQuickfire 
+          ? DateTime.now().add(const Duration(minutes: 4, seconds: 20))
+          : DateTime.now().add(const Duration(hours: 24));
+
       final response = await _client
           .from('battles')
           .update({
@@ -105,7 +112,7 @@ class BattleActionService {
             // Reset votes for new round
             'setter_vote': null,
             'attempter_vote': null,
-            'turn_deadline': DateTime.now().add(const Duration(hours: 24)).toIso8601String(),
+            'turn_deadline': votingDeadline.toIso8601String(),
           })
           .eq('id', battleId)
           .select()
@@ -114,10 +121,10 @@ class BattleActionService {
       // Cancel existing notification
       await NotificationService.cancelBattleNotification(battleId);
       
-      // Schedule new notification for deadline (24h for voting)
+      // Schedule new notification for deadline
       await NotificationService.scheduleBattleTurnExpiryNotification(
         battleId, 
-        DateTime.now().add(const Duration(hours: 24))
+        votingDeadline
       );
 
       return Battle.fromMap(response);
@@ -181,6 +188,12 @@ class BattleActionService {
     }
 
     final loserId = winnerId == battle.player1Id ? battle.player2Id : battle.player1Id;
+    
+    // Calculate new deadline
+    final Duration timerDuration = battle.isQuickfire
+        ? const Duration(minutes: 4, seconds: 20)
+        : const Duration(hours: 24);
+    final newDeadline = DateTime.now().add(timerDuration);
 
     // Winner becomes Setter, Loser becomes Attempter
     // Winner gets the first turn
@@ -188,10 +201,17 @@ class BattleActionService {
       'setter_id': winnerId,
       'attempter_id': loserId,
       'current_turn_player_id': winnerId,
-      // Optional: Clear RPS moves or keep them for history
-      // 'player1_rps_move': null, 
-      // 'player2_rps_move': null,
+      'turn_deadline': newDeadline.toIso8601String(),
     }).eq('id', battle.id!);
+
+    // Cancel RPS notification if any
+    await NotificationService.cancelBattleNotification(battle.id!);
+    
+    // Schedule new notification for deadline
+    await NotificationService.scheduleBattleTurnExpiryNotification(
+      battle.id!, 
+      newDeadline
+    );
   }
 
   // Submit vote
@@ -269,6 +289,15 @@ class BattleActionService {
             'turn_deadline': newDeadline.toIso8601String(),
           }).eq('id', battleId);
 
+          // Cancel existing notification
+          await NotificationService.cancelBattleNotification(battleId);
+          
+          // Schedule new notification for deadline
+          await NotificationService.scheduleBattleTurnExpiryNotification(
+            battleId, 
+            newDeadline
+          );
+
 
         } else {
           // Attempter missed -> They get a letter, Setter stays Setter
@@ -287,6 +316,15 @@ class BattleActionService {
               'current_turn_player_id': battle.setterId, // Setter goes again
               'turn_deadline': newDeadline.toIso8601String(),
             }).eq('id', battleId);
+
+            // Cancel existing notification
+            await NotificationService.cancelBattleNotification(battleId);
+            
+            // Schedule new notification for deadline
+            await NotificationService.scheduleBattleTurnExpiryNotification(
+              battleId, 
+              newDeadline
+            );
           }
         }
       } else {

@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import '../models/post.dart';
 import 'error_types.dart';
 import '../config/service_locator.dart';
@@ -152,7 +152,7 @@ class PostService {
 
       return enrichedResponse.map((post) => MapPost.fromMap(post)).toList();
     } catch (e) {
-      developer.log('Error getting map posts: $e', name: 'PostService');
+      AppLogger.log('Error getting map posts: $e', name: 'PostService');
       return [];
     }
   }
@@ -192,7 +192,7 @@ class PostService {
         pageSize: pageSize,
       );
     } catch (e) {
-      developer.log('Error getting following posts: $e', name: 'PostService');
+      AppLogger.log('Error getting following posts: $e', name: 'PostService');
       return [];
     }
   }
@@ -210,7 +210,7 @@ class PostService {
 
       return enrichedResponse.map((post) => MapPost.fromMap(post)).toList();
     } catch (e) {
-      developer.log('Error searching posts: $e', name: 'PostService');
+      AppLogger.log('Error searching posts: $e', name: 'PostService');
       return [];
     }
   }
@@ -228,7 +228,7 @@ class PostService {
 
       return enrichedResponse.map((post) => MapPost.fromMap(post)).toList();
     } catch (e) {
-      developer.log('Error getting user posts: $e', name: 'PostService');
+      AppLogger.log('Error getting user posts: $e', name: 'PostService');
       return [];
     }
   }
@@ -291,7 +291,7 @@ class PostService {
 
       await _client.from('map_posts').delete().eq('id', postId);
     } catch (e) {
-      developer.log('Error deleting post: $e', name: 'PostService');
+      AppLogger.log('Error deleting post: $e', name: 'PostService');
       throw Exception('Failed to delete post: $e');
     }
   }
@@ -304,7 +304,7 @@ class PostService {
           .update({'likes': currentLikes + 1})
           .eq('id', postId);
     } catch (e) {
-      developer.log('Error liking post: $e', name: 'PostService');
+      AppLogger.log('Error liking post: $e', name: 'PostService');
     }
   }
 
@@ -326,7 +326,7 @@ class PostService {
         'quality_rating': qualityRating,
       }, onConflict: 'post_id, user_id');
     } catch (e) {
-      developer.log('Error rating post: $e', name: 'PostService');
+      AppLogger.log('Error rating post: $e', name: 'PostService');
       // Fallback for when trigger/table doesn't exist yet
       try {
         await _client.from('map_posts').update({
@@ -457,7 +457,7 @@ class PostService {
         return true;
       }
     } catch (e) {
-      developer.log('Error toggling save post: $e', name: 'PostService');
+      AppLogger.log('Error toggling save post: $e', name: 'PostService');
       rethrow;
     }
   }
@@ -505,7 +505,7 @@ class PostService {
           .cast<MapPost>()
           .toList();
     } catch (e) {
-      developer.log('Error getting saved posts: $e', name: 'PostService');
+      AppLogger.log('Error getting saved posts: $e', name: 'PostService');
       return [];
     }
   }
@@ -577,7 +577,7 @@ class PostService {
           _profileCache[p['id'] as String] = p as Map<String, dynamic>;
         }
       } catch (e) {
-        developer.log('Error enriching posts with profiles: $e', name: 'PostService');
+        AppLogger.log('Error enriching posts with profiles: $e', name: 'PostService');
       }
     }
     

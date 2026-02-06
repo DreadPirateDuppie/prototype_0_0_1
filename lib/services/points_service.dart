@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import '../config/service_locator.dart';
 
 /// Service responsible for points, wallets, and streak operations
@@ -33,7 +33,7 @@ class PointsService {
 
       return (response?['balance'] as num?)?.toDouble() ?? 0.0;
     } catch (e) {
-      developer.log('Error getting user points: $e', name: 'PointsService');
+      AppLogger.log('Error getting user points: $e', name: 'PointsService');
       return 0.0;
     }
   }
@@ -57,7 +57,7 @@ class PointsService {
 
       return response;
     } catch (e) {
-      developer.log('Error getting user streak: $e', name: 'PointsService');
+      AppLogger.log('Error getting user streak: $e', name: 'PointsService');
       return {
         'current_streak': 0,
         'longest_streak': 0,
@@ -79,7 +79,7 @@ class PointsService {
         return response['value'] as Map<String, dynamic>;
       }
     } catch (e) {
-      developer.log('Error fetching points config, using defaults: $e', name: 'PointsService');
+      AppLogger.log('Error fetching points config, using defaults: $e', name: 'PointsService');
     }
 
     // Default fallbacks
@@ -145,7 +145,7 @@ class PointsService {
         return baseDailyPoints.toDouble();
       }
     } catch (e) {
-      developer.log('Error checking daily streak: $e', name: 'PointsService');
+      AppLogger.log('Error checking daily streak: $e', name: 'PointsService');
       return 0.0;
     }
   }
@@ -170,30 +170,64 @@ class PointsService {
     String? description,
   }) async {
     try {
-      // Update wallet balance
-      final currentPoints = await getUserPoints(userId);
-      final newBalance = currentPoints + amount;
-
-      await _client.from('user_wallets').upsert({
-        'user_id': userId,
-        'balance': newBalance,
-        'updated_at': DateTime.now().toIso8601String(),
+      // Use the atomic RPC function to prevent race conditions
+      await _client.rpc('award_points_atomic', params: {
+        'p_user_id': userId,
+        'p_amount': amount,
+        'p_transaction_type': type,
+        'p_reference_id': referenceId,
+        'p_description': description,
       });
 
-      // Log transaction
-      await _client.from('point_transactions').insert({
-        'user_id': userId,
-        'amount': amount,
-        'transaction_type': type,
-        'reference_id': referenceId,
-        'description': description,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-
-      developer.log('Awarded $amount points to $userId for $type',
+      AppLogger.log('Awarded $amount points to $userId for $type (Atomically)',
           name: 'PointsService');
     } catch (e) {
-      developer.log('Error awarding points: $e', name: 'PointsService');
+      // Fallback to legacy method if RPC fails (e.g., if migration wasn't run)
+      AppLogger.log('RPC failed, falling back to legacy awardPoints: $e', name: 'PointsService');
+      
+      try {
+        final currentPoints = await getUserPoints(userId);
+        final newBalance = currentPoints + amount;
+
+        await _client.from('user_wallets').upsert({
+          'user_id': userId,
+          'balance': newBalance,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+
+        await _client.from('point_transactions').insert({
+          'user_id': userId,
+          'amount': amount,
+          'transaction_type': type,
+          'reference_id': referenceId,
+          'description': description,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e2) {
+        AppLogger.log('Legacy awardPoints also failed: $e2', name: 'PointsService');
+      }
+    }
+  }
+
+  /// Get the time of the last transaction of a specific type
+  Future<DateTime?> getLastTransactionTime(String userId, String type) async {
+    try {
+      final response = await _client
+          .from('point_transactions')
+          .select('created_at')
+          .eq('user_id', userId)
+          .eq('transaction_type', type)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response != null && response['created_at'] != null) {
+        return DateTime.parse(response['created_at'] as String).toLocal();
+      }
+      return null;
+    } catch (e) {
+      AppLogger.log('Error getting last transaction time: $e', name: 'PointsService');
+      return null;
     }
   }
 
@@ -205,11 +239,11 @@ class PointsService {
           .select()
           .eq('user_id', userId)
           .order('created_at', ascending: false)
-          .limit(20);
+          .limit(50);
 
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting transactions: $e', name: 'PointsService');
+      AppLogger.log('Error getting transactions: $e', name: 'PointsService');
       return [];
     }
   }
@@ -226,7 +260,7 @@ class PointsService {
         'created_at': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      developer.log('Error logging XP history: $e', name: 'PointsService');
+      AppLogger.log('Error logging XP history: $e', name: 'PointsService');
     }
   }
 
@@ -254,7 +288,7 @@ class PointsService {
         await logXpHistory(userId, diff, 'map', reason);
       }
     } catch (e) {
-      developer.log('Error updating map score: $e', name: 'PointsService');
+      AppLogger.log('Error updating map score: $e', name: 'PointsService');
     }
   }
 
@@ -271,18 +305,15 @@ class PointsService {
       final currentScore = (response?['player_score'] as num?)?.toDouble() ?? 0.0;
       final diff = newScore - currentScore;
 
-      await _client.from('user_scores').upsert({
-        'user_id': userId,
-        'map_score': response?['map_score'] ?? 0.0,
+      await _client.from('user_scores').update({
         'player_score': newScore.clamp(0.0, double.infinity),
-        'ranking_score': response?['ranking_score'] ?? 500.0,
-      });
+      }).eq('user_id', userId);
 
       if (diff != 0) {
         await logXpHistory(userId, diff, 'player', reason);
       }
     } catch (e) {
-      developer.log('Error updating player score: $e', name: 'PointsService');
+      AppLogger.log('Error updating player score: $e', name: 'PointsService');
     }
   }
 
@@ -310,7 +341,7 @@ class PointsService {
         await logXpHistory(userId, diff, 'ranking', reason);
       }
     } catch (e) {
-      developer.log('Error updating ranking score: $e', name: 'PointsService');
+      AppLogger.log('Error updating ranking score: $e', name: 'PointsService');
     }
   }
 
@@ -333,7 +364,7 @@ class PointsService {
 
       await logXpHistory(userId, xpChange.toDouble(), 'map', 'Post upvote/downvote');
     } catch (e) {
-      developer.log('Error updating poster XP: $e', name: 'PointsService');
+      AppLogger.log('Error updating poster XP: $e', name: 'PointsService');
     }
   }
 
@@ -342,7 +373,7 @@ class PointsService {
     try {
       final postsResponse = await _client
           .from('map_posts')
-          .select('id, likes')
+          .select('id, vote_score')
           .eq('user_id', userId);
 
       final posts = (postsResponse as List).cast<Map<String, dynamic>>();
@@ -356,10 +387,10 @@ class PointsService {
       // XP from posts
       double xpFromPosts = postCount * postXp.toDouble();
 
-      // XP from upvotes
+      // XP from votes (using synchronized vote_score)
       double xpFromVotes = 0;
       for (var post in posts) {
-        xpFromVotes += (post['likes'] as num? ?? 0).toDouble() * voteXp.toDouble();
+        xpFromVotes += (post['vote_score'] as num? ?? 0).toDouble() * voteXp.toDouble();
       }
 
       final totalMapScore = xpFromPosts + xpFromVotes;
@@ -382,11 +413,11 @@ class PointsService {
         await logXpHistory(userId, diff, 'map', 'XP Recalculation');
       }
 
-      developer.log(
+      AppLogger.log(
           'Recalculated XP for $userId: $totalMapScore ($postCount posts)',
           name: 'PointsService');
     } catch (e) {
-      developer.log('Error recalculating XP: $e', name: 'PointsService');
+      AppLogger.log('Error recalculating XP: $e', name: 'PointsService');
       throw Exception('Failed to recalculate XP: $e');
     }
   }

@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import '../config/service_locator.dart';
 import 'auth_service.dart';
 
@@ -36,7 +36,7 @@ class SocialService {
         'following_id': userIdToFollow,
       });
       
-      developer.log('User ${currentUser.id} followed $userIdToFollow', name: 'SocialService');
+      AppLogger.log('User ${currentUser.id} followed $userIdToFollow', name: 'SocialService');
     } catch (e) {
       throw Exception('Failed to follow user: $e');
     }
@@ -54,7 +54,7 @@ class SocialService {
           .eq('follower_id', currentUser.id)
           .eq('following_id', userIdToUnfollow);
       
-      developer.log('User ${currentUser.id} unfollowed $userIdToUnfollow', name: 'SocialService');
+      AppLogger.log('User ${currentUser.id} unfollowed $userIdToUnfollow', name: 'SocialService');
     } catch (e) {
       throw Exception('Failed to unfollow user: $e');
     }
@@ -75,7 +75,7 @@ class SocialService {
 
       return response != null;
     } catch (e) {
-      developer.log('Error checking follow status: $e', name: 'SocialService');
+      AppLogger.log('Error checking follow status: $e', name: 'SocialService');
       return false;
     }
   }
@@ -101,7 +101,7 @@ class SocialService {
 
       return (profilesResponse as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting followers: $e', name: 'SocialService');
+      AppLogger.log('Error getting followers: $e', name: 'SocialService');
       return [];
     }
   }
@@ -127,7 +127,7 @@ class SocialService {
 
       return (profilesResponse as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting following: $e', name: 'SocialService');
+      AppLogger.log('Error getting following: $e', name: 'SocialService');
       return [];
     }
   }
@@ -150,7 +150,7 @@ class SocialService {
 
       return myFollowers.where((user) => mutualIds.contains(user['id'])).toList();
     } catch (e) {
-      developer.log('Error getting mutual followers: $e', name: 'SocialService');
+      AppLogger.log('Error getting mutual followers: $e', name: 'SocialService');
       return [];
     }
   }
@@ -173,7 +173,7 @@ class SocialService {
         'following': followingCount,
       };
     } catch (e) {
-      developer.log('Error getting follow counts: $e', name: 'SocialService');
+      AppLogger.log('Error getting follow counts: $e', name: 'SocialService');
       return {'followers': 0, 'following': 0};
     }
   }
@@ -192,7 +192,7 @@ class SocialService {
 
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error searching users: $e', name: 'SocialService');
+      AppLogger.log('Error searching users: $e', name: 'SocialService');
       return [];
     }
   }
@@ -224,7 +224,7 @@ class SocialService {
       users.shuffle();
       return users.first['id'] as String;
     } catch (e) {
-      developer.log('Error getting random opponent: $e', name: 'SocialService');
+      AppLogger.log('Error getting random opponent: $e', name: 'SocialService');
       return null;
     }
   }

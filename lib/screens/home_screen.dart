@@ -174,9 +174,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
             
             if (isFirstRouteInCurrentTab) {
               // If on the first route of the current tab, let the app exit or handle back
-              if (navProvider.selectedIndex != 0) {
-                // If not on the first tab, go back to the first tab
-                _onItemTapped(0);
+              if (navProvider.selectedIndex != 2) {
+                // If not on the map (default tab), go back to the map
+                _onItemTapped(2);
               } else {
                 // If on the first tab, exit the app (or let system handle it if we returned true above, but we returned false)
                 // Since we returned false, we need to manually pop if we want to exit, but usually we just want to minimize or let Android handle it.

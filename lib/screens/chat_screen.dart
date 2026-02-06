@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -160,7 +160,7 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     } catch (e) {
-      developer.log('Error loading conversation details: $e', name: 'ChatScreen');
+      AppLogger.log('Error loading conversation details: $e', name: 'ChatScreen');
     }
   }
 

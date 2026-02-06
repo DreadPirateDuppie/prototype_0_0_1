@@ -1,0 +1,54 @@
+Analyzing prototype_0_0_1...                                    
+
+   info • The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/screens/admin_dashboard.dart:5:8 • unnecessary_import
+warning • The declaration '_buildHeaderInfo' isn't referenced • lib/screens/battle_mode_selection_screen.dart:152:10 • unused_element
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/create_battle_screen.dart:201:20 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/create_battle_screen.dart:204:29 • use_build_context_synchronously
+   info • Use interpolation to compose strings and values • lib/screens/post_detail_screen.dart:153:32 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/screens/post_detail_screen.dart:153:100 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/screens/post_detail_screen.dart:154:83 • prefer_interpolation_to_compose_strings
+warning • Unused import: 'package:provider/provider.dart' • lib/screens/privacy_settings_screen.dart:2:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/privacy_settings_screen.dart:137:29 • deprecated_member_use
+   info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/screens/privacy_settings_screen.dart:147:11 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/privacy_settings_screen.dart:161:55 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/privacy_settings_screen.dart:161:87 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rewards/transaction_history_screen.dart:45:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rewards/transaction_history_screen.dart:68:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rewards/transaction_history_screen.dart:70:65 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rewards/transaction_history_screen.dart:94:61 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rewards/transaction_history_screen.dart:101:59 • deprecated_member_use
+warning • The value of the field '_isLoadingTricks' isn't used • lib/screens/spot_details_screen.dart:31:8 • unused_field
+   info • The private field _sortBy could be 'final' • lib/screens/spot_details_screen.dart:32:10 • prefer_final_fields
+warning • The value of the field '_sortBy' isn't used • lib/screens/spot_details_screen.dart:32:10 • unused_field
+   info • Use interpolation to compose strings and values • lib/screens/spot_details_screen.dart:476:29 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/screens/spot_details_screen.dart:476:97 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/screens/spot_details_screen.dart:477:80 • prefer_interpolation_to_compose_strings
+   info • Unnecessary use of 'toList' in a spread • lib/screens/spot_details_screen.dart:963:28 • unnecessary_to_list_in_spreads
+warning • The declaration '_buildTagFilter' isn't referenced • lib/screens/spot_details_screen.dart:1066:10 • unused_element
+warning • The declaration '_getAllTags' isn't referenced • lib/screens/spot_details_screen.dart:1093:16 • unused_element
+warning • The value of the field '_sortBy' isn't used • lib/screens/trick_archive_screen.dart:21:10 • unused_field
+   info • 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre • lib/screens/trick_submission_dialog.dart:143:19 • deprecated_member_use
+   info • The private field _isStatsExpanded could be 'final' • lib/screens/user_profile_screen.dart:46:8 • prefer_final_fields
+warning • The declaration '_buildStatColumn' isn't referenced • lib/screens/user_profile_screen.dart:224:10 • unused_element
+warning • The value of the local variable 'posts' isn't used • lib/screens/user_profile_screen.dart:326:23 • unused_local_variable
+warning • The '!' will have no effect because the receiver can't be null • lib/services/trick_service.dart:13:56 • unnecessary_non_null_assertion
+   info • The private field _selectedCategory could be 'final' • lib/tabs/map_tab.dart:58:10 • prefer_final_fields
+  error • Too many positional arguments: 0 expected, but 5 found • lib/tabs/map_tab.dart:997:17 • extra_positional_arguments_could_be_named
+  error • Expected to find ')' • lib/tabs/map_tab.dart:1118:15 • expected_token
+  error • Expected a class member • lib/tabs/map_tab.dart:1127:5 • expected_class_member
+  error • Expected a class member • lib/tabs/map_tab.dart:1127:6 • expected_class_member
+  error • Undefined name '_categories' • lib/tabs/map_tab.dart:1134:18 • undefined_identifier
+  error • Undefined name '_categories' • lib/tabs/map_tab.dart:1136:26 • undefined_identifier
+  error • Undefined name '_selectedCategory' • lib/tabs/map_tab.dart:1137:28 • undefined_identifier
+  error • The function 'setState' isn't defined • lib/tabs/map_tab.dart:1153:17 • undefined_function
+  error • Undefined name '_selectedCategory' • lib/tabs/map_tab.dart:1154:19 • undefined_identifier
+  error • The function '_loadUserPosts' isn't defined • lib/tabs/map_tab.dart:1156:17 • undefined_function
+  error • Expected a method, getter, setter or operator declaration • lib/tabs/map_tab.dart:1214:1 • expected_executable
+warning • The value of the field '_isLoading' isn't used • lib/tabs/settings_tab.dart:27:8 • unused_field
+   info • Use interpolation to compose strings and values • lib/widgets/post_card.dart:299:23 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/widgets/post_card.dart:299:91 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/widgets/post_card.dart:300:74 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/widgets/post_card.dart:301:75 • prefer_interpolation_to_compose_strings
+   info • Unnecessary use of string interpolation • lib/widgets/user_stats_card.dart:217:36 • unnecessary_string_interpolations
+
+50 issues found. (ran in 3.9s)

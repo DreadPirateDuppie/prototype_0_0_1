@@ -64,7 +64,7 @@ class _MatrixRainBackgroundState extends State<MatrixRainBackground> with Single
   }
 
   String _generateChar() {
-    return _random.nextBool() ? "1" : "0";
+    return "P";
   }
 
   @override
@@ -109,7 +109,7 @@ class _MatrixColumn {
   }
 
   String _generateChar(Random random) {
-    return random.nextBool() ? "1" : "0";
+    return "P";
   }
 }
 

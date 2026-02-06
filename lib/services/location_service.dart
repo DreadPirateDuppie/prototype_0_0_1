@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import 'dart:math' as math;
 import '../config/service_locator.dart';
 import 'auth_service.dart';
@@ -37,7 +37,7 @@ class LocationService {
       }).eq('id', currentUser.id);
       
     } catch (e) {
-      developer.log('Error updating user location: $e', name: 'LocationService');
+      AppLogger.log('Error updating user location: $e', name: 'LocationService');
     }
   }
 
@@ -55,7 +55,7 @@ class LocationService {
         'location_sharing_mode': mode,
       }).eq('id', currentUser.id);
 
-      developer.log('Updated location sharing mode to $mode for user ${currentUser.id}', name: 'LocationService');
+      AppLogger.log('Updated location sharing mode to $mode for user ${currentUser.id}', name: 'LocationService');
     } catch (e) {
       throw Exception('Failed to update sharing mode: $e');
     }
@@ -71,7 +71,7 @@ class LocationService {
         'location_blacklist': blacklist,
       }).eq('id', currentUser.id);
 
-      developer.log('Updated location blacklist for user ${currentUser.id}', name: 'LocationService');
+      AppLogger.log('Updated location blacklist for user ${currentUser.id}', name: 'LocationService');
     } catch (e) {
       throw Exception('Failed to update blacklist: $e');
     }
@@ -106,7 +106,7 @@ class LocationService {
         'blacklist': (response['location_blacklist'] as List<dynamic>?)?.cast<String>() ?? <String>[],
       };
     } catch (e) {
-      developer.log('Error getting privacy settings: $e', name: 'LocationService');
+      AppLogger.log('Error getting privacy settings: $e', name: 'LocationService');
       return {
         'sharing_mode': 'off',
         'blacklist': <String>[],
@@ -151,7 +151,7 @@ class LocationService {
 
       return visibleUsers;
     } catch (e) {
-      developer.log('Error getting visible user locations: $e', name: 'LocationService');
+      AppLogger.log('Error getting visible user locations: $e', name: 'LocationService');
       return [];
     }
   }
@@ -180,7 +180,7 @@ class LocationService {
 
       return nearbyUsers;
     } catch (e) {
-      developer.log('Error getting nearby users: $e', name: 'LocationService');
+      AppLogger.log('Error getting nearby users: $e', name: 'LocationService');
       return [];
     }
   }

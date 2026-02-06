@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import 'dart:async' as async;
 import 'error_types.dart';
 import '../config/service_locator.dart';
@@ -68,7 +68,7 @@ class AuthService {
 
       return response;
     } catch (e) {
-      developer.log('Sign up failed: $e', name: 'AuthService');
+      AppLogger.log('Sign up failed: $e', name: 'AuthService');
       rethrow;
     }
   }
@@ -127,9 +127,35 @@ class AuthService {
   Future<void> signOut() async {
     await _client.auth.signOut();
   }
+  
+  /// Delete current user account
+  /// This calls the secure RPC function delete_user_account
+  Future<void> deleteAccount() async {
+    try {
+      await _client.rpc('delete_user_account');
+      await signOut(); // Sign out locally after deletion
+    } catch (e) {
+      AppLogger.log('Account deletion failed: $e', name: 'AuthService');
+      throw Exception('Failed to delete account. Please try again later.');
+    }
+  }
 
   /// Listen to auth state changes
   Stream<AuthState> authStateChanges() {
     return _client.auth.onAuthStateChange;
+  }
+
+  /// Update user's last active timestamp
+  Future<void> updateLastActive() async {
+    final user = getCurrentUser();
+    if (user == null) return;
+    
+    try {
+      await _client.from('user_profiles').update({
+        'last_active_at': DateTime.now().toIso8601String(),
+      }).eq('id', user.id);
+    } catch (e) {
+      AppLogger.log('Failed to update last active: $e', name: 'AuthService');
+    }
   }
 }

@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'screens/signin_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'screens/profile_setup_screen.dart';
 import 'providers/theme_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/battle_provider.dart';
@@ -17,48 +19,39 @@ import 'providers/rewards_provider.dart';
 import 'providers/map_provider.dart';
 import 'providers/battle_detail_provider.dart';
 import 'config/service_locator.dart';
-import 'widgets/matrix_rain_background.dart';
+import 'widgets/cyber/cyber_scaffold.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables (optional - will use system env vars if file not found)
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
     debugPrint('Warning: .env file not found, using system environment variables');
   }
 
-  // Initialize Mobile Ads
   await MobileAds.instance.initialize();
 
-  // Get Supabase configuration from dotenv or environment variables
   final supabaseUrl = dotenv.env['SUPABASE_URL'] ??
-                      const String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://fsogspnecjsoltcmwveg.supabase.co');
+                      const String.fromEnvironment('SUPABASE_URL');
   final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? 
-                          const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzb2dzcG5lY2pzb2x0Y213dmVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1MzkxMDMsImV4cCI6MjA4MDExNTEwM30.waf9NjgeOacZmfrmnyaxnskrxuk0dZyHtqWFcuaGUFI');
+                          const String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  // Initialize Supabase with session persistence (enabled by default)
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    debugPrint('ERROR: Supabase URL or Anon Key is missing.');
+  }
+
   await Supabase.initialize(
     url: supabaseUrl,
     anonKey: supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(
-      authFlowType: AuthFlowType.pkce, // Recommended for mobile apps
+      authFlowType: AuthFlowType.pkce,
     ),
-    // Note: Session persistence is enabled by default in Supabase Flutter
-    // Sessions are stored in SharedPreferences automatically
   );
 
-  // Set up service locator for dependency injection
   setupServiceLocator();
-
-  // Initialize error tracking
   ErrorService.initialize();
-
-  // Initialize connectivity monitoring
   await ConnectivityService.initialize();
-
-  // Initialize rewarded ad service
   await RewardedAdService.instance.initialize();
 
   runApp(
@@ -70,6 +63,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => PostProvider()),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
         ChangeNotifierProvider(create: (_) => RewardsProvider()),
+        ChangeNotifierProvider.value(value: RewardedAdService.instance),
         ChangeNotifierProvider(create: (_) => MapProvider()),
         ChangeNotifierProvider(create: (_) => BattleDetailProvider()),
       ],
@@ -86,24 +80,13 @@ class MyApp extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
-          title: 'Supabase Auth App',
+          title: 'Pushinn',
           theme: themeProvider.getLightTheme(),
           darkTheme: themeProvider.getDarkTheme(),
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
           debugShowCheckedModeBanner: false,
-          builder: (context, child) {
-            return Stack(
-              children: [
-                const Positioned.fill(
-                  child: MatrixRainBackground(
-                    opacity: 0.1,
-                    speed: 0.5,
-                  ),
-                ),
-                if (child != null) child,
-              ],
-            );
-          },
+          // Fixed: Removed global Stack/MatrixRainBackground to avoid overdraw and white screen issues.
+          // The CyberScaffold handles background rendering for auth screens.
           home: const AuthWrapper(),
         );
       },
@@ -111,7 +94,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// AuthWrapper handles routing based on user authentication state
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
@@ -120,75 +102,117 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<AuthState>(
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
-        // Check connection state
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
+        if (snapshot.hasError) {
+          debugPrint('AuthWrapper Error: ${snapshot.error}');
+          return const Scaffold(
             backgroundColor: Colors.black,
-            body: Container(
-              decoration: const BoxDecoration(
-                color: Colors.black,
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Logo with glow
-                    Container(
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF00FF41).withValues(alpha: 0.6),
-                            blurRadius: 60,
-                            spreadRadius: 20,
-                          ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        'assets/images/pushinn_logo.png',
-                        width: 200,
-                        height: 200,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    // Loading indicator
-                    const SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00FF41)),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Loading text
-                    Text(
-                      'INITIALIZING...',
-                      style: TextStyle(
-                        color: const Color(0xFF00FF41).withValues(alpha: 0.7),
-                        fontFamily: 'monospace',
-                        fontSize: 14,
-                        letterSpacing: 3,
-                      ),
-                    ),
-                  ],
-                ),
+            body: Center(
+              child: Text(
+                'SYSTEM ERROR: RETRYING',
+                style: TextStyle(color: Color(0xFFFF4444), fontFamily: 'monospace'),
               ),
             ),
           );
         }
 
-        // Check if user is authenticated
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          // Explicit waiting state
+          return const _CyberLoadingScreen();
+        }
+
         final session = snapshot.data?.session;
 
         if (session != null) {
-          // User is signed in
-          return const HomeScreen();
+          return const SessionInitializer();
         } else {
-          // User is not signed in
           return const SignInScreen();
         }
       },
+    );
+  }
+}
+
+class SessionInitializer extends StatefulWidget {
+  const SessionInitializer({super.key});
+
+  @override
+  State<SessionInitializer> createState() => _SessionInitializerState();
+}
+
+class _SessionInitializerState extends State<SessionInitializer> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize user data when session is found
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        // Safely access provider
+        if (context.mounted) {
+          context.read<UserProvider>().setUser(user);
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, _) {
+        // While user data fetches (e.g. username check), show loading
+        if (userProvider.isLoading) {
+          return const _CyberLoadingScreen();
+        }
+
+        if (userProvider.hasCompletedOnboarding) {
+          return const HomeScreen();
+        } else {
+          return const OnboardingScreen();
+        }
+      },
+    );
+  }
+}
+
+class _CyberLoadingScreen extends StatelessWidget {
+  const _CyberLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return CyberScaffold(
+      showGrid: false,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+              Image.asset(
+                'assets/images/pushinn_logo_login.png',
+                width: 350,
+                height: 350,
+                key: const ValueKey('loading_logo'),
+              ),
+            const SizedBox(height: 32),
+            const SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFF00FF41),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "ESTABLISHING UPLINK...",
+              style: TextStyle(
+                color: Color(0xFF00FF41),
+                fontFamily: 'monospace',
+                fontSize: 12,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -11,6 +11,7 @@ import '../screens/followers_list_screen.dart';
 import '../utils/error_helper.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/matrix_rain_background.dart';
+import '../widgets/profile/profile_header.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -41,6 +42,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
   bool _isVerified = false;
   List<Map<String, dynamic>> _profileMedia = [];
   bool _isLoadingMedia = true;
+  String? _bio;
   
   // Stats expansion state
   bool _isStatsExpanded = false;
@@ -101,6 +103,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
       // Load media
       _loadProfileMedia();
 
+      _loadBio();
+
     } catch (e) {
       // Ignore load error
     }
@@ -120,6 +124,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
       if (mounted) {
         setState(() => _isLoadingMedia = false);
       }
+    }
+  }
+
+  Future<void> _loadBio() async {
+    try {
+      final bio = await SupabaseService.getUserBio(widget.userId);
+      if (mounted) {
+        setState(() {
+          _bio = bio;
+        });
+      }
+    } catch (e) {
+      // Ignore
     }
   }
 
@@ -447,120 +464,85 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
             SliverAppBar(
-              expandedHeight: 380.0,
+              expandedHeight: 80.0,
               floating: false,
               pinned: true,
-              backgroundColor: Colors.black,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: true,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.grey.shade900,
-                        Theme.of(context).scaffoldBackgroundColor
-                      ],
-                      stops: const [0.0, 0.6],
-                    ),
-                  ),
-                  child: SafeArea(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        const SizedBox(height: 10),
-                        // Avatar
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: CircleAvatar(
-                            radius: 50,
-                            backgroundImage: _currentAvatarUrl != null
-                                ? NetworkImage(_currentAvatarUrl!)
-                                : null,
-                            backgroundColor: Colors.grey.shade800,
-                            child: _currentAvatarUrl == null
-                                ? Text(
-                                    (_currentUsername?.isNotEmpty == true)
-                                        ? _currentUsername![0].toUpperCase()
-                                        : 'U',
-                                    style: const TextStyle(
-                                      fontSize: 40,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Username
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _currentUsername != null ? '@$_currentUsername' : 'User',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                            if (_isVerified)
-                              const VerifiedBadge(size: 20, padding: EdgeInsets.only(left: 8.0)),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // Follow Button
-                        ElevatedButton(
-                          onPressed: _toggleFollow,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isFollowing ? Colors.transparent : neonGreen,
-                            foregroundColor: _isFollowing ? neonGreen : Colors.black,
-                            side: _isFollowing ? const BorderSide(color: neonGreen) : null,
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                          child: _isFollowLoading
-                              ? SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: _isFollowing ? neonGreen : Colors.black,
-                                  ),
-                                )
-                              : Text(
-                                  _isFollowing ? 'Following' : 'Follow',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                        ),
-                        
-                        const SizedBox(height: 10),
-                      ],
-                    ),
-                  ),
+              title: const Text(
+                '> USER_PROFILE_',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: neonGreen,
+                  letterSpacing: 2,
+                  fontSize: 18,
+                  fontFamily: 'monospace',
                 ),
               ),
             ),
             
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  const SizedBox(height: 20),
+                  ProfileHeader(
+                    profileData: {
+                      'id': widget.userId,
+                      'username': _currentUsername,
+                      'avatar_url': _currentAvatarUrl,
+                      'is_verified': _isVerified,
+                      'bio': _bio,
+                    },
+                    isCurrentUser: SupabaseService.getCurrentUser()?.id == widget.userId,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Follow Button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _toggleFollow,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isFollowing ? Colors.transparent : neonGreen,
+                          foregroundColor: _isFollowing ? neonGreen : Colors.black,
+                          side: _isFollowing ? const BorderSide(color: neonGreen) : null,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        child: _isFollowLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                _isFollowing ? 'STATUS: FOLLOWING' : 'CMD: FOLLOW_USER',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+
             // Stats Card
             SliverToBoxAdapter(
               child: _userScores != null
@@ -573,7 +555,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                           followingCount: _followingCount,
                           postCount: snapshot.data?.length ?? 0,
                           initiallyExpanded: _isStatsExpanded,
-                          showDetailedStats: SupabaseService.getCurrentUser()?.id == widget.userId, 
+                          showDetailedStats: true, // Now public!
                           onInfoPressed: _showStatsInfo,
                           onPostsTap: _canViewContent ? () => _tabController.animateTo(0) : null,
                           onFollowersTap: _canViewContent ? () {

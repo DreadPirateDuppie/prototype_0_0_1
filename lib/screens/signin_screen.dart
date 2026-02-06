@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
+import '../widgets/cyber/cyber_scaffold.dart';
+import '../widgets/cyber/cyber_button.dart';
+import '../widgets/cyber/cyber_text_field.dart';
 import 'signup_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -25,7 +28,7 @@ class _SignInScreenState extends State<SignInScreen> {
   Future<void> _signIn() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter both email and password';
+        _errorMessage = 'Credentials Required';
       });
       return;
     }
@@ -41,7 +44,6 @@ class _SignInScreenState extends State<SignInScreen> {
         _passwordController.text,
       );
       // Success - AuthWrapper will handle navigation
-      // Keep loading state while transitioning
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -60,8 +62,6 @@ class _SignInScreenState extends State<SignInScreen> {
 
     try {
       await SupabaseService.signInWithGoogle();
-      // Success - AuthWrapper will handle navigation
-      // Keep loading state while transitioning
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -74,249 +74,130 @@ class _SignInScreenState extends State<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.center,
-            radius: 1.5,
-            colors: [
-              const Color(0xFF1A1A1A),
-              Colors.black,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo Image with glow effect
-                  Container(
-                    decoration: BoxDecoration(
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF00FF41).withValues(alpha: 0.5),
-                          blurRadius: 40,
-                          spreadRadius: 10,
+    return CyberScaffold(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Logo with Halo
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(seconds: 1),
+                curve: Curves.easeOutBack,
+                builder: (context, value, child) {
+                  return Transform.scale(
+                    scale: value,
+                    child: Opacity(
+                      opacity: value,
+                        child: Image.asset(
+                          'assets/images/pushinn_logo_login.png',
+                          width: 250, // Slightly larger since border is gone
+                          height: 250,
+                          fit: BoxFit.contain,
                         ),
-                      ],
                     ),
-                    child: Image.asset(
-                      'assets/images/pushinn_logo.png',
-                      width: 180,
-                      height: 180,
-                      fit: BoxFit.contain,
+                  );
+                },
+              ),
+              
+              const SizedBox(height: 40),
+              
+              // Animated Form
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 50.0, end: 0.0), // Slide up effect
+                duration: const Duration(milliseconds: 800),
+                curve: Curves.easeOutQuint,
+                builder: (context, value, child) {
+                  return Transform.translate(
+                    offset: Offset(0, value),
+                    child: Opacity(
+                      opacity: (1 - (value / 50)).clamp(0, 1),
+                      child: child,
                     ),
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  // App Name
-                  const Text(
-                    'PUSHINN',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF00FF41),
-                      letterSpacing: 4,
-                      shadows: [
-                        Shadow(
-                          color: Color(0xFF00FF41),
-                          blurRadius: 10,
-                        ),
-                      ],
+                  );
+                },
+                child: Column(
+                  children: [
+                     CyberTextField(
+                      controller: _emailController,
+                      label: 'Identity / Email',
+                      prefixIcon: Icons.fingerprint,
+                      keyboardType: TextInputType.emailAddress,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Find Spots. Skate. Connect.',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                      color: Colors.grey[400],
-                      letterSpacing: 1,
+                    const SizedBox(height: 20),
+                    CyberTextField(
+                      controller: _passwordController,
+                      label: 'Passkey',
+                      prefixIcon: Icons.lock_outline,
+                      obscureText: true,
                     ),
-                  ),
-                  const SizedBox(height: 48),
-
-                  // Input Fields
-                  TextField(
-                    controller: _emailController,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'monospace',
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'EMAIL',
-                      labelStyle: TextStyle(
-                        color: Colors.grey[500],
-                        fontFamily: 'monospace',
-                        letterSpacing: 1,
-                      ),
-                      prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF00FF41)),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey[800]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF00FF41), width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.black.withValues(alpha: 0.5),
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _passwordController,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'monospace',
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'PASSWORD',
-                      labelStyle: TextStyle(
-                        color: Colors.grey[500],
-                        fontFamily: 'monospace',
-                        letterSpacing: 1,
-                      ),
-                      prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF00FF41)),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey[800]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF00FF41), width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.black.withValues(alpha: 0.5),
-                    ),
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 24),
-
-                  if (_errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.1),
-                          border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 13,
-                            fontFamily: 'monospace',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-
-                  if (_isLoading)
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 16),
-                      child: CircularProgressIndicator(color: Color(0xFF00FF41)),
-                    ),
-
-                  // Sign In Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _signIn,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00FF41),
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                        shadowColor: const Color(0xFF00FF41).withValues(alpha: 0.5),
-                      ),
-                      child: const Text(
-                        'SIGN IN',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          letterSpacing: 2,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Google Sign In
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _signInWithGoogle,
-                      icon: const Icon(Icons.account_circle),
-                      label: const Text(
-                        'SIGN IN WITH GOOGLE',
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          letterSpacing: 1,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: BorderSide(color: Colors.grey[800]!),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        backgroundColor: Colors.transparent,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Sign Up Link
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const SignUpScreen(),
-                        ),
-                      );
-                    },
-                    child: RichText(
-                      text: TextSpan(
-                        text: "NEW USER? ",
-                        style: TextStyle(
-                          color: Colors.grey[500],
+                    
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        _errorMessage!.toUpperCase(),
+                        style: const TextStyle(
+                          color: Color(0xFFFF4444),
                           fontFamily: 'monospace',
                           fontSize: 12,
+                          letterSpacing: 1,
                         ),
-                        children: const [
-                          TextSpan(
-                            text: 'INITIALIZE >',
-                            style: TextStyle(
-                              color: Color(0xFF00FF41),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+
+                    const SizedBox(height: 40),
+
+                    CyberButton(
+                      text: "Authenticate",
+                      onPressed: _signIn,
+                      isLoading: _isLoading && _errorMessage == null,
+                      isPrimary: true,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    CyberButton(
+                      text: "Sign In With Google",
+                      onPressed: _signInWithGoogle,
+                      isPrimary: false,
+                      icon: Icons.account_circle,
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const SignUpScreen()),
+                        );
+                      },
+                      child: RichText(
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            color: Colors.grey[500],
                           ),
-                        ],
+                          children: [
+                            const TextSpan(text: "NO ID FOUND? "),
+                            TextSpan(
+                              text: "// INITIALIZE NEW USER",
+                              style: const TextStyle(
+                                color: Color(0xFF00FF41),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),

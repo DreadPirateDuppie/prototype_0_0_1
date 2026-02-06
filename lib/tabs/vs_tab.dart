@@ -89,7 +89,16 @@ class _VsTabContentState extends State<_VsTabContent> {
         return Scaffold(
           backgroundColor: Colors.transparent, // Show global Matrix
           appBar: AppBar(
-            title: const Text('> PUSHINN_'),
+            title: const Text(
+              '> PUSHINN_',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: ThemeColors.matrixGreen,
+                letterSpacing: 2,
+                fontSize: 20,
+                fontFamily: 'monospace',
+              ),
+            ),
             centerTitle: true,
             backgroundColor: Colors.transparent, // Transparent AppBar
             foregroundColor: ThemeColors.matrixGreen,

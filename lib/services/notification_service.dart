@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
@@ -13,6 +13,7 @@ class NotificationService {
   // Notification IDs
   static const int _locationSharingReminderId = 100;
   static const int _locationSharingDisabledId = 101;
+  static const int _locationSharingActiveId = 102;
 
   static Future<void> initialize() async {
     if (_initialized) return;
@@ -48,11 +49,11 @@ class NotificationService {
         );
 
     _initialized = true;
-    developer.log('NotificationService initialized', name: 'NotificationService');
+    AppLogger.log('NotificationService initialized', name: 'NotificationService');
   }
 
   static void _onNotificationTap(NotificationResponse response) {
-    developer.log('Notification tapped: ${response.id}', name: 'NotificationService');
+    AppLogger.log('Notification tapped: ${response.id}', name: 'NotificationService');
     // App automatically opens when notification is tapped
     // You can add navigation logic here if needed
   }
@@ -89,7 +90,7 @@ class NotificationService {
           UILocalNotificationDateInterpretation.absoluteTime,
     );
 
-    developer.log('Scheduled location sharing reminder for $scheduledTime',
+    AppLogger.log('Scheduled location sharing reminder for $scheduledTime',
         name: 'NotificationService');
   }
 
@@ -119,7 +120,7 @@ class NotificationService {
       ),
     );
 
-    developer.log('Showed location sharing disabled notification',
+    AppLogger.log('Showed location sharing disabled notification',
         name: 'NotificationService');
   }
 
@@ -128,7 +129,7 @@ class NotificationService {
     if (!_initialized) await initialize();
 
     await _notifications.cancel(_locationSharingReminderId);
-    developer.log('Cancelled location sharing reminder',
+    AppLogger.log('Cancelled location sharing reminder',
         name: 'NotificationService');
   }
 
@@ -138,7 +139,42 @@ class NotificationService {
 
     await _notifications.cancel(_locationSharingReminderId);
     await _notifications.cancel(_locationSharingDisabledId);
-    developer.log('Cancelled all location sharing notifications',
+    await _notifications.cancel(_locationSharingActiveId);
+    AppLogger.log('Cancelled all location sharing notifications',
+        name: 'NotificationService');
+  }
+
+  /// Show persistent (but dismissible) notification while location is actively shared
+  static Future<void> showActiveLocationSharingNotification(String mode) async {
+    if (!_initialized) await initialize();
+
+    final String modeText = mode == 'public' ? 'Everyone' : 'Friends Only';
+
+    await _notifications.show(
+      _locationSharingActiveId,
+      'Active Location Sharing',
+      'Your location is currently visible to: $modeText',
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'location_status_channel',
+          'Location Status',
+          channelDescription: 'Ongoing status for location sharing',
+          importance: Importance.low, // Lower importance so it doesn't pop up constantly
+          priority: Priority.low,
+          ongoing: false, // Dismissible by user
+          autoCancel: false,
+          color: const Color(0xFF00FF41),
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: false,
+          presentSound: false,
+        ),
+      ),
+    );
+
+    AppLogger.log('Showed active location sharing notification ($mode)',
         name: 'NotificationService');
   }
 
@@ -182,7 +218,7 @@ class NotificationService {
           UILocalNotificationDateInterpretation.absoluteTime,
     );
 
-    developer.log('Scheduled battle expiry notification for $scheduledTime',
+    AppLogger.log('Scheduled battle expiry notification for $scheduledTime',
         name: 'NotificationService');
   }
 
@@ -193,7 +229,7 @@ class NotificationService {
     final notificationId = battleId.hashCode;
     await _notifications.cancel(notificationId);
     
-    developer.log('Cancelled battle notification for $battleId',
+    AppLogger.log('Cancelled battle notification for $battleId',
         name: 'NotificationService');
   }
 }

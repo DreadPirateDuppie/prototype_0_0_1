@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../services/rewarded_ad_service.dart';
+import '../../providers/rewards_provider.dart';
 
 class RewardsEarnSection extends StatelessWidget {
   final VoidCallback onWatchAd;
@@ -111,12 +113,26 @@ class RewardsEarnSection extends StatelessWidget {
   }
 
   Widget _buildWatchAdCard(BuildContext context) {
-    final adService = RewardedAdService.instance;
+    // Watch for changes in RewardedAdService and RewardsProvider
+    final adService = Provider.of<RewardedAdService>(context);
+    final rewardsProvider = Provider.of<RewardsProvider>(context);
+    
     final bool isReady = adService.isAdReady;
     final bool isLoading = adService.isLoading;
+    final bool canWatchAd = rewardsProvider.canWatchAd;
+    final Duration? remaining = rewardsProvider.adCooldownRemaining;
+
+    String? cooldownText;
+    if (remaining != null) {
+      if (remaining.inHours > 0) {
+        cooldownText = 'Next in ${remaining.inHours}h ${remaining.inMinutes % 60}m';
+      } else {
+        cooldownText = 'Next in ${remaining.inMinutes}m';
+      }
+    }
 
     return GestureDetector(
-      onTap: isReady ? onWatchAd : null,
+      onTap: (isReady && canWatchAd) ? onWatchAd : null,
       child: Container(
         width: 120,
         padding: const EdgeInsets.all(16),
@@ -124,7 +140,7 @@ class RewardsEarnSection extends StatelessWidget {
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isReady ? const Color(0xFF00FF41) : Theme.of(context).dividerColor,
+            color: (isReady && canWatchAd) ? const Color(0xFF00FF41) : Theme.of(context).dividerColor,
             width: 1,
           ),
           boxShadow: [
@@ -141,7 +157,7 @@ class RewardsEarnSection extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF00FF41).withValues(alpha: 0.1),
+                color: (canWatchAd ? const Color(0xFF00FF41) : Colors.grey).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: isLoading
@@ -155,25 +171,26 @@ class RewardsEarnSection extends StatelessWidget {
                     )
                   : Icon(
                       Icons.play_circle_filled,
-                      color: isReady ? const Color(0xFF00FF41) : Colors.grey,
+                      color: (isReady && canWatchAd) ? const Color(0xFF00FF41) : Colors.grey,
                       size: 24,
                     ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Watch Ad',
+            Text(
+              canWatchAd ? 'Watch Ad' : 'Cooldown',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
+                color: canWatchAd ? null : Colors.grey,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
-              '+4.2',
+            Text(
+              canWatchAd ? '+4.2' : (cooldownText ?? 'Wait'),
               style: TextStyle(
-                color: Color(0xFF00FF41),
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
+                color: canWatchAd ? const Color(0xFF00FF41) : Colors.grey,
+                fontWeight: canWatchAd ? FontWeight.w900 : FontWeight.normal,
+                fontSize: canWatchAd ? 16 : 10,
               ),
             ),
           ],

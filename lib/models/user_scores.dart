@@ -4,13 +4,15 @@ class UserScores {
   final String userId;
   final double mapScore;
   final double playerScore;
+  final double points;
   final double rankingScore;
 
   UserScores({
     required this.userId,
-    this.mapScore = 0.0, // XP system starts at 0
-    this.playerScore = 0.0, // XP system starts at 0
-    this.rankingScore = 500.0, // Ranking score starts at 500
+    this.mapScore = 0.0,
+    this.playerScore = 0.0,
+    this.rankingScore = 500.0,
+    this.points = 0.0,
   });
 
   // Calculate Final Score as average of the three scores
@@ -75,6 +77,7 @@ class UserScores {
       'map_score': mapScore,
       'player_score': playerScore,
       'ranking_score': rankingScore,
+      'points': points,
     };
   }
 
@@ -84,6 +87,7 @@ class UserScores {
       mapScore: (map['map_score'] as num?)?.toDouble() ?? 0.0, // Default to 0 for XP
       playerScore: (map['player_score'] as num?)?.toDouble() ?? 0.0, // Default to 0 for XP
       rankingScore: (map['ranking_score'] as num?)?.toDouble() ?? 500.0,
+      points: (map['points'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -92,12 +96,14 @@ class UserScores {
     double? mapScore,
     double? playerScore,
     double? rankingScore,
+    double? points,
   }) {
     return UserScores(
       userId: userId ?? this.userId,
       mapScore: mapScore ?? this.mapScore,
       playerScore: playerScore ?? this.playerScore,
       rankingScore: rankingScore ?? this.rankingScore,
+      points: points ?? this.points,
     );
   }
 }

@@ -116,6 +116,97 @@ class _SettingsTabState extends State<SettingsTab> {
     }
   }
 
+  Future<void> _handleDeleteAccount() async {
+    final confirmationController = TextEditingController();
+    bool isDeleting = false;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Colors.redAccent, width: 1),
+            ),
+            title: const Text(
+              '>_CONFIRM_ACCOUNT_WIPE',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'CRITICAL: This action is irreversible. All your posts, ratings, points, and profile data will be purged from the matrix.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Type "DELETE" to confirm destruction:',
+                  style: TextStyle(color: Colors.white54, fontSize: 11, fontFamily: 'monospace'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: confirmationController,
+                  onChanged: (value) => setDialogState(() {}),
+                  style: const TextStyle(color: Colors.redAccent, fontFamily: 'monospace'),
+                  decoration: InputDecoration(
+                    hintText: 'DELETE',
+                    hintStyle: TextStyle(color: Colors.redAccent.withValues(alpha: 0.2)),
+                    filled: true,
+                    fillColor: Colors.redAccent.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isDeleting ? null : () => Navigator.pop(context, false),
+                child: const Text('ABORT', style: TextStyle(color: Colors.white54, fontFamily: 'monospace')),
+              ),
+              TextButton(
+                onPressed: isDeleting || confirmationController.text.trim() != 'DELETE'
+                    ? null
+                    : () async {
+                        setDialogState(() => isDeleting = true);
+                        try {
+                          await SupabaseService.deleteAccount();
+                          if (!context.mounted) return;
+                          Navigator.pop(context, true);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          setDialogState(() => isDeleting = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Deletion failed: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      },
+                child: isDeleting
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.redAccent))
+                    : const Text('CONFIRM_PURGE', style: TextStyle(color: Colors.redAccent, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  }
+
   Future<void> _showEditProfileDialog() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
@@ -370,176 +461,205 @@ class _SettingsTabState extends State<SettingsTab> {
           icon: Icon(Icons.arrow_back, color: neonGreen),
           onPressed: () => Navigator.pop(context),
         ),
+        centerTitle: true,
         title: Text(
           '>_SYSTEM_CONFIG',
           style: TextStyle(
             color: neonGreen,
             fontFamily: 'monospace',
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.bold,
             letterSpacing: 2,
             fontSize: 18,
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+      body: Stack(
         children: [
-          const SizedBox(height: 16),
-          
-          // Premium Banner
-          _buildPremiumBanner(),
-          
-          const SizedBox(height: 24),
-          
-          _buildSectionHeader('PROTOCOL_PREFERENCES'),
-          _buildGlassCard(
-            child: Column(
-              children: [
-                _buildSwitchItem(
-                  'Notifications',
-                  'Push notifications [STATUS: PENDING]',
-                  _notificationsEnabled,
-                  (value) {
-                    setState(() => _notificationsEnabled = value);
-                    _saveNotificationPreference(value);
-                  },
-                ),
-                _buildDivider(),
-                _buildSwitchItem(
-                  'Private Account',
-                  'Only followers can see your posts & pins',
-                  _isPrivate,
-                  (value) async {
-                    setState(() => _isPrivate = value);
-                    try {
-                      await SupabaseService.setPrivacy(value);
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      setState(() => _isPrivate = !value); // Revert on error
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error updating privacy: $e')),
-                      );
-                    }
-                  },
-                ),
-                _buildDivider(),
-                _buildSwitchItem(
-                  'Dark Mode',
-                  'Enable dark theme encryption',
-                  context.watch<ThemeProvider>().isDarkMode,
-                  (value) => context.read<ThemeProvider>().toggleDarkMode(),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          
-          _buildSectionHeader('USER_ACCOUNT'),
-          _buildGlassCard(
-            child: Column(
-              children: [
-                _buildSettingsItem(
-                  'Edit Profile',
-                  Icons.person_outline,
-                  onTap: _showEditProfileDialog,
-                ),
-                _buildDivider(),
-                _buildSettingsItem(
-                  'Privacy Policy',
-                  Icons.privacy_tip_outlined,
-                  onTap: () => _showPolicyDialog('Privacy Policy', 'This app collects and stores:\n• Your email address for authentication\n• Location data for map posts\n• Photos you upload\n• Posts, ratings, and likes\n\nYour data is stored securely on Supabase servers.\n\nWe do not sell or share your personal information with third parties.'),
-                ),
-                _buildDivider(),
-                _buildSettingsItem(
-                  'Terms of Service',
-                  Icons.description_outlined,
-                  onTap: () => _showPolicyDialog('Terms of Service', 'By using this app, you agree to:\n1. Not post inappropriate, offensive, or illegal content\n2. Respect other users and their posts\n3. Not spam or abuse the platform\n4. Take responsibility for the content you post\n5. Respect intellectual property rights'),
-                ),
-                _buildDivider(),
-                _buildSettingsItem(
-                  'About System',
-                  Icons.info_outline,
-                  onTap: () => _showAboutDialog(),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          
-          _buildSectionHeader('SUPPORT_CHANNELS'),
-          _buildGlassCard(
-            child: Column(
-              children: [
-                _buildSettingsItem(
-                  'Send Feedback',
-                  Icons.feedback_outlined,
-                  onTap: _showFeedbackDialog,
-                ),
-                _buildDivider(),
-                _buildSettingsItem(
-                  'Donate Crypto',
-                  Icons.currency_bitcoin,
-                  iconColor: neonGreen,
-                  onTap: _showDonationDialog,
-                ),
-              ],
-            ),
-          ),
-
-          if (_isAdmin && !_isLoadingAdminStatus) ...[
-            const SizedBox(height: 24),
-            _buildSectionHeader('ADMINISTRATION_LEVEL_0'),
-            _buildGlassCard(
-              child: _buildSettingsItem(
-                'Admin Dashboard',
-                Icons.admin_panel_settings_outlined,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AdminDashboard()),
-                  );
-                },
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 32),
-          
-          // Sign Out Button
-          Container(
-            height: 50,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
-              color: Colors.redAccent.withValues(alpha: 0.1),
-            ),
-            child: InkWell(
-              onTap: _handleSignOut,
-              borderRadius: BorderRadius.circular(8),
-              child: const Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              const SizedBox(height: 16),
+              
+              // Premium Banner
+              _buildPremiumBanner(),
+              
+              const SizedBox(height: 24),
+              
+              _buildSectionHeader('PROTOCOL_PREFERENCES'),
+              _buildGlassCard(
+                child: Column(
                   children: [
-                    Icon(Icons.logout, color: Colors.redAccent, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'TERMINATE_SESSION',
-                      style: TextStyle(
-                        color: Colors.redAccent,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                        fontFamily: 'monospace',
-                        fontSize: 13,
-                      ),
+                    _buildSwitchItem(
+                      'Notifications',
+                      'Push notifications [STATUS: PENDING]',
+                      _notificationsEnabled,
+                      (value) {
+                        setState(() => _notificationsEnabled = value);
+                        _saveNotificationPreference(value);
+                      },
+                    ),
+                    _buildDivider(),
+                    _buildSwitchItem(
+                      'Private Account',
+                      'Only followers can see your posts & pins',
+                      _isPrivate,
+                      (value) async {
+                        setState(() => _isPrivate = value);
+                        try {
+                          await SupabaseService.setPrivacy(value);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          setState(() => _isPrivate = !value); // Revert on error
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error updating privacy: $e')),
+                          );
+                        }
+                      },
+                    ),
+                    _buildDivider(),
+                    _buildSwitchItem(
+                      'Dark Mode',
+                      'Enable dark theme encryption',
+                      context.watch<ThemeProvider>().isDarkMode,
+                      (value) => context.read<ThemeProvider>().toggleDarkMode(),
                     ),
                   ],
                 ),
               ),
-            ),
+
+              const SizedBox(height: 24),
+              
+              _buildSectionHeader('USER_ACCOUNT'),
+              _buildGlassCard(
+                child: Column(
+                  children: [
+                    _buildSettingsItem(
+                      'Edit Profile',
+                      Icons.person_outline,
+                      onTap: _showEditProfileDialog,
+                    ),
+                    _buildDivider(),
+                    _buildSettingsItem(
+                      'Privacy Policy',
+                      Icons.privacy_tip_outlined,
+                      onTap: () => _showPolicyDialog('Privacy Policy', 'This app collects and stores:\n• Your email address for authentication\n• Location data for map posts\n• Photos you upload\n• Posts, ratings, and likes\n\nYour data is stored securely on Supabase servers.\n\nWe do not sell or share your personal information with third parties.'),
+                    ),
+                    _buildDivider(),
+                    _buildSettingsItem(
+                      'Terms of Service',
+                      Icons.description_outlined,
+                      onTap: () => _showPolicyDialog('Terms of Service', 'By using this app, you agree to:\n1. Not post inappropriate, offensive, or illegal content\n2. Respect other users and their posts\n3. Not spam or abuse the platform\n4. Take responsibility for the content you post\n5. Respect intellectual property rights'),
+                    ),
+                    _buildDivider(),
+                    _buildSettingsItem(
+                      'About System',
+                      Icons.info_outline,
+                      onTap: () => _showAboutDialog(),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+              
+              _buildSectionHeader('SUPPORT_CHANNELS'),
+              _buildGlassCard(
+                child: Column(
+                  children: [
+                    _buildSettingsItem(
+                      'Send Feedback',
+                      Icons.feedback_outlined,
+                      onTap: _showFeedbackDialog,
+                    ),
+                    _buildDivider(),
+                    _buildSettingsItem(
+                      'Donate Crypto',
+                      Icons.currency_bitcoin,
+                      iconColor: neonGreen,
+                      onTap: _showDonationDialog,
+                    ),
+                  ],
+                ),
+              ),
+
+              if (_isAdmin && !_isLoadingAdminStatus) ...[
+                const SizedBox(height: 24),
+                _buildSectionHeader('ADMINISTRATION_LEVEL_0'),
+                _buildGlassCard(
+                  child: _buildSettingsItem(
+                    'Admin Dashboard',
+                    Icons.admin_panel_settings_outlined,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AdminDashboard()),
+                      );
+                    },
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 32),
+              
+              // Sign Out Button
+              Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                  color: Colors.redAccent.withValues(alpha: 0.1),
+                ),
+                child: InkWell(
+                  onTap: _handleSignOut,
+                  borderRadius: BorderRadius.circular(8),
+                  child: const Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.logout, color: Colors.redAccent, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'TERMINATE_SESSION',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 2,
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Delete Account Button (Danger Zone)
+              Center(
+                child: TextButton(
+                  onPressed: _handleDeleteAccount,
+                  child: Text(
+                    'DELETE_ACCOUNT',
+                    style: TextStyle(
+                      color: Colors.redAccent.withValues(alpha: 0.5),
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 48),
+            ],
           ),
-          const SizedBox(height: 48),
+          if (_isLoading)
+            Container(
+              color: Colors.black54,
+              child: const Center(
+                child: CircularProgressIndicator(color: ThemeColors.matrixGreen),
+              ),
+            ),
         ],
       ),
     );

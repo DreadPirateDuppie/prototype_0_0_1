@@ -1,4 +1,4 @@
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -144,7 +144,7 @@ class _EditPostDialogState extends State<EditPostDialog> {
             newPhotoUrls.add(url);
           }
         } catch (e) {
-          developer.log('Failed to upload image', error: e, name: 'EditPostDialog');
+          AppLogger.log('Failed to upload image', error: e, name: 'EditPostDialog');
         }
       }
       

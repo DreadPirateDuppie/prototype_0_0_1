@@ -6,7 +6,7 @@ import '../models/battle.dart';
 import '../services/battle_service.dart';
 import '../services/supabase_service.dart';
 import '../services/messaging_service.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 
 class BattleDetailProvider extends ChangeNotifier {
   Battle? _battle;
@@ -83,7 +83,7 @@ class BattleDetailProvider extends ChangeNotifier {
             refreshBattle();
           }
         } catch (e) {
-          developer.log('Error in refresh timer: $e');
+          AppLogger.log('Error in refresh timer: $e');
         }
       }
     });
@@ -99,7 +99,7 @@ class BattleDetailProvider extends ChangeNotifier {
       try {
         await BattleService.checkExpiredTurns(userId);
       } catch (e) {
-        developer.log('Error checking expired turns: $e');
+        AppLogger.log('Error checking expired turns: $e');
       }
     }
 
@@ -136,7 +136,7 @@ class BattleDetailProvider extends ChangeNotifier {
         _initBattle(battle);
       }
     } catch (e) {
-      developer.log('Error loading battle: $e');
+      AppLogger.log('Error loading battle: $e');
       _isLoading = false;
       notifyListeners();
       rethrow;
@@ -166,7 +166,7 @@ class BattleDetailProvider extends ChangeNotifier {
       
       notifyListeners();
     } catch (e) {
-      developer.log('Error loading player profiles: $e');
+      AppLogger.log('Error loading player profiles: $e');
     }
   }
 

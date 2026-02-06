@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import '../config/service_locator.dart';
 import '../models/post.dart';
 import '../models/user_scores.dart';
@@ -36,6 +36,7 @@ class SupabaseService {
       _authService.signUp(email, password, displayName: displayName, username: username, age: age);
   static Future<AuthResponse> signIn(String email, String password) => _authService.signIn(email, password);
   static Future<void> signOut() => _authService.signOut();
+  static Future<void> updateLastActive() => _authService.updateLastActive();
 
   // ========== USER DELEGATION ==========
   static Future<Map<String, dynamic>?> getCurrentUserProfile() => _userService.getUserProfile(getCurrentUser()?.id ?? '');
@@ -53,6 +54,7 @@ class SupabaseService {
   static Future<Map<String, dynamic>?> getUserProfile(String userId) => _userService.getUserProfile(userId);
   static Future<void> setPrivacy(bool isPrivate) async => _userService.setPrivacy(getCurrentUser()?.id ?? '', isPrivate);
   static Future<bool> isUserPrivate(String userId) => _userService.isUserPrivate(userId);
+  static Future<String> uploadProfileImage(String userId, File imageFile) => _userService.uploadProfileImage(imageFile, userId);
 
   // ========== SOCIAL DELEGATION ==========
   static Future<void> followUser(String userIdToFollow) => _socialService.followUser(userIdToFollow);
@@ -222,6 +224,7 @@ class SupabaseService {
   static Future<void> recalculateUserXP(String userId) => _pointsService.recalculateUserXP(userId);
   static Future<double> getUserPoints(String userId) => _pointsService.getUserPoints(userId);
   static Future<Map<String, dynamic>> getUserStreak(String userId) => _pointsService.getUserStreak(userId);
+  static Future<DateTime?> getLastTransactionTime(String userId, String type) => _pointsService.getLastTransactionTime(userId, type);
   static Future<List<Map<String, dynamic>>> getPointTransactions(String userId) => _pointsService.getPointTransactions(userId);
   static Future<double> checkDailyStreak() async {
     final userId = getCurrentUser()?.id;
@@ -281,10 +284,11 @@ class SupabaseService {
 
   // ========== AUTH EXTRA DELEGATION ==========
   static Future<bool> signInWithGoogle() => _authService.signInWithGoogle();
+  static Future<void> deleteAccount() => _authService.deleteAccount();
 
   // ========== UTILS ==========
   static void logError(String message, {Object? error, StackTrace? stackTrace}) {
-    developer.log(message, error: error, stackTrace: stackTrace, name: 'SupabaseService');
+    AppLogger.log(message, error: error, stackTrace: stackTrace, name: 'SupabaseService');
   }
 
   static Future<List<Map<String, dynamic>>> getErrorLogs({int? limit}) => _adminService.getErrorLogs(limit: limit);

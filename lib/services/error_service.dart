@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/service_locator.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 
 class ErrorService {
   static SupabaseClient get _client {
@@ -45,7 +45,7 @@ class ErrorService {
       
       // Log to console in debug mode
       if (kDebugMode) {
-        developer.log('Error tracked: $error', name: 'ErrorService', error: error, stackTrace: StackTrace.fromString(stackTrace));
+        AppLogger.log('Error tracked: $error', name: 'ErrorService', error: error, stackTrace: StackTrace.fromString(stackTrace));
       }
 
       await _client.from('error_logs').insert({
@@ -59,7 +59,7 @@ class ErrorService {
       
     } catch (e) {
       // Fail silently to avoid infinite error loops
-      developer.log('Failed to log error to Supabase: $e', name: 'ErrorService');
+      AppLogger.log('Failed to log error to Supabase: $e', name: 'ErrorService');
     }
   }
 

@@ -6,6 +6,7 @@ import '../widgets/rewards/rewards_hero.dart';
 import '../widgets/rewards/rewards_streak_card.dart';
 import '../widgets/rewards/rewards_earn_section.dart';
 import '../widgets/rewards/rewards_transaction_history.dart';
+import '../screens/rewards/transaction_history_screen.dart';
 
 class RewardsTab extends StatefulWidget {
   const RewardsTab({super.key});
@@ -36,6 +37,8 @@ class _RewardsTabState extends State<RewardsTab> {
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF00FF41),
                 letterSpacing: 2,
+                fontSize: 20,
+                fontFamily: 'monospace',
               ),
             ),
             centerTitle: true,
@@ -78,10 +81,12 @@ class _RewardsTabState extends State<RewardsTab> {
                               RewardsTransactionHistory(
                                 transactions: rewardsProvider.transactions,
                                 onViewAll: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Full transaction history coming soon!'),
-                                      duration: Duration(seconds: 2),
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => TransactionHistoryScreen(
+                                        transactions: rewardsProvider.transactions,
+                                      ),
                                     ),
                                   );
                                 },

@@ -10,7 +10,8 @@ import '../services/notification_service.dart';
 import '../models/post.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_screen.dart';
-import '../screens/location_privacy_dialog.dart';
+
+import '../screens/privacy_settings_screen.dart';
 import '../widgets/ad_banner.dart';
 import '../utils/error_helper.dart';
 import '../providers/navigation_provider.dart';
@@ -54,7 +55,8 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
   List<Map<String, dynamic>> _onlineFriendsFeed = []; // All online friends for feed
 
 
-  final String _selectedCategory = 'All';
+  String _selectedCategory = 'All';
+  final List<String> _categories = ['All', 'Skatepark', 'Street', 'DIY', 'Shop', 'Other'];
   bool _hasExplicitlyNavigated = false; // Track if user has manually navigated
 
   void moveToLocation(LatLng location) {
@@ -318,6 +320,9 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
           _checkSharingElapsedTime();
           _startLocationTracking(); // Resume tracking if sharing is on
           _forceLocationUpdate(); // Force immediate update on app start
+          NotificationService.showActiveLocationSharingNotification(_sharingMode);
+        } else {
+          NotificationService.cancelAllLocationNotifications();
         }
         _loadUserPosts(); // Refresh feed based on new settings
       }
@@ -382,6 +387,9 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
       // Stop tracking
       _stopLocationTracking();
       _autoDisableTimer?.cancel();
+      
+      // Cancel active status and other location notifications
+      await NotificationService.cancelAllLocationNotifications();
       
       // Show notification
       await NotificationService.showLocationSharingDisabled();
@@ -496,6 +504,8 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
           _startLocationTracking();
           // Start auto-disable timer (1 hour)
           _startAutoDisableTimer();
+          // Show active sharing notification
+          NotificationService.showActiveLocationSharingNotification(mode);
         }
         _loadUserPosts(); // Refresh feed to show self card
       } else {
@@ -519,23 +529,14 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
   }
 
   Future<void> _openPrivacySettings() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => const LocationPrivacyDialog(),
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PrivacySettingsScreen(),
+      ),
     );
-
-    if (result == true) {
-      // Reload settings after save
-      await _loadPrivacySettings();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Privacy settings updated'),
-            backgroundColor: Color(0xFF00FF41),
-          ),
-        );
-      }
-    }
+    // Reload settings after returning
+    await _loadPrivacySettings();
   }
 
   void _addSampleMarkers() {
@@ -753,14 +754,6 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
     setState(() {
       _isPinMode = !_isPinMode;
     });
-    if (_isPinMode) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tap on the map to place a pin'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
   }
 
   void _handleMapTap(LatLng location) {
@@ -770,16 +763,18 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
   }
 
   void _showAddPostDialog(LatLng location) {
-    showDialog(
-      context: context,
-      builder: (context) => AddPostDialog(
-        location: location,
-        onPostAdded: () {
-          _loadUserPosts();
-          setState(() {
-            _isPinMode = false;
-          });
-        },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => AddPostDialog(
+          location: location,
+          onPostAdded: () {
+            _loadUserPosts();
+            setState(() {
+              _isPinMode = false;
+            });
+          },
+        ),
       ),
     );
   }
@@ -789,229 +784,164 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     
     debugPrint('MapTab: Building with ${markers.length} markers');
-    return Stack(
-      children: [
-        Column(
-          children: [
-            // App Name Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.transparent, // Show global Matrix
-                border: Border(
-                  bottom: BorderSide(
-                    color: const Color(0xFF00FF41).withValues(alpha: 0.3),
-                    width: 1,
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: const Text(
+          '> PUSHINN_',
+          style: TextStyle(
+            color: Color(0xFF00FF41),
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+            fontFamily: 'monospace',
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          const AdBanner(),
+          Expanded(
+            child: Stack(
+              children: [
+                FlutterMap(
+                  mapController: mapController,
+                  options: MapOptions(
+                    initialCenter: currentLocation,
+                    initialZoom: 13.0,
+                    minZoom: 5.0,
+                    maxZoom: 18.0,
+                    onTap: (tapPosition, point) => _handleMapTap(point),
+                    onMapReady: () {
+                      if (mounted) {
+                        setState(() {
+                          _isMapReady = true;
+                        });
+                      }
+                    },
                   ),
-                ),
-              ),
-              child: SafeArea(
-                bottom: false,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      '> PUSHINN_',
-                      style: TextStyle(
-                        color: Color(0xFF00FF41),
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
+                    ColorFiltered(
+                      colorFilter: const ColorFilter.matrix([
+                        0.1, 0, 0, 0, 0,
+                        0, 2.2, 0, 0, 10,
+                        0, 0, 0.1, 0, 0,
+                        0, 0, 0, 1, 0,
+                      ]),
+                      child: TileLayer(
+                        urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                        subdomains: const ['a', 'b', 'c', 'd'],
+                        userAgentPackageName: 'com.pushinn.app',
+                        maxZoom: 19,
+                      ),
+                    ),
+                    MarkerLayer(markers: nonClusterMarkers), // Add non-clustered markers (user location)
+                    MarkerClusterLayerWidget(
+                      options: MarkerClusterLayerOptions(
+                        maxClusterRadius: 120,
+                        size: const Size(40, 40),
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.all(50),
+                        maxZoom: 15,
+                        markers: markers,
+                        builder: (context, markers) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00FF41),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.black, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF00FF41).withValues(alpha: 0.5),
+                                  blurRadius: 8,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                markers.length.toString(),
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
                 ),
-              ),
-            ),
-            const AdBanner(),
-            Expanded(
-              child: Stack(
-                children: [
-                  FlutterMap(
-                    mapController: mapController,
-                    options: MapOptions(
-                      initialCenter: currentLocation,
-                      initialZoom: 13.0,
-                      minZoom: 5.0,
-                      maxZoom: 18.0,
-                      onTap: (tapPosition, point) => _handleMapTap(point),
-                      onMapReady: () {
-                        if (mounted) {
-                          setState(() {
-                            _isMapReady = true;
-                          });
-                        }
-                      },
+                if (_isLoadingLocation)
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.8), // Darkened for readability
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const CircularProgressIndicator(),
                     ),
-                    children: [
-                      ColorFiltered(
-                        colorFilter: const ColorFilter.matrix([
-                          0.1, 0, 0, 0, 0,
-                          0, 2.2, 0, 0, 10,
-                          0, 0, 0.1, 0, 0,
-                          0, 0, 0, 1, 0,
-                        ]),
-                        child: TileLayer(
-                          urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-                          subdomains: const ['a', 'b', 'c', 'd'],
-                          userAgentPackageName: 'com.pushinn.app',
-                          maxZoom: 19,
-                        ),
-                      ),
-                      MarkerLayer(markers: nonClusterMarkers), // Add non-clustered markers (user location)
-                      MarkerClusterLayerWidget(
-                        options: MarkerClusterLayerOptions(
-                          maxClusterRadius: 120,
-                          size: const Size(40, 40),
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.all(50),
-                          maxZoom: 15,
-                          markers: markers,
-                          builder: (context, markers) {
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF00FF41),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.black, width: 2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF00FF41).withValues(alpha: 0.5),
-                                    blurRadius: 8,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Text(
-                                  markers.length.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
                   ),
-                  if (_isLoadingLocation)
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.8), // Darkened for readability
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const CircularProgressIndicator(),
-                      ),
-                    ),
-                  
-                  // Search Bar & Notch Layout (Custom Painted)
-                  Positioned(
-                    top: 12,
-                    left: 16,
-                    right: 16,
-                    child: CustomPaint(
-                      painter: SearchNotchPainter(),
-                      child: SizedBox(
-                        height: 86, // 50 (bar) + 36 (notch)
-                        child: Stack(
-                          children: [
-                            // 1. Search Bar Content (Top)
-                            Positioned(
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              height: 50,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () {
-                                    showSearch(
-                                      context: context,
-                                      delegate: PostSearchDelegate(userPosts),
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(25),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.search_rounded,
-                                          color: const Color(0xFF00FF41).withValues(alpha: 0.8),
-                                          size: 24,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          'Search spots...',
-                                          style: TextStyle(
-                                            color: const Color(0xFF00FF41).withValues(alpha: 0.5),
-                                            fontSize: 16,
-                                            fontFamily: 'monospace',
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            
-                            // 2. Notch Content (Location Slider)
-                            Positioned(
-                              top: 50,
-                              left: 0,
-                              right: 0,
-                              height: 36,
-                              child: Center(
-                                child: SizedBox(
-                                  width: 200, // Matches painter notch width
+                
+                // Category Filter Chips
+                Positioned(
+                  top: 12,
+                  left: 0,
+                  right: 0,
+                  height: 40,
+                  child: _buildFilterChips(),
+                ),
+
+                // Search Bar & Notch Layout (Custom Painted)
+                Positioned(
+                  top: 60, // Moved down to accommodate chips
+                  left: 16,
+                  right: 16,
+                  child: CustomPaint(
+                    painter: SearchNotchPainter(),
+                    child: SizedBox(
+                      height: 86, // 50 (bar) + 36 (notch)
+                      child: Stack(
+                        children: [
+                          // 1. Search Bar Content (Top)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: 50,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  showSearch(
+                                    context: context,
+                                    delegate: PostSearchDelegate(userPosts),
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(25),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(
-                                        _isSharingLocation ? Icons.visibility : Icons.visibility_off,
-                                        size: 16,
-                                        color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey.shade500,
+                                        Icons.search_rounded,
+                                        color: const Color(0xFF00FF41).withValues(alpha: 0.8),
+                                        size: 24,
                                       ),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: 12),
                                       Text(
-                                        _isSharingLocation ? 'Visible' : 'Hidden',
+                                        'Search spots...',
                                         style: TextStyle(
-                                          color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey.shade500,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      SizedBox(
-                                        height: 20,
-                                        width: 36,
-                                        child: FittedBox(
-                                          fit: BoxFit.contain,
-                                          child: Switch(
-                                            value: _isSharingLocation,
-                                            onChanged: _toggleLocationSharing,
-                                            activeThumbColor: const Color(0xFF00FF41),
-                                            activeTrackColor: const Color(0xFF00FF41).withValues(alpha: 0.3),
-                                            inactiveThumbColor: Colors.grey.shade600,
-                                            inactiveTrackColor: Colors.grey.shade800,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      GestureDetector(
-                                        onTap: _openPrivacySettings,
-                                        child: Icon(
-                                          Icons.settings_outlined,
-                                          size: 16,
-                                          color: const Color(0xFF00FF41).withValues(alpha: 0.7),
+                                          color: const Color(0xFF00FF41).withValues(alpha: 0.5),
+                                          fontSize: 16,
+                                          fontFamily: 'monospace',
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ],
@@ -1019,124 +949,61 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // My Location Button (Bottom Left)
-                  Positioned(
-                    bottom: 80, // Lowered from 100
-                    left: 16,
-                    child: _buildVerticalMapButton(
-                      icon: Icons.my_location,
-                      onPressed: () {
-                        mapController.move(currentLocation, 15.0);
-                      },
-                    ),
-                  ),
-
-                  // Zoom Controls (Bottom Right)
-                  Positioned(
-                    bottom: 80, // Lowered from 100
-                    right: 16,
-                    child: Column(
-                      children: [
-                        _buildVerticalMapButton(
-                          icon: Icons.add,
-                          onPressed: () {
-                            mapController.move(
-                              mapController.camera.center,
-                              mapController.camera.zoom + 1,
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildVerticalMapButton(
-                          icon: Icons.remove,
-                          onPressed: () {
-                            mapController.move(
-                              mapController.camera.center,
-                              mapController.camera.zoom - 1,
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // OpenStreetMap Attribution (Required by ODbL License)
-                  Positioned(
-                    bottom: 4,
-                    right: 4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: GestureDetector(
-                        onTap: () async {
-                          // Open OSM copyright page
-                          final uri = Uri.parse('https://www.openstreetmap.org/copyright');
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                          }
-                        },
-                        child: const Text(
-                          '© OpenStreetMap contributors',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.black87,
-                            decoration: TextDecoration.underline,
                           ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  // Online Friends Cards (Bottom)
-
-
-                  // Pin placement button
-                  // Pin placement button - Centered above nav bar
-                  Positioned(
-                    bottom: 40, // Raised from 30
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // PhysicalShape for shadow and clip
-                          PhysicalShape(
-                            clipper: PinClipper(),
-                            color: _isPinMode ? Colors.red.shade600 : const Color(0xFF00FF41),
-                            elevation: 8,
-                            shadowColor: (_isPinMode ? Colors.red : const Color(0xFF00FF41)).withValues(alpha: 0.4),
-                            child: InkWell(
-                              onTap: _togglePinMode,
-                              child: Container(
-                                width: 90, // Wider (was 70)
-                                height: 90, // Taller for pin
-                                alignment: Alignment.center,
-                                padding: const EdgeInsets.only(bottom: 25), // Center icon in the round part
-                                child: Icon(
-                                  _isPinMode ? Icons.close_rounded : Icons.add_location_rounded,
-                                  color: _isPinMode ? Colors.white : Colors.black,
-                                  size: 32,
+                          
+                          // 2. Notch Content (Location Slider)
+                          Positioned(
+                            top: 50,
+                            left: 0,
+                            right: 0,
+                            height: 36,
+                            child: Center(
+                              child: SizedBox(
+                                width: 200, // Matches painter notch width
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      _isSharingLocation ? Icons.visibility : Icons.visibility_off,
+                                      size: 16,
+                                      color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey.shade500,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _isSharingLocation ? 'Visible' : 'Hidden',
+                                      style: TextStyle(
+                                        color: _isSharingLocation ? const Color(0xFF00FF41) : Colors.grey.shade500,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    SizedBox(
+                                      height: 20,
+                                      width: 36,
+                                      child: FittedBox(
+                                        fit: BoxFit.contain,
+                                        child: Switch(
+                                          value: _isSharingLocation,
+                                          onChanged: _toggleLocationSharing,
+                                          activeThumbColor: const Color(0xFF00FF41),
+                                          activeTrackColor: const Color(0xFF00FF41).withValues(alpha: 0.3),
+                                          inactiveThumbColor: Colors.grey.shade600,
+                                          inactiveTrackColor: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    GestureDetector(
+                                      onTap: _openPrivacySettings,
+                                      child: Icon(
+                                        Icons.settings_outlined,
+                                        size: 16,
+                                        color: const Color(0xFF00FF41).withValues(alpha: 0.7),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ),
-                          ),
-                          // Border
-                          IgnorePointer(
-                            child: CustomPaint(
-                              size: const Size(90, 90), // Wider (was 70)
-                              painter: PinBorderPainter(
-                                color: Colors.black,
-                                width: 2,
                               ),
                             ),
                           ),
@@ -1144,15 +1011,175 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+
+                // My Location Button (Bottom Left)
+                Positioned(
+                  bottom: 80, // Lowered from 100
+                  left: 16,
+                  child: _buildVerticalMapButton(
+                    icon: Icons.my_location,
+                    onPressed: () {
+                      mapController.move(currentLocation, 15.0);
+                    },
+                  ),
+                ),
+
+                // Zoom Controls (Bottom Right)
+                Positioned(
+                  bottom: 80, // Lowered from 100
+                  right: 16,
+                  child: Column(
+                    children: [
+                      _buildVerticalMapButton(
+                        icon: Icons.add,
+                        onPressed: () {
+                          mapController.move(
+                            mapController.camera.center,
+                            mapController.camera.zoom + 1,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildVerticalMapButton(
+                        icon: Icons.remove,
+                        onPressed: () {
+                          mapController.move(
+                            mapController.camera.center,
+                            mapController.camera.zoom - 1,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // OpenStreetMap Attribution (Required by ODbL License)
+                Positioned(
+                  bottom: 4,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: GestureDetector(
+                      onTap: () async {
+                        // Open OSM copyright page
+                        final uri = Uri.parse('https://www.openstreetmap.org/copyright');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      child: const Text(
+                        '© OpenStreetMap contributors',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.black87,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Pin placement button
+                Positioned(
+                  bottom: 40,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: _togglePinMode,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _isPinMode ? Colors.red : const Color(0xFF00FF41),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_isPinMode ? Colors.red : const Color(0xFF00FF41)).withValues(alpha: 0.5),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            ),
+                            if (_isPinMode)
+                              BoxShadow(
+                                color: Colors.red.withValues(alpha: 0.3),
+                                blurRadius: 30,
+                                spreadRadius: 5,
+                              ),
+                          ],
+                        ),
+                        child: Icon(
+                          _isPinMode ? Icons.close_rounded : Icons.add_location_rounded,
+                          color: _isPinMode ? Colors.red : const Color(0xFF00FF41),
+                          size: 36,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
+  Widget _buildFilterChips() {
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _categories.length,
+      itemBuilder: (context, index) {
+        final category = _categories[index];
+        final isSelected = _selectedCategory == category;
+        return Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: ChoiceChip(
+            label: Text(
+              category.toUpperCase(),
+              style: TextStyle(
+                color: isSelected ? Colors.black : const Color(0xFF00FF41),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+              ),
+            ),
+            selected: isSelected,
+            onSelected: (selected) {
+              if (selected) {
+                setState(() {
+                  _selectedCategory = category;
+                });
+                _loadUserPosts();
+              }
+            },
+            selectedColor: const Color(0xFF00FF41),
+            backgroundColor: Colors.black.withValues(alpha: 0.7),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+              side: BorderSide(
+                color: const Color(0xFF00FF41).withValues(alpha: isSelected ? 1 : 0.3),
+                width: 1,
+              ),
+            ),
+            showCheckmark: false,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            visualDensity: VisualDensity.compact,
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildVerticalMapButton({
     required IconData icon,
@@ -1389,59 +1416,3 @@ class PostSearchDelegate extends SearchDelegate<MapPost?> {
   }
 }
 
-class PinClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    path.moveTo(size.width / 2, size.height);
-    path.cubicTo(
-      size.width, size.height * 0.6,
-      size.width, 0,
-      size.width / 2, 0,
-    );
-    path.cubicTo(
-      0, 0,
-      0, size.height * 0.6,
-      size.width / 2, size.height,
-    );
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
-}
-
-class PinBorderPainter extends CustomPainter {
-  final Color color;
-  final double width;
-
-  PinBorderPainter({required this.color, required this.width});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = width;
-
-    final path = Path();
-    path.moveTo(size.width / 2, size.height);
-    path.cubicTo(
-      size.width, size.height * 0.6,
-      size.width, 0,
-      size.width / 2, 0,
-    );
-    path.cubicTo(
-      0, 0,
-      0, size.height * 0.6,
-      size.width / 2, size.height,
-    );
-    path.close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

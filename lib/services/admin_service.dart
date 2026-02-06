@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import '../config/service_locator.dart';
 import '../models/post.dart';
 import 'points_service.dart';
@@ -31,25 +31,25 @@ class AdminService {
     try {
       final user = _client.auth.currentUser;
       if (user == null) {
-        developer.log('User not logged in', name: 'AdminCheck');
+        AppLogger.log('User not logged in', name: 'AdminCheck');
         return false;
       }
 
       // Check if the user is a hardcoded admin (emergency fallback)
       // Note: In production, move these to environment variables for security
       // These should be removed once proper admin management is in place
-      final hardcodedAdmins = const String.fromEnvironment(
-        'ADMIN_EMAILS',
-        defaultValue: 'admin@example.com,123@123.com',
-      ).split(',');
+      // Check if the user is a hardcoded admin (emergency fallback)
+      // Note: In production, move these to environment variables or remove entirely
+      final hardcodedAdminsEnv = const String.fromEnvironment('ADMIN_EMAILS');
+      final hardcodedAdmins = hardcodedAdminsEnv.isNotEmpty ? hardcodedAdminsEnv.split(',') : <String>[];
       
       if (hardcodedAdmins.contains(user.email)) {
-        developer.log('User is hardcoded admin', name: 'AdminCheck');
+        AppLogger.log('User is hardcoded admin via environment variables', name: 'AdminCheck');
         return true;
       }
 
       // Check the user_profiles table for admin status
-      developer.log(
+      AppLogger.log(
         'Checking admin status for user: ${user.email} (${user.id})',
         name: 'AdminCheck',
       );
@@ -62,13 +62,13 @@ class AdminService {
           .timeout(const Duration(seconds: 5));
 
       final isAdmin = response?['is_admin'] == true;
-      developer.log(
+      AppLogger.log(
         'Database admin status for ${user.email}: $isAdmin',
         name: 'AdminCheck',
       );
       return isAdmin;
     } on PostgrestException catch (e) {
-      developer.log(
+      AppLogger.log(
         'Database error checking admin status: ${e.message}',
         name: 'AdminCheck',
         error: e,
@@ -76,7 +76,7 @@ class AdminService {
       );
       return false;
     } catch (e, stackTrace) {
-      developer.log(
+      AppLogger.log(
         'Error checking admin status',
         name: 'AdminCheck',
         error: e,
@@ -98,7 +98,7 @@ class AdminService {
 
       return response?['is_admin'] == true;
     } catch (e) {
-      developer.log('Error checking user admin status: $e', name: 'AdminService');
+      AppLogger.log('Error checking user admin status: $e', name: 'AdminService');
       return false;
     }
   }
@@ -110,10 +110,10 @@ class AdminService {
         'id': userId,
         'is_admin': isAdmin,
       });
-      developer.log('Set admin status for $userId to $isAdmin',
+      AppLogger.log('Set admin status for $userId to $isAdmin',
           name: 'AdminService');
     } catch (e) {
-      developer.log('Error setting admin status: $e', name: 'AdminService');
+      AppLogger.log('Error setting admin status: $e', name: 'AdminService');
       throw Exception('Failed to set admin status: $e');
     }
   }
@@ -128,7 +128,7 @@ class AdminService {
 
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting reported posts: $e', name: 'AdminService');
+      AppLogger.log('Error getting reported posts: $e', name: 'AdminService');
       return [];
     }
   }
@@ -141,7 +141,7 @@ class AdminService {
           .update({'status': status, 'resolved_at': DateTime.now().toIso8601String()})
           .eq('id', reportId);
     } catch (e) {
-      developer.log('Error updating report status: $e', name: 'AdminService');
+      AppLogger.log('Error updating report status: $e', name: 'AdminService');
       throw Exception('Failed to update report status: $e');
     }
   }
@@ -160,7 +160,7 @@ class AdminService {
       final posts = (response as List).cast<Map<String, dynamic>>();
       return posts.map((p) => MapPost.fromMap(p)).toList();
     } catch (e) {
-      developer.log('Error getting unverified posts: $e', name: 'AdminService');
+      AppLogger.log('Error getting unverified posts: $e', name: 'AdminService');
       return [];
     }
   }
@@ -194,9 +194,9 @@ class AdminService {
         referenceId: postId,
       );
 
-      developer.log('Verified post $postId and awarded points to $userId', name: 'AdminService');
+      AppLogger.log('Verified post $postId and awarded points to $userId', name: 'AdminService');
     } catch (e) {
-      developer.log('Error verifying post: $e', name: 'AdminService');
+      AppLogger.log('Error verifying post: $e', name: 'AdminService');
       throw Exception('Failed to verify post: $e');
     }
   }
@@ -212,7 +212,7 @@ class AdminService {
 
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting pending videos: $e', name: 'AdminService');
+      AppLogger.log('Error getting pending videos: $e', name: 'AdminService');
       return [];
     }
   }
@@ -225,7 +225,7 @@ class AdminService {
           .update({'status': status, 'moderated_at': DateTime.now().toIso8601String()})
           .eq('id', videoId);
     } catch (e) {
-      developer.log('Error moderating video: $e', name: 'AdminService');
+      AppLogger.log('Error moderating video: $e', name: 'AdminService');
       throw Exception('Failed to moderate video: $e');
     }
   }
@@ -241,7 +241,7 @@ class AdminService {
       );
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting cohort retention: $e', name: 'AdminService');
+      AppLogger.log('Error getting cohort retention: $e', name: 'AdminService');
       return [];
     }
   }
@@ -256,7 +256,7 @@ class AdminService {
       }
       return {'ratio': 0.0, 'dau': 0, 'mau': 0};
     } catch (e) {
-      developer.log('Error getting stickiness ratio: $e', name: 'AdminService');
+      AppLogger.log('Error getting stickiness ratio: $e', name: 'AdminService');
       return {'ratio': 0.0, 'dau': 0, 'mau': 0};
     }
   }
@@ -270,7 +270,7 @@ class AdminService {
       );
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting health scores: $e', name: 'AdminService');
+      AppLogger.log('Error getting health scores: $e', name: 'AdminService');
       return [];
     }
   }
@@ -281,7 +281,7 @@ class AdminService {
       final response = await _client.rpc('get_time_to_value_stats');
       return (response as num?)?.toDouble() ?? 0.0;
     } catch (e) {
-      developer.log('Error getting TTV: $e', name: 'AdminService');
+      AppLogger.log('Error getting TTV: $e', name: 'AdminService');
       return 0.0;
     }
   }
@@ -295,7 +295,7 @@ class AdminService {
       );
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting at-risk users: $e', name: 'AdminService');
+      AppLogger.log('Error getting at-risk users: $e', name: 'AdminService');
       return [];
     }
   }
@@ -309,7 +309,7 @@ class AdminService {
       );
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting daily post stats: $e', name: 'AdminService');
+      AppLogger.log('Error getting daily post stats: $e', name: 'AdminService');
       return [];
     }
   }
@@ -323,7 +323,7 @@ class AdminService {
       );
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting user growth stats: $e', name: 'AdminService');
+      AppLogger.log('Error getting user growth stats: $e', name: 'AdminService');
       return [];
     }
   }
@@ -391,7 +391,7 @@ class AdminService {
       };
 
     } catch (e) {
-      developer.log('Error getting paginated users: $e', name: 'AdminService');
+      AppLogger.log('Error getting paginated users: $e', name: 'AdminService');
       throw Exception('Failed to load users: $e');
     }
   }
@@ -413,7 +413,7 @@ class AdminService {
 
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting point transactions: $e', name: 'AdminService');
+      AppLogger.log('Error getting point transactions: $e', name: 'AdminService');
       return [];
     }
   }
@@ -429,7 +429,7 @@ class AdminService {
 
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting XP history: $e', name: 'AdminService');
+      AppLogger.log('Error getting XP history: $e', name: 'AdminService');
       return [];
     }
   }
@@ -466,9 +466,9 @@ class AdminService {
         'updated_at': DateTime.now().toIso8601String(),
       });
 
-      developer.log('Added transaction of $amount for user $userId', name: 'AdminService');
+      AppLogger.log('Added transaction of $amount for user $userId', name: 'AdminService');
     } catch (e) {
-      developer.log('Error adding point transaction: $e', name: 'AdminService');
+      AppLogger.log('Error adding point transaction: $e', name: 'AdminService');
       throw Exception('Failed to add point transaction: $e');
     }
   }
@@ -493,9 +493,9 @@ class AdminService {
         'updated_at': DateTime.now().toIso8601String(),
       });
 
-      developer.log('Deleted transaction $transactionId and reversed $amount points', name: 'AdminService');
+      AppLogger.log('Deleted transaction $transactionId and reversed $amount points', name: 'AdminService');
     } catch (e) {
-      developer.log('Error deleting point transaction: $e', name: 'AdminService');
+      AppLogger.log('Error deleting point transaction: $e', name: 'AdminService');
       throw Exception('Failed to delete point transaction: $e');
     }
   }
@@ -508,9 +508,9 @@ class AdminService {
         'ban_reason': reason,
         'banned_at': DateTime.now().toIso8601String(),
       }).eq('id', userId);
-      developer.log('Banned user $userId: $reason', name: 'AdminService');
+      AppLogger.log('Banned user $userId: $reason', name: 'AdminService');
     } catch (e) {
-      developer.log('Error banning user: $e', name: 'AdminService');
+      AppLogger.log('Error banning user: $e', name: 'AdminService');
       throw Exception('Failed to ban user: $e');
     }
   }
@@ -523,9 +523,9 @@ class AdminService {
         'ban_reason': null,
         'banned_at': null,
       }).eq('id', userId);
-      developer.log('Unbanned user $userId', name: 'AdminService');
+      AppLogger.log('Unbanned user $userId', name: 'AdminService');
     } catch (e) {
-      developer.log('Error unbanning user: $e', name: 'AdminService');
+      AppLogger.log('Error unbanning user: $e', name: 'AdminService');
       throw Exception('Failed to unban user: $e');
     }
   }
@@ -536,9 +536,9 @@ class AdminService {
       await _client.from('user_profiles').update({
         'can_post': canPost,
       }).eq('id', userId);
-      developer.log('Set posting restriction for $userId to $canPost', name: 'AdminService');
+      AppLogger.log('Set posting restriction for $userId to $canPost', name: 'AdminService');
     } catch (e) {
-      developer.log('Error toggling posting restriction: $e', name: 'AdminService');
+      AppLogger.log('Error toggling posting restriction: $e', name: 'AdminService');
       throw Exception('Failed to toggle posting restriction: $e');
     }
   }
@@ -549,9 +549,9 @@ class AdminService {
       await _client.from('user_profiles').update({
         'is_verified': true,
       }).eq('id', userId);
-      developer.log('Verified user $userId', name: 'AdminService');
+      AppLogger.log('Verified user $userId', name: 'AdminService');
     } catch (e) {
-      developer.log('Error verifying user: $e', name: 'AdminService');
+      AppLogger.log('Error verifying user: $e', name: 'AdminService');
       throw Exception('Failed to verify user: $e');
     }
   }
@@ -562,9 +562,9 @@ class AdminService {
       await _client.from('user_profiles').update({
         'is_verified': false,
       }).eq('id', userId);
-      developer.log('Unverified user $userId', name: 'AdminService');
+      AppLogger.log('Unverified user $userId', name: 'AdminService');
     } catch (e) {
-      developer.log('Error unverifying user: $e', name: 'AdminService');
+      AppLogger.log('Error unverifying user: $e', name: 'AdminService');
       throw Exception('Failed to unverify user: $e');
     }
   }
@@ -592,7 +592,7 @@ class AdminService {
         'total_battles': battlesCount.count,
       };
     } catch (e) {
-      developer.log('Error getting app stats: $e', name: 'AdminService');
+      AppLogger.log('Error getting app stats: $e', name: 'AdminService');
       return {
         'total_posts': 0,
         'total_users': 0,
@@ -631,7 +631,7 @@ class AdminService {
         'competitive_spots': competitiveSpots,
       };
     } catch (e) {
-      developer.log('Error getting detailed battle stats: $e', name: 'AdminService');
+      AppLogger.log('Error getting detailed battle stats: $e', name: 'AdminService');
       return {
         'max_wager': 0,
         'competitive_spots': [],
@@ -649,7 +649,7 @@ class AdminService {
       final response = await query;
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      developer.log('Error getting error logs: $e', name: 'AdminService');
+      AppLogger.log('Error getting error logs: $e', name: 'AdminService');
       return [];
     }
   }
@@ -673,7 +673,7 @@ class AdminService {
       
       return response?['value'] as Map<String, dynamic>?;
     } catch (e) {
-      developer.log('Error getting app settings: $e', name: 'AdminService');
+      AppLogger.log('Error getting app settings: $e', name: 'AdminService');
       return null;
     }
   }
@@ -686,9 +686,9 @@ class AdminService {
         'value': value,
         'updated_at': DateTime.now().toIso8601String(),
       });
-      developer.log('Updated app settings for $key', name: 'AdminService');
+      AppLogger.log('Updated app settings for $key', name: 'AdminService');
     } catch (e) {
-      developer.log('Error updating app settings: $e', name: 'AdminService');
+      AppLogger.log('Error updating app settings: $e', name: 'AdminService');
       throw Exception('Failed to update app settings: $e');
     }
   }

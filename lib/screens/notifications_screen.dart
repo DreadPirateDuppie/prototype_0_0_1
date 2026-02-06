@@ -88,6 +88,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
           icon: const Icon(Icons.arrow_back, color: matrixGreen),
           onPressed: () => Navigator.pop(context),
         ),
+        centerTitle: true,
         title: const Text(
           'Notifications',
           style: TextStyle(
@@ -95,6 +96,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
             fontWeight: FontWeight.bold,
             fontSize: 20,
             letterSpacing: 0.5,
+            fontFamily: 'monospace',
           ),
         ),
         actions: [

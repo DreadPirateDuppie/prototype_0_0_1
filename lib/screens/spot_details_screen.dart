@@ -83,23 +83,22 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
     setState(() => _isLoadingTricks = true);
     
     try {
-      // Placeholder for trick loading logic
-      // In a real implementation, this would fetch from Supabase
-      // await SupabaseService.getSpotVideos(currentPost.id!, _sortBy);
-      
-      // Simulating network delay and empty list for now
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Fetch actual tricks from Supabase
+      final archive = await SupabaseService.getSpotArchive(
+        currentPost.id!,
+        category: _selectedTag == 'All' ? null : _selectedTag.toLowerCase(),
+      );
       
       if (mounted) {
         setState(() {
-          _tricks = []; // Placeholder
+          _tricks = archive;
           _isLoadingTricks = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingTricks = false);
-        // ErrorHelper.showError(context, 'Error loading tricks: $e');
+        ErrorHelper.showError(context, 'Error loading tricks: $e');
       }
     }
   }

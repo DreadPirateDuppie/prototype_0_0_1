@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
 class NavigationProvider extends ChangeNotifier {
-  int _selectedIndex = 0;
+  int _selectedIndex = 2; // Map is default screen
   LatLng? _targetLocation;
 
   int get selectedIndex => _selectedIndex;

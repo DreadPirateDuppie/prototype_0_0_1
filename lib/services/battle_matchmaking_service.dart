@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:developer' as developer;
+import '../utils/logger.dart';
 import '../models/battle.dart';
 import 'battle_service.dart';
 import 'supabase_service.dart';
@@ -38,9 +38,9 @@ class BattleMatchmakingService {
         'battle_id': null,
       }, onConflict: 'user_id');
       
-      developer.log('Joined matchmaking queue with ranking: ${userScores.rankingScore}', name: 'BattleMatchmakingService');
+      AppLogger.log('Joined matchmaking queue with ranking: ${userScores.rankingScore}', name: 'BattleMatchmakingService');
     } catch (e) {
-      developer.log('Error joining matchmaking queue: $e', name: 'BattleMatchmakingService');
+      AppLogger.log('Error joining matchmaking queue: $e', name: 'BattleMatchmakingService');
       rethrow;
     }
   }
@@ -50,9 +50,9 @@ class BattleMatchmakingService {
     try {
       final userId = _client.auth.currentUser!.id;
       await _client.from('matchmaking_queue').delete().eq('user_id', userId);
-      developer.log('Left matchmaking queue', name: 'BattleMatchmakingService');
+      AppLogger.log('Left matchmaking queue', name: 'BattleMatchmakingService');
     } catch (e) {
-      developer.log('Error leaving matchmaking queue: $e', name: 'BattleMatchmakingService');
+      AppLogger.log('Error leaving matchmaking queue: $e', name: 'BattleMatchmakingService');
     }
   }
 
@@ -94,7 +94,7 @@ class BattleMatchmakingService {
       }
       return null;
     } catch (e) {
-      developer.log('Error finding match: $e', name: 'BattleMatchmakingService');
+      AppLogger.log('Error finding match: $e', name: 'BattleMatchmakingService');
       return null;
     }
   }
@@ -184,7 +184,7 @@ class BattleMatchmakingService {
       
       return battle;
     } catch (e) {
-      developer.log('Error creating battle from match: $e', name: 'BattleMatchmakingService');
+      AppLogger.log('Error creating battle from match: $e', name: 'BattleMatchmakingService');
       rethrow;
     }
   }

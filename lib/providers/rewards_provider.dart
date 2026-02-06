@@ -7,9 +7,12 @@ class RewardsProvider extends ChangeNotifier {
   double _points = 0.0;
   int _streak = 0;
   DateTime? _lastLoginDate;
+  DateTime? _lastAdTime;
   List<Map<String, dynamic>> _transactions = [];
   bool _isLoading = false;
   String? _error;
+
+  static const Duration adCooldown = Duration(hours: 2);
 
   // Getters
   double get points => _points;
@@ -18,6 +21,17 @@ class RewardsProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get transactions => _transactions;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  
+  bool get canWatchAd {
+    if (_lastAdTime == null) return true;
+    return DateTime.now().difference(_lastAdTime!) >= adCooldown;
+  }
+
+  Duration? get adCooldownRemaining {
+    if (canWatchAd) return null;
+    final remaining = adCooldown - DateTime.now().difference(_lastAdTime!);
+    return remaining.isNegative ? null : remaining;
+  }
 
   bool hasCheckedInToday() {
     if (_lastLoginDate == null) return false;
@@ -81,6 +95,10 @@ class RewardsProvider extends ChangeNotifier {
           _streak = dbStreak;
         }
       }
+
+      // Fetch last ad time from PointsService
+      _lastAdTime = await SupabaseService.getLastTransactionTime(user.id, 'ad_watch');
+      
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -111,6 +129,12 @@ class RewardsProvider extends ChangeNotifier {
     required Function(String) onError,
   }) async {
     final adService = RewardedAdService.instance;
+    
+    if (!canWatchAd) {
+      onError('Please wait for the cooldown to expire');
+      return;
+    }
+
     if (!adService.isAdReady) {
       onError('Ad is not ready yet');
       return;
@@ -118,7 +142,7 @@ class RewardsProvider extends ChangeNotifier {
 
     await adService.showAd();
     await loadData();
-    onRewardEarned(4); // 4.2 points awarded in adService, but UI expectation is int for onRewardEarned
+    onRewardEarned(4.2.toInt()); // Standardizing to integer for UI but acknowledging the 4.2 value
   }
 
   void clearError() {

@@ -9,7 +9,7 @@ import '../services/social_service.dart';
 import '../services/location_service.dart';
 import '../services/trick_service.dart';
 
-import '../services/ghost_line_service.dart';
+
 
 /// Global service locator instance
 final getIt = GetIt.instance;
@@ -55,9 +55,7 @@ void setupServiceLocator() {
     () => TrickService(client: getIt<SupabaseClient>()),
   );
 
-  getIt.registerLazySingleton<GhostLineService>(
-    () => GhostLineService(client: getIt<SupabaseClient>()),
-  );
+
 }
 
 /// Set up the service locator for testing with mock dependencies.
@@ -104,9 +102,7 @@ Future<void> setupServiceLocatorForTesting({SupabaseClient? mockSupabaseClient})
     () => TrickService(client: mockSupabaseClient),
   );
 
-  getIt.registerLazySingleton<GhostLineService>(
-    () => GhostLineService(client: mockSupabaseClient),
-  );
+
 }
 
 /// Reset the service locator (useful for testing cleanup)
