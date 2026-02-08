@@ -13,26 +13,45 @@
 BEGIN;
 
 -- ========================================================
--- 1. SECURITY: INFRASTRUCTURE HARDENING
+-- 1. SECURITY: EXTENSION HARDENING (Fix for spatial_ref_sys)
 -- ========================================================
+-- Moving PostGIS to a dedicated schema resolves the "RLS disabled in public" 
+-- warning for spatial_ref_sys without requiring ownership of system tables.
 
--- Move PostGIS to internal schema to clean up public
+-- A. Create internal schema
 CREATE SCHEMA IF NOT EXISTS extensions;
 GRANT USAGE ON SCHEMA extensions TO postgres, anon, authenticated, service_role;
 
+-- B. Update search path to include the new schema (Crucial for app stability)
+-- This ensures that function calls like st_distance() still work without schema prefixing.
+DO $$
+DECLARE
+    current_path TEXT;
+BEGIN
+    SELECT setting INTO current_path FROM pg_settings WHERE name = 'search_path';
+    IF current_path NOT LIKE '%extensions%' THEN
+        EXECUTE 'ALTER DATABASE postgres SET search_path TO ' || current_path || ', extensions';
+        -- Also set for current session to avoid immediate errors
+        EXECUTE 'SET search_path TO ' || current_path || ', extensions';
+    END IF;
+END $$;
+
+-- C. Move the extension
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
-    BEGIN
-      ALTER EXTENSION postgis SET SCHEMA extensions;
-    EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'Could not move postgis: %', SQLERRM;
-    END;
+    -- Ensure we are in a schema we have ownership over for the move
+    IF (SELECT extnamespace::regnamespace::text FROM pg_extension WHERE extname = 'postgis') = 'public' THEN
+      BEGIN
+        ALTER EXTENSION postgis SET SCHEMA extensions;
+      EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Note: Could not move postgis via ALTER EXTENSION. This usually happens if you are not a superuser. Manual move in dashboard may be required if warning persists.';
+      END;
+    END IF;
   END IF;
 END $$;
 
--- Note: Removing RLS enablement on spatial_ref_sys as it is extension-owned.
--- Moving the extension to the 'extensions' schema (above) is the correct fix.
+-- Note: RLS on spatial_ref_sys is NOT required when it is moved out of the public schema.
 
 -- ========================================================
 -- 2. SECURITY: PARTITION RLS ENFORCEMENT
