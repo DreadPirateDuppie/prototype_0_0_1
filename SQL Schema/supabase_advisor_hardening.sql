@@ -109,6 +109,7 @@ ALTER INDEX IF EXISTS public.idx_map_posts_location RENAME TO to_be_dropped_idx_
 -- Reducing evaluation overhead by merging redundant policies.
 
 -- Map Posts: Consolidate INSERT/UPDATE/DELETE into ALL owner policy
+DROP POLICY IF EXISTS "Map posts manage own" ON public.map_posts;
 DROP POLICY IF EXISTS "Map posts modify own" ON public.map_posts;
 DROP POLICY IF EXISTS "Map posts insert by owner" ON public.map_posts;
 DROP POLICY IF EXISTS "Map posts update by owner" ON public.map_posts;
@@ -119,6 +120,7 @@ USING ((SELECT auth.uid()) = user_id)
 WITH CHECK ((SELECT auth.uid()) = user_id);
 
 -- Battles: Consolidate participant policies
+DROP POLICY IF EXISTS "Battles manage participant" ON public.battles;
 DROP POLICY IF EXISTS "Battles modify participant" ON public.battles;
 DROP POLICY IF EXISTS "Battles participant actions" ON public.battles;
 CREATE POLICY "Battles manage participant" ON public.battles 
@@ -127,6 +129,7 @@ USING ((SELECT auth.uid()) IN (player1_id, player2_id))
 WITH CHECK ((SELECT auth.uid()) IN (player1_id, player2_id));
 
 -- Follows: Consolidate lifecycle policies
+DROP POLICY IF EXISTS "Follows manage own" ON public.follows;
 DROP POLICY IF EXISTS "Follows insert by follower" ON public.follows;
 DROP POLICY IF EXISTS "Follows delete by follower" ON public.follows;
 CREATE POLICY "Follows manage own" ON public.follows
@@ -135,6 +138,7 @@ USING (follower_id = (SELECT auth.uid()))
 WITH CHECK (follower_id = (SELECT auth.uid()));
 
 -- User Profiles: Consolidate management policies
+DROP POLICY IF EXISTS "User profiles manage own" ON public.user_profiles;
 DROP POLICY IF EXISTS "User profiles update own" ON public.user_profiles;
 DROP POLICY IF EXISTS "User profiles insert own" ON public.user_profiles;
 CREATE POLICY "User profiles manage own" ON public.user_profiles
