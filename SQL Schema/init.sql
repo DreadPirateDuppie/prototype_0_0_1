@@ -4,6 +4,7 @@
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- ========================================================
 -- CLEANUP LEGACY OBJECTS (Ghost Busting)
@@ -69,6 +70,12 @@ CREATE INDEX IF NOT EXISTS idx_user_profiles_is_admin ON public.user_profiles(is
 CREATE INDEX IF NOT EXISTS idx_user_profiles_is_verified ON public.user_profiles(is_verified);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_location_sharing ON public.user_profiles(location_sharing_mode) WHERE location_sharing_mode != 'off';
 
+-- Scalability Fix: Full-Text Search Index for user search
+ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS fts_name tsvector GENERATED ALWAYS AS (
+  to_tsvector('english', coalesce(username, '') || ' ' || coalesce(display_name, ''))
+) STORED;
+CREATE INDEX IF NOT EXISTS idx_user_profiles_fts ON public.user_profiles USING GIN (fts_name);
+
 -- 2. map_posts
 CREATE TABLE IF NOT EXISTS public.map_posts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -93,6 +100,7 @@ CREATE TABLE IF NOT EXISTS public.map_posts (
     popularity_rating DOUBLE PRECISION DEFAULT 0.0,
     security_rating DOUBLE PRECISION DEFAULT 0.0,
     quality_rating DOUBLE PRECISION DEFAULT 0.0,
+    mvp_last_updated_at TIMESTAMP WITH TIME ZONE DEFAULT '-infinity',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -292,6 +300,12 @@ CREATE TABLE IF NOT EXISTS public.trick_definitions (
 
 CREATE INDEX IF NOT EXISTS idx_trick_definitions_slug ON trick_definitions(slug);
 
+-- Scalability Fix: Full-Text Search Index for trick search
+ALTER TABLE public.trick_definitions ADD COLUMN IF NOT EXISTS fts_name tsvector GENERATED ALWAYS AS (
+  to_tsvector('english', display_name)
+) STORED;
+CREATE INDEX IF NOT EXISTS idx_trick_definitions_fts ON public.trick_definitions USING GIN (fts_name);
+
 -- 14. trick_aliases
 CREATE TABLE IF NOT EXISTS public.trick_aliases (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -470,6 +484,7 @@ CREATE TABLE IF NOT EXISTS public.conversation_participants (
   joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   role VARCHAR(20) DEFAULT 'member' CHECK (role IN ('admin', 'moderator', 'member')),
   last_read_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   is_pinned BOOLEAN DEFAULT FALSE,
   is_muted BOOLEAN DEFAULT FALSE,
   UNIQUE(conversation_id, user_id)
@@ -478,39 +493,76 @@ CREATE TABLE IF NOT EXISTS public.conversation_participants (
 
 CREATE INDEX IF NOT EXISTS idx_conversation_participants_conv_id ON public.conversation_participants(conversation_id);
 
--- 28. messages
-CREATE TABLE IF NOT EXISTS public.messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversation_id UUID NOT NULL REFERENCES public.conversations(id) ON DELETE CASCADE,
-  sender_id UUID NOT NULL REFERENCES auth.users(id),
-  content TEXT NOT NULL,
-  message_type VARCHAR(20) DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'file', 'system')),
-  media_url TEXT,
-  media_name TEXT,
-  media_size INTEGER,
-  reply_to_id UUID REFERENCES public.messages(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  is_deleted BOOLEAN DEFAULT FALSE,
-  is_edited BOOLEAN DEFAULT FALSE,
-  read_by JSONB DEFAULT '[]'::jsonb
-);
+-- 28. messages (PARTITIONED)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'messages') THEN
+    CREATE TABLE public.messages (
+      id UUID NOT NULL DEFAULT gen_random_uuid(),
+      conversation_id UUID NOT NULL REFERENCES public.conversations(id) ON DELETE CASCADE,
+      sender_id UUID NOT NULL REFERENCES auth.users(id),
+      content TEXT NOT NULL,
+      message_type VARCHAR(20) DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'file', 'system')),
+      media_url TEXT, media_name TEXT, media_size INTEGER,
+      reply_to_id UUID,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      is_deleted BOOLEAN DEFAULT FALSE,
+      is_edited BOOLEAN DEFAULT FALSE,
+      read_by JSONB DEFAULT '[]'::jsonb,
+      PRIMARY KEY (id, created_at)
+    ) PARTITION BY RANGE (created_at);
+  END IF;
+
+  -- Create initial partitions for 2026 (idempotent)
+  IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = 'public.messages'::regclass) THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'messages_y2026m01') THEN
+      CREATE TABLE public.messages_y2026m01 PARTITION OF public.messages FOR VALUES FROM ('2026-01-01') TO ('2026-02-01');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'messages_y2026m02') THEN
+      CREATE TABLE public.messages_y2026m02 PARTITION OF public.messages FOR VALUES FROM ('2026-02-01') TO ('2026-03-01');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'messages_y2026m03') THEN
+      CREATE TABLE public.messages_y2026m03 PARTITION OF public.messages FOR VALUES FROM ('2026-03-01') TO ('2026-04-01');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'messages_default') THEN
+      CREATE TABLE public.messages_default PARTITION OF public.messages DEFAULT;
+    END IF;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON public.messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON public.messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages(created_at DESC);
 
--- 29. notifications
-CREATE TABLE IF NOT EXISTS public.notifications (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    type TEXT NOT NULL,
-    title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    data JSONB DEFAULT '{}'::jsonb,
-    is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
+-- 29. notifications (PARTITIONED)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'notifications') THEN
+    CREATE TABLE public.notifications (
+        id UUID DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        data JSONB DEFAULT '{}'::jsonb,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+        PRIMARY KEY (id, created_at)
+    ) PARTITION BY RANGE (created_at);
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = 'public.notifications'::regclass) THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'notifications_y2026m01') THEN
+      CREATE TABLE public.notifications_y2026m01 PARTITION OF public.notifications FOR VALUES FROM ('2026-01-01') TO ('2026-02-01');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'notifications_y2026m02') THEN
+      CREATE TABLE public.notifications_y2026m02 PARTITION OF public.notifications FOR VALUES FROM ('2026-02-01') TO ('2026-03-01');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'notifications_default') THEN
+      CREATE TABLE public.notifications_default PARTITION OF public.notifications DEFAULT;
+    END IF;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
 
 
@@ -536,28 +588,66 @@ CREATE INDEX IF NOT EXISTS idx_saved_posts_user_id ON public.saved_posts(user_id
 
 
 
--- 32. video_upvotes
-CREATE TABLE IF NOT EXISTS public.video_upvotes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  video_id UUID NOT NULL REFERENCES public.spot_videos(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  vote_type INTEGER NOT NULL CHECK (vote_type IN (1, -1)),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(video_id, user_id)
-);
+-- 32. video_upvotes (HASH PARTITIONED)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'video_upvotes') THEN
+    CREATE TABLE public.video_upvotes (
+      id UUID NOT NULL DEFAULT gen_random_uuid(),
+      video_id UUID NOT NULL REFERENCES public.spot_videos(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+      vote_type INTEGER NOT NULL CHECK (vote_type IN (1, -1)),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      PRIMARY KEY (video_id, user_id)
+    ) PARTITION BY HASH (video_id);
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = 'public.video_upvotes'::regclass) THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'video_upvotes_p1') THEN
+      CREATE TABLE public.video_upvotes_p1 PARTITION OF public.video_upvotes FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'video_upvotes_p2') THEN
+      CREATE TABLE public.video_upvotes_p2 PARTITION OF public.video_upvotes FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'video_upvotes_p3') THEN
+      CREATE TABLE public.video_upvotes_p3 PARTITION OF public.video_upvotes FOR VALUES WITH (MODULUS 4, REMAINDER 2);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'video_upvotes_p4') THEN
+      CREATE TABLE public.video_upvotes_p4 PARTITION OF public.video_upvotes FOR VALUES WITH (MODULUS 4, REMAINDER 3);
+    END IF;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_video_upvotes_video_id ON public.video_upvotes(video_id);
 
--- 33. post_votes
-CREATE TABLE IF NOT EXISTS public.post_votes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  post_id UUID NOT NULL REFERENCES public.map_posts(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  vote_type INTEGER NOT NULL CHECK (vote_type IN (-1, 1)),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(post_id, user_id)
-);
+-- 33. post_votes (HASH PARTITIONED)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'post_votes') THEN
+    CREATE TABLE public.post_votes (
+      id UUID NOT NULL DEFAULT gen_random_uuid(),
+      post_id UUID NOT NULL REFERENCES public.map_posts(id) ON DELETE CASCADE,
+      user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+      vote_type INTEGER NOT NULL CHECK (vote_type IN (-1, 1)),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      PRIMARY KEY (post_id, user_id)
+    ) PARTITION BY HASH (post_id);
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = 'public.post_votes'::regclass) THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'post_votes_p1') THEN
+      CREATE TABLE public.post_votes_p1 PARTITION OF public.post_votes FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'post_votes_p2') THEN
+      CREATE TABLE public.post_votes_p2 PARTITION OF public.post_votes FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'post_votes_p3') THEN
+      CREATE TABLE public.post_votes_p3 PARTITION OF public.post_votes FOR VALUES WITH (MODULUS 4, REMAINDER 2);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'post_votes_p4') THEN
+      CREATE TABLE public.post_votes_p4 PARTITION OF public.post_votes FOR VALUES WITH (MODULUS 4, REMAINDER 3);
+    END IF;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_post_votes_post_id ON public.post_votes(post_id);
 
@@ -696,9 +786,26 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION search_tricks(search_query TEXT) RETURNS SETOF trick_definitions AS $$
 BEGIN
-  RETURN QUERY SELECT DISTINCT td.* FROM trick_definitions td LEFT JOIN trick_aliases ta ON td.id = ta.trick_id
-  WHERE td.display_name ILIKE '%' || search_query || '%' OR td.slug ILIKE '%' || search_query || '%' OR ta.alias ILIKE '%' || search_query || '%'
-  ORDER BY td.difficulty_multiplier DESC LIMIT 10;
+  RETURN QUERY 
+  SELECT td.* 
+  FROM trick_definitions td 
+  WHERE td.fts_name @@ websearch_to_tsquery('english', search_query)
+     OR td.display_name ILIKE '%' || search_query || '%' -- Fallback for partial matches
+  ORDER BY ts_rank(td.fts_name, websearch_to_tsquery('english', search_query)) DESC, td.difficulty_multiplier DESC 
+  LIMIT 10;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION search_profiles(search_query TEXT, limit_cnt INT DEFAULT 20) 
+RETURNS TABLE (id UUID, username TEXT, display_name TEXT, avatar_url TEXT) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT up.id, up.username, up.display_name, up.avatar_url
+  FROM user_profiles up
+  WHERE up.fts_name @@ websearch_to_tsquery('english', search_query)
+     OR up.username ILIKE '%' || search_query || '%'
+  ORDER BY ts_rank(up.fts_name, websearch_to_tsquery('english', search_query)) DESC
+  LIMIT limit_cnt;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
@@ -716,13 +823,34 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION calculate_spot_mvp() RETURNS TRIGGER AS $$
-DECLARE target_spot_id UUID; new_mvp_id UUID; new_mvp_score INTEGER;
+DECLARE 
+    target_spot_id UUID; 
+    new_mvp_id UUID; 
+    new_mvp_score INTEGER;
+    v_last_update TIMESTAMP WITH TIME ZONE;
 BEGIN
     IF (TG_OP = 'DELETE') THEN target_spot_id := OLD.spot_id; ELSE target_spot_id := NEW.spot_id; END IF;
+    
+    -- Scalability Debounce: Only recalculate if it's been more than 1 hour since last refresh
+    -- This prevents upvote storms from locking the database.
+    SELECT mvp_last_updated_at INTO v_last_update FROM map_posts WHERE id = target_spot_id;
+    
+    IF (v_last_update > NOW() - INTERVAL '1 hour') THEN
+        RETURN NULL;
+    END IF;
+
     SELECT submitted_by, SUM((10 * COALESCE(difficulty_multiplier, 1.0)) * (CASE WHEN stance = 'switch' THEN 1.7 WHEN stance = 'nollie' THEN 1.4 WHEN stance = 'fakie' THEN 1.2 ELSE 1.0 END) * (upvotes + 1)) as total_weighted_score
     INTO new_mvp_id, new_mvp_score FROM spot_videos WHERE spot_id = target_spot_id AND status = 'approved' AND is_own_clip = TRUE GROUP BY submitted_by ORDER BY total_weighted_score DESC LIMIT 1;
+    
     IF new_mvp_id IS NULL THEN new_mvp_score := 0; END IF;
-    UPDATE map_posts SET mvp_user_id = new_mvp_id, mvp_score = COALESCE(new_mvp_score, 0) WHERE id = target_spot_id;
+    
+    UPDATE map_posts 
+    SET 
+        mvp_user_id = new_mvp_id, 
+        mvp_score = COALESCE(new_mvp_score, 0),
+        mvp_last_updated_at = NOW() 
+    WHERE id = target_spot_id;
+    
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -738,7 +866,14 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION update_conversation_last_message() RETURNS TRIGGER AS $$
-BEGIN UPDATE conversations SET last_message_at = NEW.created_at WHERE id = NEW.conversation_id; RETURN NEW; END;
+BEGIN 
+    UPDATE conversations SET last_message_at = NEW.created_at WHERE id = NEW.conversation_id;
+    -- Scalability Fix: Trigger update on participants so they can listen to their own scoped changes
+    UPDATE conversation_participants 
+    SET last_activity_at = NEW.created_at 
+    WHERE conversation_id = NEW.conversation_id;
+    RETURN NEW; 
+END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 
@@ -747,6 +882,55 @@ RETURNS TABLE (day date, count bigint) AS $$
 BEGIN
     RETURN QUERY SELECT date_series.day::date, COUNT(u.created_at)::bigint FROM generate_series(CURRENT_DATE - (days_ago - 1) * INTERVAL '1 day', CURRENT_DATE, '1 day') AS date_series(day)
     LEFT JOIN public.user_profiles u ON DATE(u.created_at) = date_series.day GROUP BY date_series.day ORDER BY date_series.day;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Scalability Fix: Server-side spatial filtering for user locations
+DROP FUNCTION IF EXISTS get_nearby_users(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION);
+CREATE OR REPLACE FUNCTION get_nearby_users(
+  p_latitude DOUBLE PRECISION,
+  p_longitude DOUBLE PRECISION,
+  p_radius_meters DOUBLE PRECISION
+)
+RETURNS TABLE (
+  id UUID,
+  username TEXT,
+  display_name TEXT,
+  avatar_url TEXT,
+  current_latitude DOUBLE PRECISION,
+  current_longitude DOUBLE PRECISION,
+  location_sharing_mode TEXT,
+  location_blacklist TEXT[],
+  is_verified BOOLEAN,
+  distance_meters DOUBLE PRECISION
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    up.id,
+    up.username,
+    up.display_name,
+    up.avatar_url,
+    up.current_latitude,
+    up.current_longitude,
+    up.location_sharing_mode,
+    up.location_blacklist,
+    up.is_verified,
+    ST_Distance(
+      ST_MakePoint(up.current_longitude, up.current_latitude)::geography,
+      ST_MakePoint(p_longitude, p_latitude)::geography
+    ) AS distance_meters
+  FROM public.user_profiles up
+  WHERE
+    up.location_sharing_mode != 'off'
+    AND up.current_latitude IS NOT NULL
+    AND up.current_longitude IS NOT NULL
+    AND ST_DWithin(
+      ST_MakePoint(up.current_longitude, up.current_latitude)::geography,
+      ST_MakePoint(p_longitude, p_latitude)::geography,
+      p_radius_meters
+    )
+  ORDER BY distance_meters ASC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
@@ -1180,6 +1364,10 @@ CREATE POLICY "Conversations insert by creator" ON public.conversations FOR INSE
 DROP POLICY IF EXISTS "Messages modify own" ON public.messages;
 CREATE POLICY "Messages modify own" ON public.messages FOR ALL USING (sender_id = (SELECT auth.uid()));
 
+-- 5b. Notifications Policies
+DROP POLICY IF EXISTS "Notifications select own" ON public.notifications;
+CREATE POLICY "Notifications select own" ON public.notifications FOR SELECT USING (user_id = (SELECT auth.uid()));
+
 -- 6. Follows Policies
 DROP POLICY IF EXISTS "Public follows access" ON public.follows;
 DROP POLICY IF EXISTS "Users can manage own follows" ON public.follows;
@@ -1472,3 +1660,23 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION get_db_health TO authenticated;
+
+-- =============================================================================
+-- FEEDBACK SYSTEM WEBHOOKS (REFERENCE)
+-- =============================================================================
+
+/* 
+INSTRUCTIONS FOR SECURE FEEDBACK EMAIL NOTIFICATIONS:
+1. Deploy the Edge Function: `supabase functions deploy send-feedback-email`
+2. Set Secrets:
+   `supabase secrets set RESEND_API_KEY=re_your_key`
+   `supabase secrets set ADMIN_EMAIL=pushinn.ltd@gmail.com`
+3. Go to Supabase Dashboard -> Database -> Webhooks
+4. Create new Webhook:
+   - Name: "send_feedback_email"
+   - Table: "user_feedback"
+   - Events: "Insert"
+   - Method: POST
+   - URL: https://[PROJECT_ID].supabase.co/functions/v1/send-feedback-email
+   - Auth Header: [Your Service Role Key]
+*/

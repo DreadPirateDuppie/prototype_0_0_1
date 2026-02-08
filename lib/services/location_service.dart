@@ -114,22 +114,47 @@ class LocationService {
     }
   }
 
-  /// Get visible user locations based on privacy settings
-  Future<List<Map<String, dynamic>>> getVisibleUserLocations() async {
+  /// Get visible user locations near a specific coordinate based on privacy settings
+  /// Now uses server-side spatial filtering for massive scalability.
+  Future<List<Map<String, dynamic>>> getVisibleUserLocations({
+    double? latitude,
+    double? longitude,
+    double radiusInMeters = 50000.0, // Default to 50km
+  }) async {
     try {
       final currentUser = _authService.getCurrentUser();
       if (currentUser == null) return [];
 
-      final response = await _client
-          .from('user_profiles')
-          .select('id, username, display_name, avatar_url, current_latitude, current_longitude, location_sharing_mode, location_blacklist, is_verified')
-          .neq('location_sharing_mode', 'off')
-          .not('current_latitude', 'is', null)
-          .not('current_longitude', 'is', null);
+      // If coordinates aren't provided, use the current user's last known location
+      double finalLat = latitude ?? 0.0;
+      double finalLng = longitude ?? 0.0;
+
+      if (latitude == null || longitude == null) {
+        final profile = await _client
+            .from('user_profiles')
+            .select('current_latitude, current_longitude')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+        
+        if (profile != null && profile['current_latitude'] != null) {
+          finalLat = profile['current_latitude'] as double;
+          finalLng = profile['current_longitude'] as double;
+        } else {
+          return []; // Cannot search without a center point
+        }
+      }
+
+      // Call the high-performance Postgres spatial function
+      final response = await _client.rpc('get_nearby_users', params: {
+        'p_latitude': finalLat,
+        'p_longitude': finalLng,
+        'p_radius_meters': radiusInMeters,
+      });
 
       final users = (response as List).cast<Map<String, dynamic>>();
       final visibleUsers = <Map<String, dynamic>>[];
 
+      // Fetch following list for 'friends' mode filtering
       final following = await _socialService.getFollowing(currentUser.id);
       final followingIds = following.map((f) => f['id'] as String).toSet();
 
@@ -140,6 +165,7 @@ class LocationService {
         final sharingMode = user['location_sharing_mode'] as String;
         final blacklist = (user['location_blacklist'] as List<dynamic>?)?.cast<String>() ?? <String>[];
 
+        // Ensure current user isn't blacklisted by the target user
         if (blacklist.contains(currentUser.id)) continue;
 
         if (sharingMode == 'public') {
@@ -157,32 +183,17 @@ class LocationService {
   }
 
   /// Get online users near a specific location
+  /// @deprecated Use getVisibleUserLocations directly as it now handles spatial filtering
   Future<List<Map<String, dynamic>>> getNearbyOnlineUsers(
     double latitude,
     double longitude, {
     double radiusInMeters = 100.0,
   }) async {
-    try {
-      final allUsers = await getVisibleUserLocations();
-      final nearbyUsers = <Map<String, dynamic>>[];
-
-      for (final user in allUsers) {
-        final userLat = user['current_latitude'] as double?;
-        final userLon = user['current_longitude'] as double?;
-
-        if (userLat != null && userLon != null) {
-          final distance = _calculateDistance(latitude, longitude, userLat, userLon);
-          if (distance <= radiusInMeters) {
-            nearbyUsers.add(user);
-          }
-        }
-      }
-
-      return nearbyUsers;
-    } catch (e) {
-      AppLogger.log('Error getting nearby users: $e', name: 'LocationService');
-      return [];
-    }
+    return getVisibleUserLocations(
+      latitude: latitude,
+      longitude: longitude,
+      radiusInMeters: radiusInMeters,
+    );
   }
 
   /// Calculate distance between two coordinates in meters using Haversine formula

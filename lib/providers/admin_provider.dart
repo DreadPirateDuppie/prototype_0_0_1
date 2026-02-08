@@ -36,6 +36,7 @@ class AdminProvider with ChangeNotifier {
   
   // Reports & Other Data
   List<Map<String, dynamic>> _reports = [];
+  List<Map<String, dynamic>> _feedback = [];
   List<MapPost> _unverifiedPosts = [];
   List<Map<String, dynamic>> _pendingVideos = [];
   List<Map<String, dynamic>> _errorLogs = [];
@@ -51,6 +52,7 @@ class AdminProvider with ChangeNotifier {
   Map<String, dynamic> get stats => _stats;
   List<Map<String, dynamic>> get users => _users;
   List<Map<String, dynamic>> get reports => _reports;
+  List<Map<String, dynamic>> get feedback => _feedback;
   List<MapPost> get unverifiedPosts => _unverifiedPosts;
   List<Map<String, dynamic>> get pendingVideos => _pendingVideos;
   List<Map<String, dynamic>> get errorLogs => _errorLogs;
@@ -98,6 +100,7 @@ class AdminProvider with ChangeNotifier {
         loadAnalytics(),
         loadUsersPaginated(reset: true),
         loadReports(),
+        loadFeedback(),
         loadUnverifiedPosts(),
         loadPendingVideos(),
         loadAppSettings(),
@@ -322,6 +325,15 @@ class AdminProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading reports: $e');
+    }
+  }
+
+  Future<void> loadFeedback() async {
+    try {
+      _feedback = await _adminService.getFeedback();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading feedback: $e');
     }
   }
 

@@ -3,7 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider extends ChangeNotifier {
   static const String _themeKey = 'isDarkMode';
+  static const String _matrixRainKey = 'showMatrixRain';
   bool _isDarkMode = true; // Default to dark mode for Matrix theme
+  bool _showMatrixRain = false; // Default to false per user request
 
   // Matrix color constants
   static const Color matrixGreen = Color(0xFF00FF41);
@@ -17,6 +19,7 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   bool get isDarkMode => _isDarkMode;
+  bool get showMatrixRain => _showMatrixRain;
 
   ThemeData getLightTheme() {
     // Light theme with Matrix accent
@@ -217,6 +220,7 @@ class ThemeProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       _isDarkMode = prefs.getBool(_themeKey) ?? true; // Default to dark
+      _showMatrixRain = prefs.getBool(_matrixRainKey) ?? false; // Default to false
       notifyListeners();
     } catch (e) {
       // Silently fail, default to dark mode
@@ -228,6 +232,17 @@ class ThemeProvider extends ChangeNotifier {
       _isDarkMode = !_isDarkMode;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_themeKey, _isDarkMode);
+      notifyListeners();
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
+  Future<void> toggleMatrixRain() async {
+    try {
+      _showMatrixRain = !_showMatrixRain;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_matrixRainKey, _showMatrixRain);
       notifyListeners();
     } catch (e) {
       // Silently fail

@@ -3,6 +3,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../services/now_payments_service.dart';
 import '../services/supabase_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
+
 
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
@@ -252,98 +255,139 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   ),
                 ),
 
-                // Purchase Button
+                // Purchase or Status Section
                 Padding(
                   padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handlePurchase,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.amber,
-                            foregroundColor: Colors.black,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 8,
-                          ),
-                          child: _isLoading
-                              ? const CircularProgressIndicator(color: Colors.black)
-                              : const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      'Subscribe Now',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      '\$4.99 / month',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // XMR Payment Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: OutlinedButton(
-                          onPressed: _isLoading ? null : _handleXMRPurchase,
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.orange, width: 2),
-                            foregroundColor: Colors.orange,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Image.network(
-                                'https://www.getmonero.org/press-kit/symbols/monero-symbol-480.png',
-                                height: 24,
-                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.currency_bitcoin, size: 24),
+                  child: context.watch<UserProvider>().isPremium || context.watch<UserProvider>().isAdmin
+                      ? Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.amber, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.amber.withValues(alpha: 0.2),
+                                blurRadius: 15,
+                                spreadRadius: 2,
                               ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Pay with XMR',
+                            ],
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.verified_user, color: Colors.amber, size: 40),
+                              SizedBox(height: 8),
+                              Text(
+                                'MEMBERSHIP ACTIVE',
                                 style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 2,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                              Text(
+                                'ALL PROTOCOLS UNLOCKED',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10,
+                                  letterSpacing: 1,
                                 ),
                               ),
                             ],
                           ),
+                        )
+                      : Column(
+                          children: [
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _handlePurchase,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.amber,
+                                  foregroundColor: Colors.black,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 8,
+                                ),
+                                child: _isLoading
+                                    ? const CircularProgressIndicator(color: Colors.black)
+                                    : const Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Subscribe Now',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          Text(
+                                            '\$4.99 / month',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            // XMR Payment Button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: OutlinedButton(
+                                onPressed: _isLoading ? null : _handleXMRPurchase,
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: Colors.orange, width: 2),
+                                  foregroundColor: Colors.orange,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Image.network(
+                                      'https://www.getmonero.org/press-kit/symbols/monero-symbol-480.png',
+                                      height: 24,
+                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.currency_bitcoin, size: 24),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Pay with XMR',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton(
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('No purchases to restore')),
+                                );
+                              },
+                              child: Text(
+                                'Restore Purchases',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('No purchases to restore')),
-                          );
-                        },
-                        child: Text(
-                          'Restore Purchases',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),

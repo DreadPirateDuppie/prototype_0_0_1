@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/rewards_provider.dart';
+import '../providers/user_provider.dart';
 import '../widgets/ad_banner.dart';
 import '../widgets/rewards/rewards_hero.dart';
 import '../widgets/rewards/rewards_streak_card.dart';
@@ -54,7 +55,13 @@ class _RewardsTabState extends State<RewardsTab> {
           body: rewardsProvider.isLoading && rewardsProvider.transactions.isEmpty
               ? const Center(child: CircularProgressIndicator())
               : RefreshIndicator(
-                  onRefresh: rewardsProvider.loadData,
+                  onRefresh: () async {
+                    final userProvider = Provider.of<UserProvider>(context, listen: false);
+                    await Future.wait<void>([
+                      rewardsProvider.loadData(),
+                      userProvider.refresh(),
+                    ]);
+                  },
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(

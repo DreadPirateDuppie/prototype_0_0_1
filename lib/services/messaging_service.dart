@@ -206,21 +206,20 @@ class MessagingService {
       if (!controller.isClosed) controller.add(conversations);
     });
 
-    // Subscribe to changes in conversations, participants, and messages
-    final channel = _client.channel('public:conversations_updates');
+    // SCALABILITY REFINE: Instead of listening to all conversations/messages, 
+    // listen specifically to active participation records for this user.
+    // This scales O(1) per user relative to global traffic.
+    final channel = _client.channel('user_conversations:${user.id}');
     
     channel.onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
-      table: 'conversations',
-      callback: (payload) async {
-        final conversations = await getConversations();
-        if (!controller.isClosed) controller.add(conversations);
-      },
-    ).onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      schema: 'public',
-      table: 'messages',
+      table: 'conversation_participants',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'user_id',
+        value: user.id,
+      ),
       callback: (payload) async {
         final conversations = await getConversations();
         if (!controller.isClosed) controller.add(conversations);

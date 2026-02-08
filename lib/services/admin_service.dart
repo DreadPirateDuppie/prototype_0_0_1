@@ -133,6 +133,21 @@ class AdminService {
     }
   }
 
+  /// Get all user feedback (for admin dashboard)
+  Future<List<Map<String, dynamic>>> getFeedback() async {
+    try {
+      final response = await _client
+          .from('user_feedback')
+          .select('*, user_profiles(username, avatar_url, display_name)')
+          .order('created_at', ascending: false);
+
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      AppLogger.log('Error getting user feedback: $e', name: 'AdminService');
+      return [];
+    }
+  }
+
   /// Update report status
   Future<void> updateReportStatus(String reportId, String status) async {
     try {

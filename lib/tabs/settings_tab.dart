@@ -11,6 +11,9 @@ import '../config/theme_config.dart'; // For ThemeColors
 import '../screens/edit_username_dialog.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../providers/user_provider.dart';
+
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -278,7 +281,7 @@ class _SettingsTabState extends State<SettingsTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Transmit your thoughts to the collective.',
+                  'Transmit your direct frequency to the core team.',
                   style: TextStyle(color: Colors.white70, fontSize: 13),
                 ),
                 const SizedBox(height: 16),
@@ -287,7 +290,7 @@ class _SettingsTabState extends State<SettingsTab> {
                   maxLines: 4,
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: 'Enter data pulse here...',
+                    hintText: 'Enter pulse data here...',
                     hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.05),
@@ -319,11 +322,12 @@ class _SettingsTabState extends State<SettingsTab> {
 
                         try {
                           await SupabaseService.submitFeedback(text);
+                          
                           if (!context.mounted) return;
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Feedback transmitted successfully.'),
+                              content: Text('TRANSMISSION_SUCCESSFUL: Feedback received.'),
                               backgroundColor: ThemeColors.matrixGreen,
                             ),
                           );
@@ -332,7 +336,7 @@ class _SettingsTabState extends State<SettingsTab> {
                           setState(() => isSubmitting = false);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Error: $e'),
+                              content: Text('TRANSMISSION_FAILURE: $e'),
                               backgroundColor: Colors.red,
                             ),
                           );
@@ -473,92 +477,104 @@ class _SettingsTabState extends State<SettingsTab> {
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              const SizedBox(height: 16),
-              
-              // Premium Banner
-              _buildPremiumBanner(),
-              
-              const SizedBox(height: 24),
-              
-              _buildSectionHeader('PROTOCOL_PREFERENCES'),
-              _buildGlassCard(
-                child: Column(
-                  children: [
-                    _buildSwitchItem(
-                      'Notifications',
-                      'Push notifications [STATUS: PENDING]',
-                      _notificationsEnabled,
-                      (value) {
-                        setState(() => _notificationsEnabled = value);
-                        _saveNotificationPreference(value);
-                      },
-                    ),
-                    _buildDivider(),
-                    _buildSwitchItem(
-                      'Private Account',
-                      'Only followers can see your posts & pins',
-                      _isPrivate,
-                      (value) async {
-                        setState(() => _isPrivate = value);
-                        try {
-                          await SupabaseService.setPrivacy(value);
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          setState(() => _isPrivate = !value); // Revert on error
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error updating privacy: $e')),
-                          );
-                        }
-                      },
-                    ),
-                    _buildDivider(),
-                    _buildSwitchItem(
-                      'Dark Mode',
-                      'Enable dark theme encryption',
-                      context.watch<ThemeProvider>().isDarkMode,
-                      (value) => context.read<ThemeProvider>().toggleDarkMode(),
-                    ),
-                  ],
+      body: RefreshIndicator(
+        onRefresh: () => context.read<UserProvider>().refresh(),
+        color: neonGreen,
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                const SizedBox(height: 16),
+                
+                // Premium Banner
+                if (context.watch<UserProvider>().shouldShowAds)
+                  _buildPremiumBanner(),
+                
+                const SizedBox(height: 24),
+                
+                _buildSectionHeader('PROTOCOL_PREFERENCES'),
+                _buildGlassCard(
+                  child: Column(
+                    children: [
+                      _buildSwitchItem(
+                        'Notifications',
+                        'Push notifications [STATUS: PENDING]',
+                        _notificationsEnabled,
+                        (value) {
+                          setState(() => _notificationsEnabled = value);
+                          _saveNotificationPreference(value);
+                        },
+                      ),
+                      _buildDivider(),
+                      _buildSwitchItem(
+                        'Private Account',
+                        'Only followers can see your posts & pins',
+                        _isPrivate,
+                        (value) async {
+                          setState(() => _isPrivate = value);
+                          try {
+                            await SupabaseService.setPrivacy(value);
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            setState(() => _isPrivate = !value); // Revert on error
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error updating privacy: $e')),
+                            );
+                          }
+                        },
+                      ),
+                      _buildDivider(),
+                      _buildSwitchItem(
+                        'Dark Mode',
+                        'Enable dark theme encryption',
+                        context.watch<ThemeProvider>().isDarkMode,
+                        (value) => context.read<ThemeProvider>().toggleDarkMode(),
+                      ),
+                      _buildDivider(),
+                      _buildSwitchItem(
+                        'Matrix Rain',
+                        'Toggle digital precipitation (MAP/FEED)',
+                        context.watch<ThemeProvider>().showMatrixRain,
+                        (value) => context.read<ThemeProvider>().toggleMatrixRain(),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 24),
-              
-              _buildSectionHeader('USER_ACCOUNT'),
-              _buildGlassCard(
-                child: Column(
-                  children: [
-                    _buildSettingsItem(
-                      'Edit Profile',
-                      Icons.person_outline,
-                      onTap: _showEditProfileDialog,
-                    ),
-                    _buildDivider(),
-                    _buildSettingsItem(
-                      'Privacy Policy',
-                      Icons.privacy_tip_outlined,
-                      onTap: () => _showPolicyDialog('Privacy Policy', 'This app collects and stores:\n• Your email address for authentication\n• Location data for map posts\n• Photos you upload\n• Posts, ratings, and likes\n\nYour data is stored securely on Supabase servers.\n\nWe do not sell or share your personal information with third parties.'),
-                    ),
-                    _buildDivider(),
-                    _buildSettingsItem(
-                      'Terms of Service',
-                      Icons.description_outlined,
-                      onTap: () => _showPolicyDialog('Terms of Service', 'By using this app, you agree to:\n1. Not post inappropriate, offensive, or illegal content\n2. Respect other users and their posts\n3. Not spam or abuse the platform\n4. Take responsibility for the content you post\n5. Respect intellectual property rights'),
-                    ),
-                    _buildDivider(),
-                    _buildSettingsItem(
-                      'About System',
-                      Icons.info_outline,
-                      onTap: () => _showAboutDialog(),
-                    ),
-                  ],
+                const SizedBox(height: 24),
+                
+                _buildSectionHeader('USER_ACCOUNT'),
+                _buildGlassCard(
+                  child: Column(
+                    children: [
+                      _buildSettingsItem(
+                        'Privacy Policy',
+                        Icons.privacy_tip_outlined,
+                        onTap: () => _showPolicyDialog(
+                          'Privacy Policy',
+                          'This app collects and stores:\n• Your email address for authentication\n• Location data for map posts\n• Photos you upload\n• Posts, ratings, and likes\n\nYour data is stored securely on Supabase servers.\n\nWe do not sell or share your personal information with third parties.',
+                        ),
+                      ),
+                      _buildDivider(),
+                      _buildSettingsItem(
+                        'Terms of Service',
+                        Icons.description_outlined,
+                        onTap: () => _showPolicyDialog(
+                          'Terms of Service',
+                          'By using this app, you agree to:\n1. Not post inappropriate, offensive, or illegal content\n2. Respect other users and their posts\n3. Not spam or abuse the platform\n4. Take responsibility for the content you post\n5. Respect intellectual property rights',
+                        ),
+                      ),
+                      _buildDivider(),
+                      _buildSettingsItem(
+                        'About System',
+                        Icons.info_outline,
+                        onTap: _showAboutDialog,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
               const SizedBox(height: 24),
               
@@ -662,8 +678,9 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildPremiumBanner() {
     return Container(

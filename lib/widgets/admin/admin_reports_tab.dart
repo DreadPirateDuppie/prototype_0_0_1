@@ -11,7 +11,7 @@ class AdminReportsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Column(
         children: [
           const TabBar(
@@ -19,6 +19,7 @@ class AdminReportsTab extends StatelessWidget {
               Tab(text: 'REPORTS'),
               Tab(text: 'U_SPOTS'),
               Tab(text: 'P_VIDEOS'),
+              Tab(text: 'FEEDBACK'),
             ],
             labelColor: ThemeColors.matrixGreen,
             unselectedLabelColor: Colors.white24,
@@ -31,11 +32,96 @@ class AdminReportsTab extends StatelessWidget {
                 _ReportsList(),
                 _UnverifiedSpotsList(),
                 _PendingVideosList(),
+                const _FeedbackList(),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _FeedbackList extends StatelessWidget {
+  const _FeedbackList();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AdminProvider>(
+      builder: (context, provider, child) {
+        if (provider.isLoading && provider.feedback.isEmpty) {
+          return const Center(child: CircularProgressIndicator(color: ThemeColors.matrixGreen));
+        }
+
+        if (provider.feedback.isEmpty) {
+          return const Center(
+            child: Text(
+              'NO_FEEDBACK_TRANSMISSIONS',
+              style: TextStyle(color: Colors.white24, fontFamily: 'monospace', fontSize: 12),
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: provider.loadFeedback,
+          child: ListView.builder(
+            itemCount: provider.feedback.length,
+            itemBuilder: (context, index) {
+              final feedback = provider.feedback[index];
+              final profile = feedback['user_profiles'];
+              final username = profile?['username'] ?? 'UNKNOWN_NODE';
+              final displayName = profile?['display_name'] ?? 'Anonymous';
+              final avatarUrl = profile?['avatar_url'];
+              final createdAt = DateTime.parse(feedback['created_at']).toLocal();
+              
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: ThemeColors.matrixGreen.withValues(alpha: 0.1)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                          child: avatarUrl == null ? const Icon(Icons.person, size: 12, color: Colors.white24) : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          username,
+                          style: const TextStyle(
+                            color: ThemeColors.matrixGreen,
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${createdAt.month}/${createdAt.day} ${createdAt.hour}:${createdAt.minute.toString().padLeft(2, '0')}',
+                          style: const TextStyle(color: Colors.white24, fontSize: 10, fontFamily: 'monospace'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      feedback['feedback_text'] ?? '[NO_DATA]',
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

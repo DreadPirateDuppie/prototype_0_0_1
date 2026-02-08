@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import '../providers/user_provider.dart';
 
 class AdBanner extends StatefulWidget {
   final int initialIndex;
@@ -226,6 +228,19 @@ class _AdBannerState extends State<AdBanner> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = context.watch<UserProvider>();
+    final shouldShowAds = userProvider.shouldShowAds;
+    
+    if (!shouldShowAds) {
+      return const SizedBox.shrink();
+    }
+
+    // Don't show anything (even fallback) if we're still loading user profile,
+    // to avoid flashing "Remove Ads" for premium/admin users.
+    if (userProvider.isLoading && !_isLoaded) {
+      return const SizedBox(height: 60); // Reserved space to avoid jumpy UI
+    }
+
     if (_isLoaded && _bannerAd != null && _adSize != null) {
       return SizedBox(
         width: _adSize!.width.toDouble(),

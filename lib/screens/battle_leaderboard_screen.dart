@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
+import '../widgets/hud_avatar.dart';
+import 'user_profile_screen.dart';
 
 class BattleLeaderboardScreen extends StatefulWidget {
   const BattleLeaderboardScreen({super.key});
@@ -222,35 +224,24 @@ class _BattleLeaderboardScreenState extends State<BattleLeaderboardScreen> {
                               const SizedBox(width: 16),
 
                               // Avatar
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: matrixGreen.withValues(alpha: 0.3),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: ClipOval(
-                                  child: player['avatar_url'] != null
-                                      ? Image.network(
-                                          player['avatar_url'],
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Icon(
-                                              Icons.person,
-                                              color: matrixGreen.withValues(alpha: 0.5),
-                                              size: 28,
-                                            );
-                                          },
-                                        )
-                                      : Icon(
-                                          Icons.person,
-                                          color: matrixGreen.withValues(alpha: 0.5),
-                                          size: 28,
-                                        ),
-                                ),
+                              HudAvatar(
+                                avatarUrl: player['avatar_url'],
+                                username: player['username'],
+                                radius: 24,
+                                showScanline: rank <= 3, // Premium scan for top 3
+                                neonColor: rank <= 3 ? rankColor : matrixGreen,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => UserProfileScreen(
+                                        userId: player['user_id'],
+                                        username: player['username'],
+                                        avatarUrl: player['avatar_url'],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                               const SizedBox(width: 16),
 

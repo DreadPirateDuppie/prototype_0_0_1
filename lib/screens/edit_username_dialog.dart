@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class EditUsernameDialog extends StatefulWidget {
   final String currentUsername;
@@ -23,6 +25,9 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
+  File? _imageFile;
+  final ImagePicker _picker = ImagePicker();
+  String? _avatarUrlPreview;
 
   @override
   void initState() {
@@ -30,6 +35,28 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
     _usernameController =
         TextEditingController(text: widget.currentUsername.isNotEmpty ? widget.currentUsername : '');
     _bioController = TextEditingController(text: widget.currentBio ?? '');
+    _loadCurrentAvatar();
+  }
+
+  Future<void> _loadCurrentAvatar() async {
+    final user = SupabaseService.getCurrentUser();
+    if (user != null) {
+      final url = await SupabaseService.getUserAvatarUrl(user.id);
+      if (mounted) {
+        setState(() {
+          _avatarUrlPreview = url;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    if (image != null && mounted) {
+      setState(() {
+        _imageFile = File(image.path);
+      });
+    }
   }
 
   @override
@@ -84,25 +111,33 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
     });
 
     try {
-      // Check if username is available (excluding current user)
       final user = SupabaseService.getCurrentUser();
       if (user != null) {
-        final isAvailable = await SupabaseService.isUsernameAvailableForUser(username, user.id);
-        
-        if (!isAvailable) {
-          setState(() {
-            _errorMessage = 'Username is already taken';
-            _isLoading = false;
-          });
-          return;
+        // 1. Check if username changed and is available
+        if (username.toLowerCase() != widget.currentUsername.toLowerCase()) {
+          final isAvailable = await SupabaseService.isUsernameAvailableForUser(username, user.id);
+          if (!isAvailable) {
+            setState(() {
+              _errorMessage = 'Username is already taken';
+              _isLoading = false;
+            });
+            return;
+          }
         }
 
-        // Save username
+        // 2. Upload avatar if changed
+        String? finalAvatarUrl;
+        if (_imageFile != null) {
+          finalAvatarUrl = await SupabaseService.uploadProfileImage(user.id, _imageFile!);
+        }
+
+        // 3. Save all changes (Bio, Username, Avatar)
         await SupabaseService.saveUserUsername(user.id, username);
+        await SupabaseService.saveUserBio(user.id, _bioController.text.trim());
         
         if (mounted) {
           setState(() {
-            _successMessage = 'Username saved!';
+            _successMessage = 'Profile updated!';
             _isLoading = false;
           });
 
@@ -119,7 +154,7 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error saving username: $e';
+          _errorMessage = 'Error saving profile: $e';
           _isLoading = false;
         });
       }
@@ -138,7 +173,7 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
         side: BorderSide(color: matrixGreen, width: 2),
       ),
       title: const Text(
-        'EDIT USERNAME',
+        'EDIT PROFILE',
         style: TextStyle(
           color: matrixGreen,
           fontFamily: 'monospace',
@@ -150,6 +185,40 @@ class _EditUsernameDialogState extends State<EditUsernameDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Avatar Selector
+            GestureDetector(
+              onTap: _isLoading ? null : _pickImage,
+              child: Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: matrixGreen, width: 2),
+                      image: _imageFile != null
+                          ? DecorationImage(image: FileImage(_imageFile!), fit: BoxFit.cover)
+                          : (_avatarUrlPreview != null
+                              ? DecorationImage(image: NetworkImage(_avatarUrlPreview!), fit: BoxFit.cover)
+                              : null),
+                    ),
+                    child: (_imageFile == null && _avatarUrlPreview == null)
+                        ? const Icon(Icons.person, size: 50, color: matrixGreen)
+                        : null,
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: matrixGreen,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.camera_alt, size: 16, color: matrixBlack),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
             TextField(
               controller: _usernameController,
               style: const TextStyle(color: matrixGreen),

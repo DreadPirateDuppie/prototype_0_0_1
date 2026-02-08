@@ -1,5 +1,7 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../providers/theme_provider.dart';
+import '../matrix_rain_background.dart';
+import 'package:provider/provider.dart';
 
 class CyberScaffold extends StatefulWidget {
   final Widget child;
@@ -42,9 +44,13 @@ class _CyberScaffoldState extends State<CyberScaffold> with SingleTickerProvider
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // 0. Matrix Rain Background (Toggleable)
+          if (context.watch<ThemeProvider>().showMatrixRain)
+            const MatrixRainBackground(opacity: 0.15),
+            
           // 1. Subtle Radial Gradient Background
           Container(
-            color: Colors.black,
+            color: Colors.black.withOpacity(widget.showGrid || widget.showScanlines ? 0.7 : 1.0),
           ),
 
           // 2. Animated Grid (Optional)

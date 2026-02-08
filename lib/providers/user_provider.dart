@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_scores.dart';
 import '../services/supabase_service.dart';
 import '../services/battle_service.dart';
+import '../utils/logger.dart';
 
 /// Provider for managing user state across the app
 class UserProvider extends ChangeNotifier {
@@ -13,6 +14,7 @@ class UserProvider extends ChangeNotifier {
   int? _age;
   UserScores? _userScores;
   bool _isLoading = false;
+  bool _isPremium = false;
   bool _isAdmin = false;
   bool _isVerified = false;
   String? _error;
@@ -26,7 +28,9 @@ class UserProvider extends ChangeNotifier {
   UserScores? get userScores => _userScores;
   bool get isLoading => _isLoading;
   bool get isAdmin => _isAdmin;
+  bool get isPremium => _isPremium;
   bool get isVerified => _isVerified;
+  bool get shouldShowAds => !_isAdmin && !_isPremium;
   String? get error => _error;
   bool get hasError => _error != null;
   bool get isLoggedIn => _currentUser != null;
@@ -44,42 +48,59 @@ class UserProvider extends ChangeNotifier {
 
   /// Load user profile data
   Future<void> loadUserProfile() async {
-    if (_currentUser == null) return;
+    if (_currentUser == null) {
+      AppLogger.log('Cannot load profile: No current user', name: 'UserProvider');
+      return;
+    }
     
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // Load username
-      _username = await SupabaseService.getUserUsername(_currentUser!.id);
+      AppLogger.log('Loading profile for user: ${_currentUser!.id}', name: 'UserProvider');
       
-      // Load avatar
-      _avatarUrl = await SupabaseService.getUserAvatarUrl(_currentUser!.id);
+      // Load essential profile data in parallel for speed
+      final results = await Future.wait([
+        SupabaseService.getUserUsername(_currentUser!.id),
+        SupabaseService.getUserAvatarUrl(_currentUser!.id),
+        SupabaseService.getUserBio(_currentUser!.id),
+        SupabaseService.getUserAge(_currentUser!.id),
+        SupabaseService.isCurrentUserAdmin(),
+        SupabaseService.getUserProfile(_currentUser!.id),
+        BattleService.getUserScores(_currentUser!.id),
+      ]);
+
+      _username = results[0] as String?;
+      _avatarUrl = results[1] as String?;
+      _bio = results[2] as String?;
+      _age = results[3] as int?;
+      _isAdmin = results[4] as bool? ?? false;
       
-      // Load bio
-      _bio = await SupabaseService.getUserBio(_currentUser!.id);
+      final profile = results[5] as Map<String, dynamic>?;
+      if (profile != null) {
+        _isVerified = profile['is_verified'] as bool? ?? false;
+        _isPremium = profile['is_premium'] as bool? ?? false;
+        AppLogger.log('Profile loaded: premium=$_isPremium, admin=$_isAdmin, verified=$_isVerified', name: 'UserProvider');
+      } else {
+        AppLogger.log('Profile record not found in database for ${_currentUser!.id}', name: 'UserProvider');
+      }
       
-      // Load age
-      _age = await SupabaseService.getUserAge(_currentUser!.id);
-      
-      // Load scores
-      _userScores = await BattleService.getUserScores(_currentUser!.id);
-      
-      // Check admin status
-      _isAdmin = await SupabaseService.isCurrentUserAdmin();
-      
-      // Load verification status
-      final profile = await SupabaseService.getUserProfile(_currentUser!.id);
-      _isVerified = profile?['is_verified'] as bool? ?? false;
+      _userScores = results[6] as UserScores?;
       
       _error = null;
     } catch (e) {
+      AppLogger.log('Critical error loading user profile', error: e, name: 'UserProvider');
       _error = 'Failed to load profile: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
+  }
 
-    _isLoading = false;
-    notifyListeners();
+  /// Manually refresh all user data
+  Future<void> refresh() async {
+    await loadUserProfile();
   }
 
   /// Update username
@@ -186,6 +207,7 @@ class UserProvider extends ChangeNotifier {
     _bio = null;
     _userScores = null;
     _isAdmin = false;
+    _isPremium = false;
     _isVerified = false;
     _error = null;
     notifyListeners();

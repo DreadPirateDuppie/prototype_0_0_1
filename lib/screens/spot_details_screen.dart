@@ -14,6 +14,8 @@ import 'package:provider/provider.dart';
 import 'package:latlong2/latlong.dart';
 import '../widgets/verified_badge.dart';
 import 'trick_archive_screen.dart';
+import '../widgets/hud_avatar.dart';
+import 'user_profile_screen.dart';
 
 class SpotDetailsScreen extends StatefulWidget {
   final MapPost post;
@@ -434,23 +436,24 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                   // User Info & Date
                   Row(
                     children: [
-                      CircleAvatar(
+                      HudAvatar(
                         radius: 20,
-                        backgroundColor: matrixGreen,
-                        backgroundImage: currentPost.avatarUrl != null
-                            ? NetworkImage(currentPost.avatarUrl!)
-                            : null,
-                        child: currentPost.avatarUrl == null
-                            ? Text(
-                                (currentPost.userName?.isNotEmpty == true)
-                                    ? currentPost.userName![0].toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
+                        avatarUrl: currentPost.avatarUrl,
+                        username: currentPost.userName,
+                        showScanline: false,
+                        neonColor: matrixGreen,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => UserProfileScreen(
+                                userId: currentPost.userId,
+                                username: currentPost.userName,
+                                avatarUrl: currentPost.avatarUrl,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(width: 12),
                       Column(
@@ -544,44 +547,35 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                       ),
                       child: Row(
                         children: [
-                          // MVP Avatar with Crown
-                          Stack(
-                            alignment: Alignment.topRight,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: const BoxDecoration(
-                                  color: Colors.amber,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: Colors.black,
-                                  backgroundImage: _mvpProfile?['avatar_url'] != null
-                                      ? NetworkImage(_mvpProfile!['avatar_url'])
-                                      : null,
-                                  child: _mvpProfile?['avatar_url'] == null
-                                      ? Text(
-                                          (_mvpProfile?['username']?.isNotEmpty == true)
-                                              ? _mvpProfile!['username'][0].toUpperCase()
-                                              : 'K',
-                                          style: const TextStyle(
-                                            color: Colors.amber,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                              ),
-                              Transform.translate(
-                                offset: const Offset(8, -8),
-                                child: const Icon(
-                                  Icons.emoji_events,
-                                  color: Colors.amber,
-                                  size: 24,
-                                ),
-                              ),
-                            ],
+                          HudAvatar(
+                            radius: 24,
+                            avatarUrl: _mvpProfile?['avatar_url'],
+                            username: _mvpProfile?['username'],
+                            showScanline: true,
+                            neonColor: Colors.amber,
+                            onTap: () {
+                              if (currentPost.mvpUserId != null) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => UserProfileScreen(
+                                      userId: currentPost.mvpUserId!,
+                                      username: _mvpProfile?['username'],
+                                      avatarUrl: _mvpProfile?['avatar_url'],
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                          Positioned(
+                            top: -8,
+                            right: -8,
+                            child: const Icon(
+                              Icons.emoji_events,
+                              color: Colors.amber,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 16),
                           

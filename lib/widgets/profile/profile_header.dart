@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../verified_badge.dart';
+import '../../services/supabase_service.dart';
+import '../../screens/edit_username_dialog.dart';
+import '../../providers/profile_provider.dart';
+import 'package:provider/provider.dart';
 
 class ProfileHeader extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -146,12 +150,33 @@ class _ProfileHeaderState extends State<ProfileHeader> with SingleTickerProvider
                 ],
               ),
             ),
-            if (isVerified) ...[
-              const SizedBox(width: 8),
-              const VerifiedBadge(size: 18),
-            ],
           ],
         ),
+        
+        if (widget.isCurrentUser) ...[
+          const SizedBox(height: 16),
+          _buildTerminalButton(
+            label: 'CMD: EDIT_PROFILE',
+            onTap: () async {
+              final user = widget.profileData['id'];
+              if (user == null) return;
+              
+              await showDialog(
+                context: context,
+                builder: (context) => EditUsernameDialog(
+                  currentUsername: widget.profileData['username'] ?? '',
+                  currentBio: widget.profileData['bio'],
+                  onSave: (newUsername, newBio) {
+                    // Profile updated in DB by dialog, now refresh provider
+                    if (mounted) {
+                      context.read<ProfileProvider>().loadProfile(user);
+                    }
+                  },
+                ),
+              );
+            },
+          ),
+        ],
         
         // Bio with HUD Prefix
         if (bio != null && bio.isNotEmpty) ...[
@@ -202,6 +227,31 @@ class _ProfileHeaderState extends State<ProfileHeader> with SingleTickerProvider
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildTerminalButton({required String label, required VoidCallback onTap}) {
+    const neonGreen = Color(0xFF00FF41);
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: neonGreen.withValues(alpha: 0.5)),
+          color: neonGreen.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: neonGreen,
+            fontFamily: 'monospace',
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
+        ),
+      ),
     );
   }
 }

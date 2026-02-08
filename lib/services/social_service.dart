@@ -184,16 +184,26 @@ class SocialService {
       final currentUser = _authService.getCurrentUser();
       if (currentUser == null) return [];
 
-      final response = await _client
-          .from('user_profiles')
-          .select('id, username, display_name, avatar_url, is_verified')
-          .or('username.ilike.%$query%,display_name.ilike.%$query%')
-          .limit(20);
+      final response = await _client.rpc('search_profiles', params: {
+        'search_query': query,
+        'limit_cnt': 20,
+      });
 
-      return (response as List).cast<Map<String, dynamic>>();
+      return (response as List).cast<Map<String, dynamic>>().where((u) => u['id'] != currentUser.id).toList();
     } catch (e) {
       AppLogger.log('Error searching users: $e', name: 'SocialService');
-      return [];
+      
+      // Fallback to legacy search if RPC fails
+      try {
+        final response = await _client
+            .from('user_profiles')
+            .select('id, username, display_name, avatar_url, is_verified')
+            .or('username.ilike.%$query%,display_name.ilike.%$query%')
+            .limit(20);
+        return (response as List).cast<Map<String, dynamic>>();
+      } catch (fallbackError) {
+        return [];
+      }
     }
   }
 

@@ -282,22 +282,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Icon
+                    // HUD Icon Wrapper
                     Container(
                       width: 48,
                       height: 48,
-                      decoration: BoxDecoration(
-                        color: _getColorForType(type).withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _getColorForType(type).withValues(alpha: 0.3),
-                          width: 2,
-                        ),
-                      ),
-                      child: Icon(
-                        _getIconForType(type),
-                        color: _getColorForType(type),
-                        size: 24,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Small HUD Brackets
+                          CustomPaint(
+                            size: const Size(48, 48),
+                            painter: HudCornerPainter(color: _getColorForType(type)),
+                          ),
+                          Icon(
+                            _getIconForType(type),
+                            color: _getColorForType(type),
+                            size: 20,
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -415,4 +417,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
       return '${date.day}/${date.month}/${date.year}';
     }
   }
+}
+
+class HudCornerPainter extends CustomPainter {
+  final Color color;
+  HudCornerPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.4)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    final length = size.width * 0.2;
+    
+    // Top Left
+    canvas.drawLine(Offset.zero, Offset(length, 0), paint);
+    canvas.drawLine(Offset.zero, Offset(0, length), paint);
+
+    // Top Right
+    canvas.drawLine(Offset(size.width, 0), Offset(size.width - length, 0), paint);
+    canvas.drawLine(Offset(size.width, 0), Offset(size.width, length), paint);
+
+    // Bottom Left
+    canvas.drawLine(Offset(0, size.height), Offset(length, size.height), paint);
+    canvas.drawLine(Offset(0, size.height), Offset(0, size.height - length), paint);
+
+    // Bottom Right
+    canvas.drawLine(Offset(size.width, size.height), Offset(size.width - length, size.height), paint);
+    canvas.drawLine(Offset(size.width, size.height), Offset(size.width, size.height - length), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

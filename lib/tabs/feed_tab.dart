@@ -1,5 +1,7 @@
 import '../utils/logger.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/post.dart';
 import 'package:geocoding/geocoding.dart';
@@ -304,7 +306,13 @@ class _FeedTabState extends State<FeedTab> with SingleTickerProviderStateMixin {
         onPostAdded: () => _loadPosts(refresh: true),
       ),
       body: RefreshIndicator(
-        onRefresh: () => _loadPosts(refresh: true),
+        onRefresh: () async {
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          await Future.wait<void>([
+            _loadPosts(refresh: true),
+            userProvider.refresh(),
+          ]);
+        },
         color: matrixGreen,
         backgroundColor: Colors.black,
         child: _isLoading && _posts.isEmpty

@@ -6,6 +6,7 @@ import 'edit_post_dialog.dart';
 import '../widgets/video_player_widget.dart';
 import 'user_profile_screen.dart';
 import '../widgets/verified_badge.dart';
+import '../widgets/hud_avatar.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final MapPost post;
@@ -116,20 +117,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     },
                     child: Row(
                       children: [
-                        CircleAvatar(
+                        HudAvatar(
                           radius: 18,
-                          backgroundColor: matrixGreen.withValues(alpha: 0.2),
-                          backgroundImage: currentPost.avatarUrl != null
-                              ? NetworkImage(currentPost.avatarUrl!)
-                              : null,
-                          child: currentPost.avatarUrl == null
-                              ? Text(
-                                  (currentPost.userName?.isNotEmpty == true)
-                                      ? currentPost.userName![0].toUpperCase()
-                                      : 'U',
-                                  style: const TextStyle(color: matrixGreen, fontSize: 12),
-                                )
-                              : null,
+                          avatarUrl: currentPost.avatarUrl,
+                          username: currentPost.userName,
+                          showScanline: false,
+                          neonColor: matrixGreen,
                         ),
                         const SizedBox(width: 10),
                         Column(
@@ -150,14 +143,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               ],
                             ),
                              Text(
-                               'TIMESTAMP://' + currentPost.createdAt.toString().substring(2, 4) + '.' + 
+                               'TIMESTAMP // ' + currentPost.createdAt.toString().substring(2, 4) + '.' + 
                                currentPost.createdAt.toString().substring(5, 7) + '.' + 
                                currentPost.createdAt.toString().substring(8, 10),
                                style: TextStyle(
-                                 color: Colors.white.withValues(alpha: 0.4),
+                                 color: matrixGreen.withValues(alpha: 0.4),
                                  fontSize: 9,
                                  fontFamily: 'monospace',
-                                 letterSpacing: 1,
+                                 letterSpacing: 2,
                                ),
                              ),
                           ],

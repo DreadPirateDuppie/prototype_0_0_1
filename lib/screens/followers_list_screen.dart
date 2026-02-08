@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../utils/error_helper.dart';
+import '../widgets/hud_avatar.dart';
+import '../screens/user_profile_screen.dart';
 
 class FollowersListScreen extends StatefulWidget {
   final String userId;
@@ -25,6 +27,9 @@ class _FollowersListScreenState extends State<FollowersListScreen>
   List<Map<String, dynamic>> _following = [];
   bool _isLoading = true;
   Set<String> _followingIds = {}; // IDs of users the current user follows
+  
+  static const Color matrixGreen = Color(0xFF00FF41);
+  static const Color matrixBlack = Color(0xFF000000);
 
   @override
   void initState() {
@@ -108,51 +113,89 @@ class _FollowersListScreenState extends State<FollowersListScreen>
     final isCurrentUser = currentUser?.id == userId;
     final isFollowing = _followingIds.contains(userId);
 
-    return ListTile(
-      leading: CircleAvatar(
-        radius: 24,
-        backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-        backgroundColor: Colors.green.shade200,
-        child: avatarUrl == null
-            ? Text(
-                name.substring(0, 1).toUpperCase(),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              )
-            : null,
-      ),
-      title: Text(
-        name,
-        style: const TextStyle(fontWeight: FontWeight.bold),
-      ),
-      subtitle: username != null ? Text('@$username') : null,
-      trailing: isCurrentUser
-          ? null
-          : SizedBox(
-              width: 100,
-              child: OutlinedButton(
-                onPressed: () => _toggleFollow(userId),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: isFollowing ? Colors.grey : Colors.green,
-                  side: BorderSide(
-                    color: isFollowing ? Colors.grey : Colors.green,
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UserProfileScreen(
+              userId: userId,
+              username: username,
+              avatarUrl: avatarUrl,
+            ),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            HudAvatar(
+              avatarUrl: avatarUrl,
+              username: username,
+              radius: 20,
+              showScanline: false,
+              neonColor: matrixGreen,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   Text(
+                    name.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                      fontFamily: 'monospace',
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                child: Text(
-                  isFollowing ? 'Following' : 'Follow',
-                  style: const TextStyle(fontSize: 12),
-                ),
+                  if (username != null)
+                    Text(
+                      '@$username'.toUpperCase(),
+                      style: TextStyle(
+                        color: matrixGreen.withValues(alpha: 0.5),
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                ],
               ),
             ),
+            if (!isCurrentUser)
+              SizedBox(
+                width: 100,
+                child: TextButton(
+                  onPressed: () => _toggleFollow(userId),
+                  style: TextButton.styleFrom(
+                    backgroundColor: isFollowing ? Colors.transparent : matrixGreen,
+                    foregroundColor: isFollowing ? matrixGreen : Colors.black,
+                    side: BorderSide(color: matrixGreen),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    shape: const RoundedRectangleBorder(),
+                  ),
+                  child: Text(
+                    isFollowing ? 'STATUS: OK' : 'CMD: FLW',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildList(List<Map<String, dynamic>> users) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: matrixGreen),
+      );
     }
 
     if (users.isEmpty) {
@@ -163,11 +206,11 @@ class _FollowersListScreenState extends State<FollowersListScreen>
             Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
-              _tabController.index == 0 ? 'No followers yet' : 'Not following anyone yet',
+              _tabController.index == 0 ? 'NO_FOLLOWERS_FOUND' : 'DATA_STREAM_EMPTY',
               style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                color: matrixGreen.withValues(alpha: 0.5),
+                fontFamily: 'monospace',
               ),
             ),
           ],
@@ -184,18 +227,38 @@ class _FollowersListScreenState extends State<FollowersListScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: matrixBlack,
       appBar: AppBar(
-        title: Text(widget.username != null ? '@${widget.username}' : 'Followers'),
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
+        title: Text(
+          (widget.username != null ? '> @${widget.username}' : '> FOLLOW_LIST').toUpperCase(),
+          style: const TextStyle(
+            color: matrixGreen,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+            fontFamily: 'monospace',
+            fontSize: 16,
+          ),
+        ),
+        backgroundColor: matrixBlack,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: matrixGreen),
+          onPressed: () => Navigator.pop(context),
+        ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
+          indicatorColor: matrixGreen,
+          labelColor: matrixGreen,
+          unselectedLabelColor: Colors.white24,
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontFamily: 'monospace',
+            fontSize: 12,
+          ),
+          indicatorWeight: 1,
           tabs: [
-            Tab(text: 'Followers (${_followers.length})'),
-            Tab(text: 'Following (${_following.length})'),
+            Tab(text: 'FOLLOWERS // ${_followers.length}'),
+            Tab(text: 'FOLLOWING // ${_following.length}'),
           ],
         ),
       ),
