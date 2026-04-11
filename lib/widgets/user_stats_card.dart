@@ -214,7 +214,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _buildCoreStat('POINTS', scores.points.toStringAsFixed(0), 'P'),
-          _buildCoreStat('VOTE_W', '${(scores.voteWeight * 100).toStringAsFixed(0)}', '%'),
+          _buildCoreStat('VOTE_W', (scores.voteWeight * 100).toStringAsFixed(0), '%'),
         ],
       ),
     );

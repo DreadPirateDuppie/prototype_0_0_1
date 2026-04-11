@@ -218,38 +218,36 @@ class _SettingsTabState extends State<SettingsTab> {
 
     try {
       final profile = await SupabaseService.getUserProfile(user.id);
-      if (mounted) {
-        setState(() => _isLoading = false);
-        if (profile == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error: Could not retrieve profile data.')),
-          );
-          return;
-        }
-        showDialog(
-          context: context,
-          builder: (context) => EditUsernameDialog(
-            currentUsername: profile['username'] ?? '',
-            currentBio: profile['bio'],
-            onSave: (newUsername, newBio) {
-              // Profile is updated in the database by the dialog itself
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Profile updated successfully.'),
-                  backgroundColor: ThemeColors.matrixGreen,
-                ),
-              );
-            },
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      if (profile == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading profile: $e'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('Error: Could not retrieve profile data.')),
         );
+        return;
       }
+      showDialog(
+        context: context,
+        builder: (context) => EditUsernameDialog(
+          currentUsername: profile['username'] ?? '',
+          currentBio: profile['bio'],
+          onSave: (newUsername, newBio) {
+            // Profile is updated in the database by the dialog itself
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile updated successfully.'),
+                backgroundColor: ThemeColors.matrixGreen,
+              ),
+            );
+          },
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading profile: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -422,8 +420,9 @@ class _SettingsTabState extends State<SettingsTab> {
                     const SizedBox(height: 8),
                     TextButton.icon(
                       onPressed: () {
+                        final messenger = ScaffoldMessenger.of(context);
                         Clipboard.setData(const ClipboardData(text: walletAddress));
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           const SnackBar(
                             content: Text('Address copied to system clipboard.'),
                             backgroundColor: ThemeColors.matrixGreen,

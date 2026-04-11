@@ -74,6 +74,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final matrixBlack = theme.colorScheme.surface;
+    final createdAtStr = currentPost.createdAt.toString();
 
     return Scaffold(
       backgroundColor: matrixBlack,
@@ -143,9 +144,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               ],
                             ),
                              Text(
-                               'TIMESTAMP // ' + currentPost.createdAt.toString().substring(2, 4) + '.' + 
-                               currentPost.createdAt.toString().substring(5, 7) + '.' + 
-                               currentPost.createdAt.toString().substring(8, 10),
+                               'TIMESTAMP // ${createdAtStr.substring(2, 4)}.${createdAtStr.substring(5, 7)}.${createdAtStr.substring(8, 10)}',
                                style: TextStyle(
                                  color: matrixGreen.withValues(alpha: 0.4),
                                  fontSize: 9,
