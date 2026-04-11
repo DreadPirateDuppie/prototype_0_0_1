@@ -129,6 +129,7 @@ class _PostCardState extends State<PostCard> {
   @override
   Widget build(BuildContext context) {
     const matrixGreen = Color(0xFF00FF41);
+    final createdAtStr = currentPost.createdAt.toString();
     
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -296,11 +297,7 @@ class _PostCardState extends State<PostCard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'TIMESTAMP://' + currentPost.createdAt.toString().substring(2, 4) + '.' + 
-                      currentPost.createdAt.toString().substring(5, 7) + '.' + 
-                      currentPost.createdAt.toString().substring(8, 10) + '.' +
-                      currentPost.createdAt.toString().substring(11, 13) + 
-                      currentPost.createdAt.toString().substring(14, 16),
+                      'TIMESTAMP://${createdAtStr.substring(2, 4)}.${createdAtStr.substring(5, 7)}.${createdAtStr.substring(8, 10)}.${createdAtStr.substring(11, 13)}${createdAtStr.substring(14, 16)}',
                       style: TextStyle(
                         fontSize: 9,
                         color: matrixGreen.withValues(alpha: 0.4),

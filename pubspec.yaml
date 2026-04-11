@@ -1,5 +1,5 @@
 name: prototype_0_0_1
-description: "A new Flutter project."
+description: "Pushinn – a skate-spot discovery and battle app."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

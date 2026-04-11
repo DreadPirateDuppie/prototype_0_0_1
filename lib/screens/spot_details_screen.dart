@@ -298,6 +298,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
     final matrixBlack = colorScheme.surface;
     final textColor = theme.textTheme.bodyLarge?.color ?? matrixGreen;
     final secondaryTextColor = theme.textTheme.bodySmall?.color ?? matrixGreen.withValues(alpha: 0.7);
+    final createdAtStr = currentPost.createdAt.toString();
 
     return Scaffold(
       backgroundColor: matrixBlack,
@@ -476,9 +477,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                             ],
                           ),
                           Text(
-                            'TIMESTAMP://' + currentPost.createdAt.toString().substring(2, 4) + '.' + 
-                            currentPost.createdAt.toString().substring(5, 7) + '.' + 
-                            currentPost.createdAt.toString().substring(8, 10),
+                            'TIMESTAMP://${createdAtStr.substring(2, 4)}.${createdAtStr.substring(5, 7)}.${createdAtStr.substring(8, 10)}',
                             style: TextStyle(
                               color: secondaryTextColor,
                               fontSize: 10,

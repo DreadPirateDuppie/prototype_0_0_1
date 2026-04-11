@@ -149,43 +149,6 @@ class BattleModeSelectionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeaderInfo() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 12,
-              height: 12,
-              color: ThemeColors.matrixGreen,
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'SESSION_INITIATED',
-              style: TextStyle(
-                color: ThemeColors.matrixGreen,
-                fontFamily: 'monospace',
-                fontSize: 10,
-                letterSpacing: 2,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'SELECT ENGAGEMENT PROTOCOL:',
-          style: TextStyle(
-            color: ThemeColors.matrixGreen.withValues(alpha: 0.5),
-            fontFamily: 'monospace',
-            fontSize: 10,
-            letterSpacing: 1,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildFooterStatus() {
     return Column(
       children: [

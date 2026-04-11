@@ -45,7 +45,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
   String? _bio;
   
   // Stats expansion state
-  bool _isStatsExpanded = false;
+  final bool _isStatsExpanded = false;
   bool _isPrivate = false;
   
   bool get _canViewContent {
@@ -150,31 +150,28 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
     try {
       if (_isFollowing) {
         await SupabaseService.unfollowUser(widget.userId);
-        if (mounted) {
-          setState(() {
-            _isFollowing = false;
-            _followersCount--;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Unfollowed user')),
-          );
-        }
+        if (!mounted) return;
+        setState(() {
+          _isFollowing = false;
+          _followersCount--;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unfollowed user')),
+        );
       } else {
         await SupabaseService.followUser(widget.userId);
-        if (mounted) {
-          setState(() {
-            _isFollowing = true;
-            _followersCount++;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Following user!')),
-          );
-        }
+        if (!mounted) return;
+        setState(() {
+          _isFollowing = true;
+          _followersCount++;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Following user!')),
+        );
       }
     } catch (e) {
-      if (mounted) {
-        ErrorHelper.showError(context, 'Error updating follow status: $e');
-      }
+      if (!mounted) return;
+      ErrorHelper.showError(context, 'Error updating follow status: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -234,27 +231,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
         Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 4),
         Text(description, style: TextStyle(fontSize: 13, color: Theme.of(context).textTheme.bodySmall?.color)),
-      ],
-    );
-  }
-
-  Widget _buildStatColumn(String label, String count) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          count,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Theme.of(context).textTheme.bodySmall?.color,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
       ],
     );
   }
@@ -339,19 +315,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
             if (isPostSource) {
               // Navigate to the post
               try {
-                // We need to fetch the full post first
-                final posts = await SupabaseService.getAllMapPosts(); // Inefficient, should have getById
-                // Better approach: filter by ID locally if possible or add getPostById
-                // For now, let's just assume we can find it or fail gracefully.
-                // Actually, let's use the PostService directly if possible or add a method.
-                // Since I can't easily change the Service contract right now without more files, 
-                // I'll filter getAllMapPosts (not ideal but works for prototype).
-                // Wait, SupabaseService.getAllMapPosts doesn't take an ID.
-                // Let's rely on the fact that if it's a post, we can try to construct a partial MapPost 
-                // but SpotDetails needs a full one. 
-                // Let's just catch the tap and try to open it.
-                
-                // Optimized: Fetch just this post
+                // Fetch just this post by ID
                 final post = await Supabase.instance.client
                   .from('map_posts')
                   .select()
