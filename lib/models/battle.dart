@@ -39,10 +39,10 @@ class Battle {
   final String? winnerId;
   final String currentTurnPlayerId;
   final int wagerAmount;
-  final int betAmount;
+  final int wagerAmount;
   final bool isQuickfire;
   final DateTime? turnDeadline;
-  final bool betAccepted;
+  final bool wagerAccepted;
   final String? setterId;
   final String? attempterId;
   final String? setterVote; // 'landed' or 'missed'
@@ -68,10 +68,10 @@ class Battle {
     this.winnerId,
     required this.currentTurnPlayerId,
     this.wagerAmount = 0,
-    this.betAmount = 0,
+    this.wagerAmount = 0,
     this.isQuickfire = false,
     this.turnDeadline,
-    this.betAccepted = false,
+    this.wagerAccepted = false,
     this.setterId,
     this.attempterId,
     this.setterVote,
@@ -139,10 +139,10 @@ class Battle {
       'winner_id': winnerId,
       'current_turn_player_id': currentTurnPlayerId,
       'wager_amount': wagerAmount,
-      'bet_amount': betAmount,
+      'wager_amount': wagerAmount,
       'is_quickfire': isQuickfire,
       'turn_deadline': turnDeadline?.toIso8601String(),
-      'bet_accepted': betAccepted,
+      'wager_accepted': wagerAccepted,
       'setter_id': setterId,
       'attempter_id': attempterId,
       'setter_vote': setterVote,
@@ -179,12 +179,12 @@ class Battle {
       winnerId: map['winner_id'] as String?,
       currentTurnPlayerId: map['current_turn_player_id'] as String,
       wagerAmount: (map['wager_amount'] as num?)?.toInt() ?? 0,
-      betAmount: (map['bet_amount'] as num?)?.toInt() ?? 0,
+      wagerAmount: (map['wager_amount'] as num?)?.toInt() ?? 0,
       isQuickfire: map['is_quickfire'] as bool? ?? false,
       turnDeadline: map['turn_deadline'] != null
           ? DateTime.parse(map['turn_deadline'] as String)
           : null,
-      betAccepted: map['bet_accepted'] as bool? ?? false,
+      wagerAccepted: map['wager_accepted'] as bool? ?? false,
       setterId: map['setter_id'] as String?,
       attempterId: map['attempter_id'] as String?,
       setterVote: map['setter_vote'] as String?,
@@ -212,10 +212,10 @@ class Battle {
     String? winnerId,
     String? currentTurnPlayerId,
     int? wagerAmount,
-    int? betAmount,
+    int? wagerAmount,
     bool? isQuickfire,
     DateTime? turnDeadline,
-    bool? betAccepted,
+    bool? wagerAccepted,
     String? setterId,
     String? attempterId,
     String? setterVote,
@@ -241,10 +241,10 @@ class Battle {
       winnerId: winnerId ?? this.winnerId,
       currentTurnPlayerId: currentTurnPlayerId ?? this.currentTurnPlayerId,
       wagerAmount: wagerAmount ?? this.wagerAmount,
-      betAmount: betAmount ?? this.betAmount,
+      wagerAmount: wagerAmount ?? this.wagerAmount,
       isQuickfire: isQuickfire ?? this.isQuickfire,
       turnDeadline: turnDeadline ?? this.turnDeadline,
-      betAccepted: betAccepted ?? this.betAccepted,
+      wagerAccepted: wagerAccepted ?? this.wagerAccepted,
       setterId: setterId ?? this.setterId,
       attempterId: attempterId ?? this.attempterId,
       setterVote: setterVote ?? this.setterVote,

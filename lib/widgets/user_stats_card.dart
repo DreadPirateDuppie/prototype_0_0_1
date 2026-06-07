@@ -211,7 +211,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
         border: Border.all(color: ThemeColors.matrixGreen.withValues(alpha: 0.1)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceWagerween,
         children: [
           _buildCoreStat('POINTS', scores.points.toStringAsFixed(0), 'P'),
           _buildCoreStat('VOTE_W', '${(scores.voteWeight * 100).toStringAsFixed(0)}', '%'),
@@ -234,7 +234,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
+          textBaseline: TextBaseline.alphawageric,
           children: [
             Text(
               value,
@@ -325,7 +325,7 @@ class _UserStatsCardState extends State<UserStatsCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceWagerween,
           children: [
             Text(
               label,

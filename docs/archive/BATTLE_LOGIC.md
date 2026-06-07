@@ -17,7 +17,7 @@ At any given time, there are two roles in a battle:
 
 ### 1. Battle Creation
 - One player challenges another
-- Game mode and optional wager/bet are specified
+- Game mode and optional wager/wager are specified
 - Setter and Attempter roles are **randomly assigned** at start
 - Timer starts for the Setter
 
@@ -120,7 +120,7 @@ If not over: Return to Setting Phase
 
 ### `createBattle`
 - Creates new battle with random Setter/Attempter assignment
-- Handles wager/bet deductions
+- Handles wager/wager deductions
 - Sets initial deadline
 
 ### `uploadSetTrick`

@@ -400,8 +400,8 @@ class _BattleDetailPopupState extends State<BattleDetailPopup> {
                       
                       const SizedBox(height: 16),
                       
-                      // Bet Information
-                      if (_battle.betAmount > 0) ...[
+                      // Wager Information
+                      if (_battle.wagerAmount > 0) ...[
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -420,7 +420,7 @@ class _BattleDetailPopupState extends State<BattleDetailPopup> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'BET: ${_battle.betAmount} pts (POT: ${_battle.betAmount * 2})',
+                                'WAGER: ${_battle.wagerAmount} pts (POT: ${_battle.wagerAmount * 2})',
                                 style: const TextStyle(
                                   color: Color(0xFFFFD700),
                                   fontWeight: FontWeight.bold,

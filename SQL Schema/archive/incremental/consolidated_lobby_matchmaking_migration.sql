@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS matchmaking_queue (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   game_mode TEXT NOT NULL DEFAULT 'skate',
   is_quickfire BOOLEAN NOT NULL DEFAULT true,
-  bet_amount INTEGER NOT NULL DEFAULT 0,
+  wager_amount INTEGER NOT NULL DEFAULT 0,
   ranking_score DOUBLE PRECISION NOT NULL DEFAULT 500,
   joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   status TEXT NOT NULL DEFAULT 'waiting', -- 'waiting', 'matched', 'cancelled'

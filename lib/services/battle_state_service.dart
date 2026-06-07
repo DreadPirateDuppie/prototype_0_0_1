@@ -22,23 +22,23 @@ class BattleStateService {
     required GameMode gameMode,
     String? customLetters,
     int wagerAmount = 0,
-    int betAmount = 0,
+    int wagerAmount = 0,
     bool isQuickfire = false,
   }) async {
     try {
-      // Check if player has enough points for bet
-      if (betAmount > 0) {
+      // Check if player has enough points for wager
+      if (wagerAmount > 0) {
         final balance = await SupabaseService.getUserPoints(player1Id);
-        if (balance < betAmount) {
-          throw Exception('Insufficient points for bet');
+        if (balance < wagerAmount) {
+          throw Exception('Insufficient points for wager');
         }
         
-        // Deduct bet from player 1 (player 2 must match to accept)
+        // Deduct wager from player 1 (player 2 must match to accept)
         await SupabaseService.awardPoints(
           player1Id, 
-          -betAmount.toDouble(), 
-          'bet_entry', 
-          description: 'Bet for battle vs $player2Id'
+          -wagerAmount.toDouble(), 
+          'wager_entry', 
+          description: 'Wager for battle vs $player2Id'
         );
       }
 
@@ -59,10 +59,10 @@ class BattleStateService {
         createdAt: DateTime.now(),
         currentTurnPlayerId: '', // Empty string indicates waiting for RPS
         wagerAmount: wagerAmount,
-        betAmount: betAmount,
+        wagerAmount: wagerAmount,
         isQuickfire: isQuickfire,
         turnDeadline: DateTime.now().add(timerDuration), // Initial deadline for RPS
-        betAccepted: betAmount == 0, // Auto-accept if no bet
+        wagerAccepted: wagerAmount == 0, // Auto-accept if no wager
         setterId: null, // No setter initially for RPS
         attempterId: null, // No attempter initially for RPS
       );
@@ -105,8 +105,8 @@ class BattleStateService {
     } catch (e) {
       if (e.toString().contains('Insufficient points')) {
         throw AppValidationException(
-          'Insufficient points for bet',
-          userMessage: 'You don\'t have enough points for this bet.',
+          'Insufficient points for wager',
+          userMessage: 'You don\'t have enough points for this wager.',
           originalError: e,
         );
       }
@@ -335,11 +335,11 @@ class BattleStateService {
       await BattleService.updatePlayerScoreForBattle(battle);
       
       // Handle Wager Payout
-      if (battle.betAmount > 0) {
-        // Winner gets their bet back (no doubling)
+      if (battle.wagerAmount > 0) {
+        // Winner gets their wager back (no doubling)
         await SupabaseService.awardPoints(
           winnerId,
-          battle.betAmount.toDouble(),
+          battle.wagerAmount.toDouble(),
           'battle_win', 
           referenceId: battleId, 
           description: 'Won battle wager'

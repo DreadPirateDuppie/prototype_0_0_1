@@ -192,7 +192,7 @@ class BattleModeSelectionScreen extends StatelessWidget {
         Divider(color: ThemeColors.matrixGreen.withValues(alpha: 0.1)),
         const SizedBox(height: 8),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceWagerween,
           children: [
             _buildStatusItem('ENCRYPTION', 'ACTIVE'),
             _buildStatusItem('LATENCY', 'LOW'),
@@ -314,7 +314,7 @@ class BattleModeSelectionScreen extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.spaceWagerween,
                               children: [
                                 Text(
                                   title,

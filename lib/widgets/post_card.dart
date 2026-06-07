@@ -343,7 +343,7 @@ class _PostCardState extends State<PostCard> {
             Padding(
               padding: const EdgeInsets.all(12.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceWagerween,
                 children: [
                   VoteButtons(
                     postId: currentPost.id!,

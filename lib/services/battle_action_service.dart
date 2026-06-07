@@ -338,31 +338,31 @@ class BattleActionService {
     }
   }
 
-  // Opponent accepts bet
-  static Future<void> acceptBet({
+  // Opponent accepts wager
+  static Future<void> acceptWager({
     required String battleId,
     required String opponentId,
-    required int betAmount,
+    required int wagerAmount,
   }) async {
     try {
       // Verify opponent has enough points
       final balance = await SupabaseService.getUserPoints(opponentId);
-      if (balance < betAmount) {
-        throw Exception('Opponent has insufficient points for bet');
+      if (balance < wagerAmount) {
+        throw Exception('Opponent has insufficient points for wager');
       }
-      // Deduct bet from opponent
+      // Deduct wager from opponent
       await SupabaseService.awardPoints(
         opponentId,
-        -betAmount.toDouble(),
-        'bet_entry',
-        description: 'Bet match for battle $battleId',
+        -wagerAmount.toDouble(),
+        'wager_entry',
+        description: 'Wager match for battle $battleId',
       );
-      // Update battle to mark bet accepted
+      // Update battle to mark wager accepted
       await _client.from('battles').update({
-        'bet_accepted': true,
+        'wager_accepted': true,
       }).eq('id', battleId);
     } catch (e) {
-      throw Exception('Failed to accept bet: $e');
+      throw Exception('Failed to accept wager: $e');
     }
   }
 }

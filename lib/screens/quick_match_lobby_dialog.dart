@@ -27,7 +27,7 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
   
   GameMode _selectedMode = GameMode.skate;
   bool _isQuickfire = true;
-  int _betAmount = 0;
+  int _wagerAmount = 0;
   int _userPoints = 0;
   double _myRankingScore = 500.0;
   int _playersInQueue = 0;
@@ -114,7 +114,7 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
       await BattleService.joinMatchmakingQueue(
         gameMode: _selectedMode,
         isQuickfire: _isQuickfire,
-        betAmount: _betAmount,
+        wagerAmount: _wagerAmount,
       );
     } catch (e) {
       if (mounted) {
@@ -146,7 +146,7 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
       myRankingScore: _myRankingScore,
       gameMode: _selectedMode.toString().split('.').last,
       isQuickfire: _isQuickfire,
-      betAmount: _betAmount,
+      wagerAmount: _wagerAmount,
       expandedRange: expandedRange,
     );
 
@@ -166,7 +166,7 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
         opponentId: opponentId,
         gameMode: _selectedMode,
         isQuickfire: _isQuickfire,
-        betAmount: _betAmount,
+        wagerAmount: _wagerAmount,
       );
 
       if (battle != null && mounted) {
@@ -684,7 +684,7 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.spaceWagerween,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -707,7 +707,7 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '$_betAmount PTS',
+                          '$_wagerAmount PTS',
                           style: const TextStyle(
                             color: ThemeColors.matrixGreen,
                             fontWeight: FontWeight.bold,
@@ -729,12 +729,12 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
                       overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                     ),
                     child: Slider(
-                      value: _betAmount.toDouble(),
+                      value: _wagerAmount.toDouble(),
                       min: 0,
                       max: _userPoints.toDouble() > 1000 ? 1000 : _userPoints.toDouble(),
                       divisions: 10,
                       onChanged: (_matchFound || _isSearchingStarted) ? null : (value) {
-                        setState(() => _betAmount = value.toInt());
+                        setState(() => _wagerAmount = value.toInt());
                       },
                     ),
                   ),
@@ -749,7 +749,7 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
 
   Widget _buildSettingRow(String title, String subtitle, Widget trailing) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.spaceWagerween,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -140,23 +140,23 @@ void main() {
       });
     });
 
-    group('Bet and wager logic', () {
-      test('pot amount is double the bet', () {
-        const betAmount = 50;
-        final potAmount = betAmount * 2;
+    group('Wager and wager logic', () {
+      test('pot amount is double the wager', () {
+        const wagerAmount = 50;
+        final potAmount = wagerAmount * 2;
         expect(potAmount, 100);
       });
 
-      test('battle with no bet is auto-accepted', () {
-        const betAmount = 0;
-        final betAccepted = betAmount == 0;
-        expect(betAccepted, true);
+      test('battle with no wager is auto-accepted', () {
+        const wagerAmount = 0;
+        final wagerAccepted = wagerAmount == 0;
+        expect(wagerAccepted, true);
       });
 
-      test('battle with bet requires acceptance', () {
-        const betAmount = 50;
-        final betAccepted = betAmount == 0;
-        expect(betAccepted, false);
+      test('battle with wager requires acceptance', () {
+        const wagerAmount = 50;
+        final wagerAccepted = wagerAmount == 0;
+        expect(wagerAccepted, false);
       });
     });
 

@@ -45,7 +45,7 @@ class UsersTab extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceWagerween,
                 children: [
                   const Text(
                     'USER_DIRECTORY',

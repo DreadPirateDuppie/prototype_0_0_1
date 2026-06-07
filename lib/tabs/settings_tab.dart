@@ -477,11 +477,7 @@ class _SettingsTabState extends State<SettingsTab> {
           ),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: () => context.read<UserProvider>().refresh(),
-        color: neonGreen,
-        backgroundColor: Colors.black,
-        child: Stack(
+      body: Stack(
           children: [
             ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -583,6 +579,18 @@ class _SettingsTabState extends State<SettingsTab> {
                 child: Column(
                   children: [
                     _buildSettingsItem(
+                      'Contact Support',
+                      Icons.headset_mic_outlined,
+                      onTap: _showSupportDialog,
+                    ),
+                    _buildDivider(),
+                    _buildSettingsItem(
+                      'Direct Email',
+                      Icons.alternate_email,
+                      onTap: _launchSupportEmail,
+                    ),
+                    _buildDivider(),
+                    _buildSettingsItem(
                       'Send Feedback',
                       Icons.feedback_outlined,
                       onTap: _showFeedbackDialog,
@@ -678,8 +686,7 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
         ],
       ),
-    ),
-  );
+    );
 }
 
   Widget _buildPremiumBanner() {
@@ -763,6 +770,172 @@ class _SettingsTabState extends State<SettingsTab> {
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        '[$title]',
+        style: TextStyle(
+          color: ThemeColors.matrixGreen.withValues(alpha: 0.7),
+          fontFamily: 'monospace',
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlassCard({required Widget child}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsItem(String title, IconData icon, {VoidCallback? onTap, Color? iconColor}) {
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(icon, color: iconColor ?? Colors.white70, size: 20),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontFamily: 'monospace',
+        ),
+      ),
+      trailing: const Icon(Icons.chevron_right, color: Colors.white24, size: 16),
+      dense: true,
+    );
+  }
+
+  Widget _buildSwitchItem(String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
+    return SwitchListTile(
+      value: value,
+      onChanged: onChanged,
+      activeThumbColor: ThemeColors.matrixGreen,
+      title: Text(
+        title,
+        style: const TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace'),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+      ),
+      dense: true,
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(height: 1, color: Colors.white.withValues(alpha: 0.05), indent: 50);
+  }
+
+  void _showPolicyDialog(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.black,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: ThemeColors.matrixGreen, width: 1),
+        ),
+        title: Text(
+          '>_$title',
+          style: const TextStyle(
+            color: ThemeColors.matrixGreen,
+            fontFamily: 'monospace',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Text(
+            content,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('DISMISS', style: TextStyle(color: ThemeColors.matrixGreen, fontFamily: 'monospace')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.black,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: ThemeColors.matrixGreen, width: 1),
+        ),
+        title: Text(
+          '>_SYSTEM_INFO',
+          style: TextStyle(
+            color: ThemeColors.matrixGreen,
+            fontFamily: 'monospace',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'PUSHINN_PROTOCOL',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'v1.0.0_stable_build',
+              style: TextStyle(color: ThemeColors.matrixGreen.withValues(alpha: 0.7), fontSize: 11, fontFamily: 'monospace'),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'A decentralized geographic intelligence network for the community.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('ACKNOWLEDGE', style: TextStyle(color: ThemeColors.matrixGreen, fontFamily: 'monospace')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+,
               ],
             ),
           ),

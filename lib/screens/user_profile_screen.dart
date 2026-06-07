@@ -341,7 +341,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
               try {
                 // We need to fetch the full post first
                 final posts = await SupabaseService.getAllMapPosts(); // Inefficient, should have getById
-                // Better approach: filter by ID locally if possible or add getPostById
+                // Wagerter approach: filter by ID locally if possible or add getPostById
                 // For now, let's just assume we can find it or fail gracefully.
                 // Actually, let's use the PostService directly if possible or add a method.
                 // Since I can't easily change the Service contract right now without more files, 

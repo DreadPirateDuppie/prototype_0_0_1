@@ -295,6 +295,16 @@ class SupabaseService {
 
   static Future<void> submitFeedback(String feedback) => _userService.submitFeedback(feedback, userId: getCurrentUser()?.id);
 
+  static Future<void> submitSupportTicket({required String subject, required String message}) {
+    final userId = getCurrentUser()?.id;
+    if (userId == null) throw Exception('User not authenticated');
+    return _userService.submitSupportTicket(
+      userId: userId,
+      subject: subject,
+      message: message,
+    );
+  }
+
   // ========== NOTIFICATIONS (Placeholder) ==========
   static Future<List<Map<String, dynamic>>> getNotifications() async {
     final userId = getCurrentUser()?.id;

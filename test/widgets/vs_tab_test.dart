@@ -35,7 +35,7 @@ void main() {
             currentTurnPlayerId: 'user-1',
             createdAt: DateTime.now(),
             verificationStatus: VerificationStatus.pending,
-            betAccepted: true,
+            wagerAccepted: true,
           ),
           Battle(
             id: '2',
@@ -61,7 +61,7 @@ void main() {
       });
 
       test('Filter active battles', () {
-        final activeBattles = battles.where((b) => b.completedAt == null && b.betAccepted).toList();
+        final activeBattles = battles.where((b) => b.completedAt == null && b.wagerAccepted).toList();
         expect(activeBattles.length, 1);
         expect(activeBattles.first.id, '1');
       });
@@ -73,14 +73,14 @@ void main() {
       });
 
       test('Filter pending battles', () {
-        final pendingBattles = battles.where((b) => !b.betAccepted && b.completedAt == null).toList();
+        final pendingBattles = battles.where((b) => !b.wagerAccepted && b.completedAt == null).toList();
         expect(pendingBattles.length, 1);
       });
 
       test('Filter my turn battles', () {
         const currentUserId = 'user-1';
         final myTurnBattles = battles.where(
-          (b) => b.currentTurnPlayerId == currentUserId && b.completedAt == null && b.betAccepted,
+          (b) => b.currentTurnPlayerId == currentUserId && b.completedAt == null && b.wagerAccepted,
         ).toList();
         expect(myTurnBattles.length, 1);
       });
@@ -166,17 +166,17 @@ void main() {
       test('Active battle status', () {
         String getStatusLabel(Battle battle) {
           if (battle.completedAt != null) return 'Finished';
-          if (!battle.betAccepted) return 'Waiting';
+          if (!battle.wagerAccepted) return 'Waiting';
           return 'In Progress';
         }
 
         final activeBattle = Battle(
           player1Id: '1', player2Id: '2', gameMode: GameMode.skate, currentTurnPlayerId: '1', createdAt: DateTime.now(),
-          betAccepted: true,
+          wagerAccepted: true,
         );
         final pendingBattle = Battle(
           player1Id: '1', player2Id: '2', gameMode: GameMode.skate, currentTurnPlayerId: '1', createdAt: DateTime.now(),
-          betAccepted: false,
+          wagerAccepted: false,
         );
         final completedBattle = Battle(
           player1Id: '1', player2Id: '2', gameMode: GameMode.skate, currentTurnPlayerId: '1', createdAt: DateTime.now(),
@@ -270,7 +270,7 @@ void main() {
             player2Id: 'user-2',
             gameMode: GameMode.skate,
             currentTurnPlayerId: 'user-1',
-            betAccepted: true,
+            wagerAccepted: true,
             createdAt: DateTime.now(),
           ),
           Battle(
@@ -279,7 +279,7 @@ void main() {
             player2Id: 'user-3',
             gameMode: GameMode.skate,
             currentTurnPlayerId: 'user-3',
-            betAccepted: true,
+            wagerAccepted: true,
             createdAt: DateTime.now(),
           ),
           Battle(
@@ -288,14 +288,14 @@ void main() {
             player2Id: 'user-1',
             gameMode: GameMode.skate,
             currentTurnPlayerId: 'user-1',
-            betAccepted: true,
+            wagerAccepted: true,
             createdAt: DateTime.now(),
           ),
         ];
 
         const currentUserId = 'user-1';
         final actionsRequired = battles.where(
-          (b) => b.currentTurnPlayerId == currentUserId && b.completedAt == null && b.betAccepted,
+          (b) => b.currentTurnPlayerId == currentUserId && b.completedAt == null && b.wagerAccepted,
         ).length;
 
         expect(actionsRequired, 2);
@@ -318,7 +318,7 @@ void main() {
       });
     });
 
-    group('Quickfire and Bet Badges', () {
+    group('Quickfire and Wager Badges', () {
       test('Quickfire battle badge', () {
         final battle = Battle(
           player1Id: 'p1',
@@ -332,18 +332,18 @@ void main() {
         expect(battle.isQuickfire, true);
       });
 
-      test('Bet amount badge', () {
+      test('Wager amount badge', () {
         final battle = Battle(
           player1Id: 'p1',
           player2Id: 'p2',
           gameMode: GameMode.skate,
           currentTurnPlayerId: 'p1',
           createdAt: DateTime.now(),
-          betAmount: 100,
+          wagerAmount: 100,
         );
 
-        expect(battle.betAmount > 0, true);
-        expect(battle.betAmount, 100);
+        expect(battle.wagerAmount > 0, true);
+        expect(battle.wagerAmount, 100);
       });
     });
   });

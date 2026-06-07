@@ -58,7 +58,7 @@ class BattleHeader extends StatelessWidget {
 
   Widget _buildPlayersRow(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.spaceWagerween,
       children: [
         Expanded(
           child: _buildPlayerInfo(
@@ -329,7 +329,7 @@ class BattleHeader extends StatelessWidget {
   }
 }
 
-/// A widget displaying game mode and bet information
+/// A widget displaying game mode and wager information
 class BattleInfoBadges extends StatelessWidget {
   final Battle battle;
   
@@ -357,10 +357,10 @@ class BattleInfoBadges extends StatelessWidget {
             label: 'QUICKFIRE',
             color: Colors.orange,
           ),
-        if (battle.betAmount > 0)
+        if (battle.wagerAmount > 0)
           _buildBadge(
             icon: Icons.monetization_on,
-            label: '${battle.betAmount} PTS',
+            label: '${battle.wagerAmount} PTS',
             color: Colors.amber,
           ),
       ],

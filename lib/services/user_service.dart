@@ -251,6 +251,25 @@ class UserService {
     }
   }
 
+  /// Submit a support ticket
+  Future<void> submitSupportTicket({
+    required String userId,
+    required String subject,
+    required String message,
+  }) async {
+    try {
+      await _client.from('support_tickets').insert({
+        'user_id': userId,
+        'subject': subject,
+        'message': message,
+      });
+      AppLogger.log('Support ticket submitted by user $userId', name: 'UserService');
+    } catch (e) {
+      AppLogger.log('Error submitting support ticket: $e', name: 'UserService');
+      throw Exception('Failed to submit support ticket');
+    }
+  }
+
   /// Get user bio
   Future<String?> getUserBio(String userId) async {
     try {

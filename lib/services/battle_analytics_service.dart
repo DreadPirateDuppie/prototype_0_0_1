@@ -37,7 +37,7 @@ class BattleAnalyticsService {
           ? battle.player2Letters
           : battle.player1Letters;
 
-      // Fewer letters = better performance = less point loss
+      // Fewer letters = wagerter performance = less point loss
       final pointsLost = 5 + (loserLetters.length * 2);
       final newLoserScore = (loser.playerScore - pointsLost).clamp(0.0, 1000.0);
       await pointsService.updatePlayerScore(

@@ -22,7 +22,7 @@ class BattleService {
     required GameMode gameMode,
     String? customLetters,
     int wagerAmount = 0,
-    int betAmount = 0,
+    int wagerAmount = 0,
     bool isQuickfire = false,
   }) {
     return BattleStateService.createBattle(
@@ -31,7 +31,7 @@ class BattleService {
       gameMode: gameMode,
       customLetters: customLetters,
       wagerAmount: wagerAmount,
-      betAmount: betAmount,
+      wagerAmount: wagerAmount,
       isQuickfire: isQuickfire,
     );
   }
@@ -134,12 +134,12 @@ class BattleService {
     return BattleActionService.resolveVotes(battleId);
   }
 
-  static Future<void> acceptBet({
+  static Future<void> acceptWager({
     required String battleId,
     required String opponentId,
-    required int betAmount,
+    required int wagerAmount,
   }) {
-    return BattleActionService.acceptBet(battleId: battleId, opponentId: opponentId, betAmount: betAmount);
+    return BattleActionService.acceptWager(battleId: battleId, opponentId: opponentId, wagerAmount: wagerAmount);
   }
 
   // ==================== ANALYTICS SERVICE DELEGATES ====================
@@ -177,12 +177,12 @@ class BattleService {
   static Future<void> joinMatchmakingQueue({
     required GameMode gameMode,
     bool isQuickfire = true,
-    int betAmount = 0,
+    int wagerAmount = 0,
   }) {
     return BattleMatchmakingService.joinMatchmakingQueue(
       gameMode: gameMode, 
       isQuickfire: isQuickfire, 
-      betAmount: betAmount
+      wagerAmount: wagerAmount
     );
   }
 
@@ -194,14 +194,14 @@ class BattleService {
     required double myRankingScore,
     required String gameMode,
     required bool isQuickfire,
-    int betAmount = 0,
+    int wagerAmount = 0,
     int expandedRange = 100,
   }) {
     return BattleMatchmakingService.findMatch(
       myRankingScore: myRankingScore, 
       gameMode: gameMode, 
       isQuickfire: isQuickfire, 
-      betAmount: betAmount, 
+      wagerAmount: wagerAmount, 
       expandedRange: expandedRange
     );
   }
@@ -221,13 +221,13 @@ class BattleService {
     required String opponentId,
     required GameMode gameMode,
     bool isQuickfire = true,
-    int betAmount = 0,
+    int wagerAmount = 0,
   }) {
     return BattleMatchmakingService.createBattleFromMatch(
       opponentId: opponentId, 
       gameMode: gameMode, 
       isQuickfire: isQuickfire, 
-      betAmount: betAmount
+      wagerAmount: wagerAmount
     );
   }
 

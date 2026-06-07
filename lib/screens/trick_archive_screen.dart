@@ -235,7 +235,7 @@ class _TrickArchiveScreenState extends State<TrickArchiveScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceWagerween,
                   children: [
                     Text(
                       video.displayTitle.toUpperCase(),

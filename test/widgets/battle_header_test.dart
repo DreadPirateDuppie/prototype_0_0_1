@@ -167,18 +167,18 @@ void main() {
         expect(quickfireBattle.isQuickfire, true);
       });
 
-      test('Bet amount badge logic', () {
-        final betBattle = Battle(
+      test('Wager amount badge logic', () {
+        final wagerBattle = Battle(
           player1Id: 'p1',
           player2Id: 'p2',
           gameMode: GameMode.skate,
           currentTurnPlayerId: 'p1',
           createdAt: DateTime.now(),
-          betAmount: 100,
+          wagerAmount: 100,
         );
 
-        expect(betBattle.betAmount, 100);
-        expect(betBattle.betAmount > 0, true);
+        expect(wagerBattle.wagerAmount, 100);
+        expect(wagerBattle.wagerAmount > 0, true);
       });
 
       test('Game mode display', () {

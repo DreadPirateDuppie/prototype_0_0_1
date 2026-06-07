@@ -61,7 +61,7 @@ DROP INDEX IF EXISTS idx_battle_tricks_created_at;
 DROP INDEX IF EXISTS idx_trick_nodes_category;
 DROP INDEX IF EXISTS idx_user_trick_progress_user_id;
 DROP INDEX IF EXISTS idx_user_trick_progress_status;
-DROP INDEX IF EXISTS idx_battles_bet_accepted;
+DROP INDEX IF EXISTS idx_battles_wager_accepted;
 DROP INDEX IF EXISTS idx_user_profiles_can_post;
 DROP INDEX IF EXISTS idx_user_profiles_is_premium;
 

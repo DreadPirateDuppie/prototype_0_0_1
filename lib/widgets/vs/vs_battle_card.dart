@@ -232,7 +232,7 @@ class VsBattleCard extends StatelessWidget {
   Widget _buildStatusIndicators(Battle battle, bool isMyTurn, bool isCompleted) {
     final widgets = <Widget>[];
     
-    if (battle.betAmount > 0) {
+    if (battle.wagerAmount > 0) {
       widgets.add(
         Container(
           margin: const EdgeInsets.only(right: AppSpacing.sm),
@@ -258,7 +258,7 @@ class VsBattleCard extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                '${battle.betAmount}',
+                '${battle.wagerAmount}',
                 style: AppTextStyles.caption.copyWith(
                   color: const Color(0xFFFFD700),
                   fontWeight: FontWeight.w900,
@@ -362,7 +362,7 @@ class VsBattleCard extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
+          textBaseline: TextBaseline.alphawageric,
           children: [
             Text(
               letters.isEmpty ? '-' : letters.toUpperCase(),

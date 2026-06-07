@@ -312,16 +312,16 @@ class BattleDetailProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> acceptBet() async {
+  Future<void> acceptWager() async {
     if (_battle == null) return;
     _isLoading = true;
     notifyListeners();
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
-      await BattleService.acceptBet(
+      await BattleService.acceptWager(
         battleId: _battle!.id!,
         opponentId: userId,
-        betAmount: _battle!.betAmount,
+        wagerAmount: _battle!.wagerAmount,
       );
       await loadBattle(_battle!.id!);
     } catch (e) {

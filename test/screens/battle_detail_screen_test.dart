@@ -284,35 +284,35 @@ void main() {
       });
     });
 
-    group('Bet and Wager Logic', () {
-      test('Battle with bet amount', () {
+    group('Wager and Wager Logic', () {
+      test('Battle with wager amount', () {
         final battle = Battle(
           player1Id: 'p1',
           player2Id: 'p2',
           gameMode: GameMode.skate,
           currentTurnPlayerId: 'p1',
           createdAt: DateTime.now(),
-          betAmount: 100,
-          betAccepted: false,
+          wagerAmount: 100,
+          wagerAccepted: false,
         );
 
-        expect(battle.betAmount, 100);
-        expect(battle.betAmount * 2, 200); // Pot calculation
-        expect(battle.betAccepted, false);
+        expect(battle.wagerAmount, 100);
+        expect(battle.wagerAmount * 2, 200); // Pot calculation
+        expect(battle.wagerAccepted, false);
       });
 
-      test('Battle without bet', () {
+      test('Battle without wager', () {
         final battle = Battle(
           player1Id: 'p1',
           player2Id: 'p2',
           gameMode: GameMode.skate,
           currentTurnPlayerId: 'p1',
           createdAt: DateTime.now(),
-          betAmount: 0,
+          wagerAmount: 0,
         );
 
-        expect(battle.betAmount, 0);
-        expect(battle.betAmount > 0, false);
+        expect(battle.wagerAmount, 0);
+        expect(battle.wagerAmount > 0, false);
       });
     });
 

@@ -33,7 +33,7 @@ class ActivityChart extends StatelessWidget {
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceWagerween,
             children: [
               Text(
                 'ACTIVITY_LOG [30D]',

@@ -174,7 +174,7 @@ CREATE POLICY "Users can update their own messages" ON messages
 CREATE POLICY "Users can delete their own messages" ON messages
     FOR DELETE USING (sender_id = auth.uid());
 
--- Create function to get or create direct conversation between two users
+-- Create function to get or create direct conversation wagerween two users
 CREATE OR REPLACE FUNCTION get_or_create_direct_conversation(
     user1_id UUID,
     user2_id UUID

@@ -54,7 +54,7 @@ void main() {
         expect(scores.playerLevel, greaterThanOrEqualTo(1));
       });
 
-      test('Level progress is between 0 and 1', () {
+      test('Level progress is wagerween 0 and 1', () {
         final scores = UserScores(
           userId: 'test-user',
           mapScore: 150,
@@ -105,7 +105,7 @@ void main() {
   });
 
   group('ScoreProgressBar Tests', () {
-    test('Score progress clamped between 0 and 1', () {
+    test('Score progress clamped wagerween 0 and 1', () {
       // Test with negative score
       const negativeScore = -100.0;
       final progressNeg = (negativeScore / 1000.0).clamp(0.0, 1.0);

@@ -79,7 +79,7 @@ void main() {
             'id': '2',
             'user_id': 'user-1',
             'amount': -25.0,
-            'transaction_type': 'bet',
+            'transaction_type': 'wager',
             'description': 'Battle wager',
             'created_at': '2025-11-24T15:30:00Z',
           },
@@ -95,7 +95,7 @@ void main() {
           switch (type) {
             case 'reward':
               return 'Earnings';
-            case 'bet':
+            case 'wager':
               return 'Wagers';
             case 'purchase':
               return 'Purchases';
@@ -107,7 +107,7 @@ void main() {
         }
 
         expect(getTransactionCategory('reward'), 'Earnings');
-        expect(getTransactionCategory('bet'), 'Wagers');
+        expect(getTransactionCategory('wager'), 'Wagers');
         expect(getTransactionCategory('unknown'), 'Other');
       });
 

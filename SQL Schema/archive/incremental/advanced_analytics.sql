@@ -34,7 +34,7 @@ BEGIN
         SELECT
             c.user_id,
             c.cohort_date,
-            -- Calculate month difference between post creation and user creation
+            -- Calculate month difference wagerween post creation and user creation
             floor(extract(epoch from (p.created_at - c.cohort_date::timestamp)) / 2592000)::int as month_diff
         FROM cohorts c
         JOIN public.map_posts p ON p.user_id = c.user_id

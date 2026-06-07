@@ -42,7 +42,7 @@ ON map_posts
 FOR DELETE
 USING (auth.uid() = user_id);
 
--- Create indexes for better performance
+-- Create indexes for wagerter performance
 CREATE INDEX idx_map_posts_user_id ON map_posts(user_id);
 CREATE INDEX idx_map_posts_created_at ON map_posts(created_at);
 CREATE INDEX idx_map_posts_location ON map_posts(latitude, longitude);

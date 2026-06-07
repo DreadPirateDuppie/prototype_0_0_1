@@ -161,7 +161,7 @@ class _TrickSubmissionDialogState extends State<TrickSubmissionDialog> {
                 const Text('Stance', style: TextStyle(color: Colors.white70, fontSize: 12)),
                 const SizedBox(height: 8),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceWagerween,
                   children: ['regular', 'fakie', 'nollie', 'switch'].map((stance) {
                     final isSelected = _selectedStance == stance;
                     return GestureDetector(

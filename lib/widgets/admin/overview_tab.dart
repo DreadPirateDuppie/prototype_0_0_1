@@ -92,7 +92,7 @@ class OverviewTab extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceWagerween,
                 children: [
                   const Text(
                     'RECENT_ACTIVITY',

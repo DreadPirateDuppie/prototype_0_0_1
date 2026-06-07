@@ -70,7 +70,7 @@ class _SkateLobbyScreenState extends State<SkateLobbyScreen> {
       // Hack: We'll just store the raw data and maybe fetch profiles one by one or rely on a future update
       // Actually, let's just use the stream data for now and maybe we can get display names from a separate call
       
-      // BETTER: Let's just update the local state.
+      // WAGERTER: Let's just update the local state.
       if (mounted) {
         setState(() {
           _players.clear();
@@ -429,7 +429,7 @@ class _SkateLobbyScreenState extends State<SkateLobbyScreen> {
   Widget _buildSkateLetters(String currentLetters) {
     const word = 'SKATE';
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.spaceWagerween,
       children: List.generate(word.length, (index) {
         final letter = word[index];
         final hasLetter = index < currentLetters.length;

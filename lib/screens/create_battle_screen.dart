@@ -32,7 +32,7 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
   bool _isLoading = false;
   int _userPoints = 0;
   int _opponentPoints = 0;
-  int _betAmount = 0;
+  int _wagerAmount = 0;
   bool _isQuickfire = false;
   
   List<Map<String, dynamic>> _mutualFollowers = [];
@@ -132,21 +132,21 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
       if (mounted) {
         setState(() {
           _opponentPoints = points.toInt();
-          final maxBet = _getMaxBet();
-          if (_betAmount > maxBet) _betAmount = maxBet;
+          final maxWager = _getMaxWager();
+          if (_wagerAmount > maxWager) _wagerAmount = maxWager;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _opponentPoints = 0;
-          _betAmount = 0;
+          _wagerAmount = 0;
         });
       }
     }
   }
 
-  int _getMaxBet() {
+  int _getMaxWager() {
     if (_opponentPoints > 0 && _userPoints > 0) {
       return _userPoints < _opponentPoints ? _userPoints : _opponentPoints;
     }
@@ -193,7 +193,7 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
             ? _customLettersController.text.toUpperCase()
             : null,
         wagerAmount: wagerAmount,
-        betAmount: _betAmount,
+        wagerAmount: _wagerAmount,
         isQuickfire: _isQuickfire,
       );
 
@@ -288,7 +288,7 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
                         const SizedBox(height: 24),
                         _buildSectionLabel('STAKES & RULES'),
                         const SizedBox(height: 12),
-                        _buildBetCard(),
+                        _buildWagerCard(),
                         const SizedBox(height: 12),
                         _buildGlassRow(
                           icon: Icons.flash_on,
@@ -563,7 +563,7 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
     );
   }
 
-  Widget _buildBetCard() {
+  Widget _buildWagerCard() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
@@ -578,10 +578,10 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
           child: Column(
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceWagerween,
                 children: [
                   const Text('Wager Points', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  Text('$_betAmount PTS', style: const TextStyle(color: ThemeColors.matrixGreen, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                  Text('$_wagerAmount PTS', style: const TextStyle(color: ThemeColors.matrixGreen, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
                 ],
               ),
               const SizedBox(height: 8),
@@ -595,15 +595,15 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
                   thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                 ),
                 child: Slider(
-                  value: _betAmount.toDouble(),
+                  value: _wagerAmount.toDouble(),
                   min: 0,
-                  max: _getMaxBet().toDouble() > 1000 ? 1000 : _getMaxBet().toDouble(),
+                  max: _getMaxWager().toDouble() > 1000 ? 1000 : _getMaxWager().toDouble(),
                   divisions: 10,
-                  onChanged: (value) => setState(() => _betAmount = value.toInt()),
+                  onChanged: (value) => setState(() => _wagerAmount = value.toInt()),
                 ),
               ),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceWagerween,
                 children: [
                   Text('Your Balance: $_userPoints', style: const TextStyle(color: Colors.white24, fontSize: 9)),
                   Text('Opponent: $_opponentPoints', style: const TextStyle(color: Colors.white24, fontSize: 9)),

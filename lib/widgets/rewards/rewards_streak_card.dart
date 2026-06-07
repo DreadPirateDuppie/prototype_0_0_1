@@ -32,7 +32,7 @@ class RewardsStreakCard extends StatelessWidget {
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceWagerween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,7 +122,7 @@ class RewardsStreakCard extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceWagerween,
             children: List.generate(7, (index) {
               final activeCount = streak == 0 ? 0 : ((streak - 1) % 7) + 1;
               final isActive = index < activeCount;

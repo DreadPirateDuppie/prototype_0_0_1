@@ -167,12 +167,12 @@ CREATE TABLE IF NOT EXISTS public.battles (
     set_trick_video_url TEXT,
     attempt_video_url TEXT,
 
-    -- RPS & Betting
+    -- RPS & Wagerting
     player1_rps_move TEXT CHECK (player1_rps_move IN ('rock', 'paper', 'scissors')),
     player2_rps_move TEXT CHECK (player2_rps_move IN ('rock', 'paper', 'scissors')),
     wager_amount INTEGER DEFAULT 0,
-    bet_amount INTEGER DEFAULT 0,
-    bet_accepted BOOLEAN DEFAULT FALSE,
+    wager_amount INTEGER DEFAULT 0,
+    wager_accepted BOOLEAN DEFAULT FALSE,
 
     -- Metadata
     is_quickfire BOOLEAN DEFAULT FALSE,
@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS public.point_transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) NOT NULL,
     amount NUMERIC NOT NULL,
-    transaction_type TEXT NOT NULL, -- e.g., 'bet_won', 'bet_placed', 'daily_login'
+    transaction_type TEXT NOT NULL, -- e.g., 'wager_won', 'wager_placed', 'daily_login'
     reference_id TEXT, -- e.g., battle_id
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS public.matchmaking_queue (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   game_mode TEXT NOT NULL DEFAULT 'skate',
   is_quickfire BOOLEAN NOT NULL DEFAULT true,
-  bet_amount INTEGER NOT NULL DEFAULT 0,
+  wager_amount INTEGER NOT NULL DEFAULT 0,
   ranking_score DOUBLE PRECISION NOT NULL DEFAULT 500,
   joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   status TEXT NOT NULL DEFAULT 'waiting', -- 'waiting', 'matched', 'cancelled'

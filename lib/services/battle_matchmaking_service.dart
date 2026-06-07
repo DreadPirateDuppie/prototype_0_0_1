@@ -11,17 +11,17 @@ class BattleMatchmakingService {
   static Future<void> joinMatchmakingQueue({
     required GameMode gameMode,
     bool isQuickfire = true,
-    int betAmount = 0,
+    int wagerAmount = 0,
   }) async {
     try {
       final userId = _client.auth.currentUser!.id;
       final userScores = await BattleService.getUserScores(userId);
       
-      // Verify user has enough points for bet
-      if (betAmount > 0) {
+      // Verify user has enough points for wager
+      if (wagerAmount > 0) {
         final balance = await SupabaseService.getUserPoints(userId);
-        if (balance < betAmount) {
-          throw Exception('Insufficient points for bet');
+        if (balance < wagerAmount) {
+          throw Exception('Insufficient points for wager');
         }
       }
       
@@ -30,7 +30,7 @@ class BattleMatchmakingService {
         'user_id': userId,
         'game_mode': gameMode.toString().split('.').last,
         'is_quickfire': isQuickfire,
-        'bet_amount': betAmount,
+        'wager_amount': wagerAmount,
         'ranking_score': userScores.rankingScore,
         'status': 'waiting',
         'joined_at': DateTime.now().toIso8601String(),
@@ -61,13 +61,13 @@ class BattleMatchmakingService {
     required double myRankingScore,
     required String gameMode,
     required bool isQuickfire,
-    int betAmount = 0,
+    int wagerAmount = 0,
     int expandedRange = 100,
   }) async {
     try {
       final userId = _client.auth.currentUser!.id;
       
-      // Find opponents within ranking range who want similar bet, oldest first
+      // Find opponents within ranking range who want similar wager, oldest first
       final results = await _client
           .from('matchmaking_queue')
           .select()
@@ -82,13 +82,13 @@ class BattleMatchmakingService {
       
       if (results.isNotEmpty) {
         final match = results.first;
-        // Check bet compatibility - either both 0 or within 20% of each other
-        final matchBet = match['bet_amount'] as int;
-        final betCompatible = (betAmount == 0 && matchBet == 0) ||
-            (betAmount > 0 && matchBet > 0 && 
-             (matchBet - betAmount).abs() <= (betAmount * 0.2).round());
+        // Check wager compatibility - either both 0 or within 20% of each other
+        final matchWager = match['wager_amount'] as int;
+        final wagerCompatible = (wagerAmount == 0 && matchWager == 0) ||
+            (wagerAmount > 0 && matchWager > 0 && 
+             (matchWager - wagerAmount).abs() <= (wagerAmount * 0.2).round());
         
-        if (betCompatible) {
+        if (wagerCompatible) {
           return match;
         }
       }
@@ -144,7 +144,7 @@ class BattleMatchmakingService {
     required String opponentId,
     required GameMode gameMode,
     bool isQuickfire = true,
-    int betAmount = 0,
+    int wagerAmount = 0,
   }) async {
     try {
       final userId = _client.auth.currentUser!.id;
@@ -165,7 +165,7 @@ class BattleMatchmakingService {
         player1Id: userId,
         player2Id: opponentId,
         gameMode: gameMode,
-        betAmount: betAmount,
+        wagerAmount: wagerAmount,
         isQuickfire: isQuickfire,
       );
       
