@@ -3,48 +3,21 @@ import '../utils/logger.dart';
 
 import '../models/battle.dart';
 import '../models/user_scores.dart';
-import 'points_service.dart';
 
 class BattleAnalyticsService {
   static final SupabaseClient _client = Supabase.instance.client;
 
-  // Update player score based on battle outcome
+  // Update player scores based on battle outcome
   static Future<void> updatePlayerScoreForBattle(Battle battle) async {
     try {
-      final pointsService = PointsService();
-      
-      // Get current scores for both players
-      final winner = await getUserScores(battle.winnerId!);
-      final loser = await getUserScores(
-        battle.player1Id == battle.winnerId
-            ? battle.player2Id
-            : battle.player1Id,
-      );
-
-      // Winner gains points
-      final newWinnerScore = (winner.playerScore + 10).clamp(0.0, 1000.0);
-      await pointsService.updatePlayerScore(
-        battle.winnerId!, 
-        newWinnerScore, 
-        reason: 'Won battle ${battle.id}'
-      );
-
-      // Loser loses points based on letters collected
-      final loserId = battle.player1Id == battle.winnerId
-          ? battle.player2Id
-          : battle.player1Id;
-      final loserLetters = battle.player1Id == battle.winnerId
-          ? battle.player2Letters
-          : battle.player1Letters;
-
-      // Fewer letters = wagerter performance = less point loss
-      final pointsLost = 5 + (loserLetters.length * 2);
-      final newLoserScore = (loser.playerScore - pointsLost).clamp(0.0, 1000.0);
-      await pointsService.updatePlayerScore(
-        loserId, 
-        newLoserScore, 
-        reason: 'Lost battle ${battle.id}'
-      );
+      // Both players' scores are computed and applied server-side by the
+      // SECURITY DEFINER RPC (winner +10, loser -(5 + 2 * letters), read
+      // from the battles row) and applied at most once per battle. Direct
+      // client writes to user_scores are revoked, so the old read-modify-
+      // write upserts would fail anyway.
+      await _client.rpc('apply_battle_player_scores', params: {
+        'p_battle_id': battle.id,
+      });
     } catch (e) {
       // Silently fail score updates
       AppLogger.log('Failed to update battle scores: $e', name: 'BattleAnalyticsService');
@@ -82,22 +55,11 @@ class BattleAnalyticsService {
     }
   }
 
-  // Update player score
-  static Future<void> updatePlayerScore(String userId, double newScore) async {
-    await PointsService().updatePlayerScore(userId, newScore);
-  }
-
-  // Update ranking score
-  static Future<void> updateRankingScore(String userId, double adjustment) async {
-    final scores = await getUserScores(userId);
-    final newScore = (scores.rankingScore + adjustment).clamp(0.0, 1000.0);
-    await PointsService().updateRankingScore(userId, newScore);
-  }
-
-  // Update map score
-  static Future<void> updateMapScore(String userId, double newScore) async {
-    await PointsService().updateMapScore(userId, newScore);
-  }
+  // NOTE: updatePlayerScore / updateRankingScore / updateMapScore are gone:
+  // arbitrary-value score setters cannot be validated server-side and direct
+  // client writes to user_scores are revoked. Battle scores go through
+  // apply_battle_player_scores (above), voter ranking through
+  // apply_verification_ranking_scores (VerificationService).
 
   // Get user analytics (W/L ratio, favorite trick)
   static Future<Map<String, dynamic>> getUserAnalytics(String userId) async {

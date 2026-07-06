@@ -301,25 +301,14 @@ class VerificationService {
     VoteType majorityResult,
   ) async {
     try {
-      final votes = await getVotesForAttempt(attemptId);
-
-      for (var vote in votes) {
-        if (vote.voteType == VoteType.rebate) {
-          // Rebate votes don't affect ranking
-          continue;
-        }
-
-        if (vote.voteType == majorityResult) {
-          // Voted with majority - increase score
-          await BattleService.updateRankingScore(vote.userId, 1);
-        } else {
-          // Voted against majority - decrease score
-          await BattleService.updateRankingScore(vote.userId, -1);
-        }
-      }
-
-      // Check for repeat trolling (future enhancement)
-      // Would need to track consecutive wrong votes
+      // Applied server-side by the SECURITY DEFINER RPC: +1/-1 per non-rebate
+      // voter by agreement with the attempt's STORED result (majorityResult
+      // is intentionally not sent — the server re-reads it from
+      // verification_attempts), at most once per attempt. Direct client
+      // writes to user_scores are revoked.
+      await _client.rpc('apply_verification_ranking_scores', params: {
+        'p_attempt_id': attemptId,
+      });
     } catch (e) {
       // Silently fail ranking updates
     }

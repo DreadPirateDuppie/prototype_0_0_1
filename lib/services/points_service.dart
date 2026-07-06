@@ -95,70 +95,52 @@ class PointsService {
   /// Check and update daily streak
   Future<double> checkDailyStreak(String userId) async {
     try {
-      final streakData = await getUserStreak(userId);
-      final currentStreak = streakData['current_streak'] as int;
-      final longestStreak = streakData['longest_streak'] as int;
-      final lastLoginStr = streakData['last_login_date'] as String?;
+      // Streak state is server-authoritative: record_daily_login is a
+      // SECURITY DEFINER RPC and the only remaining write path to
+      // daily_streaks (direct client writes are revoked). The server decides
+      // first-login / increment / reset from its own clock (UTC, matching
+      // award_points_atomic's once-per-day check) and returns what happened.
+      final result = await _client.rpc('record_daily_login');
+      final streakResult = Map<String, dynamic>.from(result as Map);
+      final status = streakResult['status'] as String? ?? '';
+      final newStreak = (streakResult['current_streak'] as num?)?.toInt() ?? 1;
 
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      if (status == 'already_logged_today') {
+        return 0.0;
+      }
 
-      // Load dynamic config
+      // Load dynamic config for the award amount. The amount is re-validated
+      // server-side by award_points_atomic against the same config and the
+      // (now server-computed) streak, so a tampered client gains nothing.
       final config = await _getPointsConfig();
       final baseDailyPoints = (config['base_daily_points'] ?? 3.5) as num;
       final streakMultiplier = (config['streak_bonus_multiplier'] ?? 0.5) as num;
       final firstLoginBonus = (config['first_login_bonus'] ?? 10.0) as num;
 
-      // If never logged in before
-      if (lastLoginStr == null) {
-        await _updateStreak(userId, 1, 1, today);
-        await awardPoints(userId, firstLoginBonus.toDouble(), 'daily_login',
-            description: 'First login bonus');
-        return firstLoginBonus.toDouble();
-      }
-
-      final lastLogin = DateTime.parse(lastLoginStr);
-      final lastLoginDate =
-          DateTime(lastLogin.year, lastLogin.month, lastLogin.day);
-
-      final difference = today.difference(lastLoginDate).inDays;
-
-      if (difference == 0) {
-        // Already logged in today, do nothing
-        return 0.0;
-      } else if (difference == 1) {
-        // Logged in yesterday, increment streak
-        final newStreak = currentStreak + 1;
-        final newLongest = newStreak > longestStreak ? newStreak : longestStreak;
-        await _updateStreak(userId, newStreak, newLongest, today);
-
-        // Calculate bonus: Base + (Streak * Multiplier)
-        final bonus = baseDailyPoints + (newStreak * streakMultiplier);
-        await awardPoints(userId, bonus.toDouble(), 'daily_login',
-            description: 'Daily streak: $newStreak days');
-        return bonus.toDouble();
-      } else {
-        // Missed a day (or more), reset streak
-        await _updateStreak(userId, 1, longestStreak, today);
-        await awardPoints(userId, baseDailyPoints.toDouble(), 'daily_login',
-            description: 'Daily login (streak reset)');
-        return baseDailyPoints.toDouble();
+      switch (status) {
+        case 'first_login':
+          await awardPoints(userId, firstLoginBonus.toDouble(), 'daily_login',
+              description: 'First login bonus');
+          return firstLoginBonus.toDouble();
+        case 'incremented':
+          // Bonus: Base + (Streak * Multiplier)
+          final bonus = baseDailyPoints + (newStreak * streakMultiplier);
+          await awardPoints(userId, bonus.toDouble(), 'daily_login',
+              description: 'Daily streak: $newStreak days');
+          return bonus.toDouble();
+        case 'reset':
+          await awardPoints(userId, baseDailyPoints.toDouble(), 'daily_login',
+              description: 'Daily login (streak reset)');
+          return baseDailyPoints.toDouble();
+        default:
+          AppLogger.log('Unexpected record_daily_login status: $status',
+              name: 'PointsService');
+          return 0.0;
       }
     } catch (e) {
       AppLogger.log('Error checking daily streak: $e', name: 'PointsService');
       return 0.0;
     }
-  }
-
-  Future<void> _updateStreak(
-      String userId, int streak, int longest, DateTime date) async {
-    await _client.from('daily_streaks').upsert({
-      'user_id': userId,
-      'current_streak': streak,
-      'longest_streak': longest,
-      'last_login_date': date.toIso8601String().split('T')[0],
-      'updated_at': DateTime.now().toIso8601String(),
-    });
   }
 
   /// Award points (or deduct if negative)
@@ -182,30 +164,13 @@ class PointsService {
       AppLogger.log('Awarded $amount points to $userId for $type (Atomically)',
           name: 'PointsService');
     } catch (e) {
-      // Fallback to legacy method if RPC fails (e.g., if migration wasn't run)
-      AppLogger.log('RPC failed, falling back to legacy awardPoints: $e', name: 'PointsService');
-      
-      try {
-        final currentPoints = await getUserPoints(userId);
-        final newBalance = currentPoints + amount;
-
-        await _client.from('user_wallets').upsert({
-          'user_id': userId,
-          'balance': newBalance,
-          'updated_at': DateTime.now().toIso8601String(),
-        });
-
-        await _client.from('point_transactions').insert({
-          'user_id': userId,
-          'amount': amount,
-          'transaction_type': type,
-          'reference_id': referenceId,
-          'description': description,
-          'created_at': DateTime.now().toIso8601String(),
-        });
-      } catch (e2) {
-        AppLogger.log('Legacy awardPoints also failed: $e2', name: 'PointsService');
-      }
+      // No client-side fallback: computing a balance on the client and
+      // writing it back is a race condition and a trust-the-client exploit.
+      // Balance changes must only ever happen through the atomic
+      // SECURITY DEFINER RPC. Surface the failure to the caller instead.
+      AppLogger.log('award_points_atomic RPC failed, points NOT awarded: $e',
+          name: 'PointsService');
+      rethrow;
     }
   }
 
@@ -248,173 +213,25 @@ class PointsService {
     }
   }
 
-  /// Log XP history
-  Future<void> logXpHistory(
-      String userId, double amount, String type, String reason) async {
-    try {
-      await _client.from('xp_history').insert({
-        'user_id': userId,
-        'score_type': type,
-        'amount': amount,
-        'reason': reason,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      AppLogger.log('Error logging XP history: $e', name: 'PointsService');
-    }
-  }
+  // NOTE: the old updateMapScore / updatePlayerScore / updateRankingScore /
+  // updatePosterXP / logXpHistory methods are gone on purpose. They were
+  // arbitrary-value writes to user_scores / xp_history, which are now
+  // revoked server-side (20260705_validate_streaks_and_scores.sql). Score
+  // changes only happen through the validated SECURITY DEFINER RPCs:
+  // apply_battle_player_scores, apply_verification_ranking_scores and
+  // recalculate_map_score below.
 
-  /// Update map score (XP)
-  Future<void> updateMapScore(String userId, double newScore, {String reason = 'Map score update'}) async {
-    try {
-      // Get existing scores
-      final response = await _client
-          .from('user_scores')
-          .select()
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      final currentScore = (response?['map_score'] as num?)?.toDouble() ?? 0.0;
-      final diff = newScore - currentScore;
-
-      await _client.from('user_scores').upsert({
-        'user_id': userId,
-        'map_score': newScore.clamp(0.0, double.infinity),
-        'player_score': response?['player_score'] ?? 0.0,
-        'ranking_score': response?['ranking_score'] ?? 500.0,
-      });
-
-      if (diff != 0) {
-        await logXpHistory(userId, diff, 'map', reason);
-      }
-    } catch (e) {
-      AppLogger.log('Error updating map score: $e', name: 'PointsService');
-    }
-  }
-
-  /// Update player score (XP)
-  Future<void> updatePlayerScore(String userId, double newScore, {String reason = 'Player score update'}) async {
-    try {
-      // Get existing scores
-      final response = await _client
-          .from('user_scores')
-          .select()
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      final currentScore = (response?['player_score'] as num?)?.toDouble() ?? 0.0;
-      final diff = newScore - currentScore;
-
-      await _client.from('user_scores').update({
-        'player_score': newScore.clamp(0.0, double.infinity),
-      }).eq('user_id', userId);
-
-      if (diff != 0) {
-        await logXpHistory(userId, diff, 'player', reason);
-      }
-    } catch (e) {
-      AppLogger.log('Error updating player score: $e', name: 'PointsService');
-    }
-  }
-
-  /// Update ranking score
-  Future<void> updateRankingScore(String userId, double newScore, {String reason = 'Ranking score update'}) async {
-    try {
-      // Get existing scores
-      final response = await _client
-          .from('user_scores')
-          .select()
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      final currentScore = (response?['ranking_score'] as num?)?.toDouble() ?? 500.0;
-      final diff = newScore - currentScore;
-
-      await _client.from('user_scores').upsert({
-        'user_id': userId,
-        'map_score': response?['map_score'] ?? 0.0,
-        'player_score': response?['player_score'] ?? 0.0,
-        'ranking_score': newScore.clamp(0.0, 1000.0),
-      });
-
-      if (diff != 0) {
-        await logXpHistory(userId, diff, 'ranking', reason);
-      }
-    } catch (e) {
-      AppLogger.log('Error updating ranking score: $e', name: 'PointsService');
-    }
-  }
-
-  /// Update poster XP based on votes
-  Future<void> updatePosterXP(String userId, int xpChange) async {
-    try {
-      final response = await _client
-          .from('user_scores')
-          .select('map_score')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      final currentScore = (response?['map_score'] as num?)?.toDouble() ?? 0.0;
-      final newScore = (currentScore + xpChange).clamp(0.0, double.infinity);
-
-      await _client.from('user_scores').upsert({
-        'user_id': userId,
-        'map_score': newScore,
-      });
-
-      await logXpHistory(userId, xpChange.toDouble(), 'map', 'Post upvote/downvote');
-    } catch (e) {
-      AppLogger.log('Error updating poster XP: $e', name: 'PointsService');
-    }
-  }
-
-  /// Recalculate user XP based on posts and votes
+  /// Recalculate user XP (map_score) based on posts and votes.
   Future<void> recalculateUserXP(String userId) async {
     try {
-      final postsResponse = await _client
-          .from('map_posts')
-          .select('id, vote_score')
-          .eq('user_id', userId);
-
-      final posts = (postsResponse as List).cast<Map<String, dynamic>>();
-      final postCount = posts.length;
-
-      // Load dynamic config
-      final config = await _getPointsConfig();
-      final postXp = (config['post_xp'] ?? 100.0) as num;
-      final voteXp = (config['vote_xp'] ?? 1.0) as num;
-
-      // XP from posts
-      double xpFromPosts = postCount * postXp.toDouble();
-
-      // XP from votes (using synchronized vote_score)
-      double xpFromVotes = 0;
-      for (var post in posts) {
-        xpFromVotes += (post['vote_score'] as num? ?? 0).toDouble() * voteXp.toDouble();
-      }
-
-      final totalMapScore = xpFromPosts + xpFromVotes;
-
-      // Get current score to calculate diff
-      final currentScoreResponse = await _client
-          .from('user_scores')
-          .select('map_score')
-          .eq('user_id', userId)
-          .maybeSingle();
-      final currentScore = (currentScoreResponse?['map_score'] as num?)?.toDouble() ?? 0.0;
-      final diff = totalMapScore - currentScore;
-
-      await _client.from('user_scores').upsert({
-        'user_id': userId,
-        'map_score': totalMapScore,
+      // Computed entirely server-side from map_posts rows (posts * post_xp +
+      // vote_score * vote_xp); the client cannot influence the result.
+      // Direct client writes to user_scores are revoked.
+      final total = await _client.rpc('recalculate_map_score', params: {
+        'p_user_id': userId,
       });
 
-      if (diff != 0) {
-        await logXpHistory(userId, diff, 'map', 'XP Recalculation');
-      }
-
-      AppLogger.log(
-          'Recalculated XP for $userId: $totalMapScore ($postCount posts)',
+      AppLogger.log('Recalculated XP for $userId: $total',
           name: 'PointsService');
     } catch (e) {
       AppLogger.log('Error recalculating XP: $e', name: 'PointsService');

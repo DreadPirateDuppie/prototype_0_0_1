@@ -150,17 +150,10 @@ class BattleService {
     return BattleAnalyticsService.getUserScores(userId);
   }
 
-  static Future<void> updatePlayerScore(String userId, double newScore) {
-    return BattleAnalyticsService.updatePlayerScore(userId, newScore);
-  }
-
-  static Future<void> updateRankingScore(String userId, double adjustment) {
-    return BattleAnalyticsService.updateRankingScore(userId, adjustment);
-  }
-
-  static Future<void> updateMapScore(String userId, double newScore) {
-    return BattleAnalyticsService.updateMapScore(userId, newScore);
-  }
+  // NOTE: updatePlayerScore / updateRankingScore / updateMapScore delegates
+  // removed — direct client writes to user_scores are revoked
+  // (20260705_validate_streaks_and_scores.sql); score changes go through the
+  // apply_battle_player_scores / apply_verification_ranking_scores RPCs.
 
   static Future<Map<String, dynamic>> getUserAnalytics(String userId) {
     return BattleAnalyticsService.getUserAnalytics(userId);

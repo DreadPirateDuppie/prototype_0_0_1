@@ -458,27 +458,15 @@ class AdminService {
     String? referenceId,
   }) async {
     try {
-      // 1. Insert the transaction
-      await _client.from('point_transactions').insert({
-        'user_id': userId,
-        'amount': amount,
-        'transaction_type': type,
-        'description': description,
-        'reference_id': referenceId,
-      });
-
-      // 2. Update the user's points in user_wallets
-      final walletResponse = await _client
-          .from('user_wallets')
-          .select('balance')
-          .eq('user_id', userId)
-          .maybeSingle();
-      
-      final currentBalance = (walletResponse?['balance'] as num?)?.toDouble() ?? 0.0;
-      await _client.from('user_wallets').upsert({
-        'user_id': userId,
-        'balance': currentBalance + amount,
-        'updated_at': DateTime.now().toIso8601String(),
+      // Route through the atomic SECURITY DEFINER RPC: it inserts the
+      // transaction and updates the wallet balance in one atomic operation.
+      // Direct client writes to user_wallets/point_transactions are revoked.
+      await _client.rpc('award_points_atomic', params: {
+        'p_user_id': userId,
+        'p_amount': amount,
+        'p_transaction_type': type,
+        'p_reference_id': referenceId,
+        'p_description': description,
       });
 
       AppLogger.log('Added transaction of $amount for user $userId', name: 'AdminService');
@@ -491,21 +479,12 @@ class AdminService {
   /// Delete a point transaction
   Future<void> deletePointTransaction(String transactionId, String userId, double amount) async {
     try {
-      // 1. Delete the transaction
-      await _client.from('point_transactions').delete().eq('id', transactionId);
-
-      // 2. Reverse the points in user_wallets
-      final walletResponse = await _client
-          .from('user_wallets')
-          .select('balance')
-          .eq('user_id', userId)
-          .maybeSingle();
-      
-      final currentBalance = (walletResponse?['balance'] as num?)?.toDouble() ?? 0.0;
-      await _client.from('user_wallets').upsert({
-        'user_id': userId,
-        'balance': currentBalance - amount,
-        'updated_at': DateTime.now().toIso8601String(),
+      // Route through the admin-only SECURITY DEFINER RPC: it verifies the
+      // caller is an admin, deletes the transaction, and reverses the wallet
+      // balance atomically using the amount stored server-side (the client
+      // supplied userId/amount are intentionally not trusted).
+      await _client.rpc('admin_reverse_point_transaction', params: {
+        'p_transaction_id': transactionId,
       });
 
       AppLogger.log('Deleted transaction $transactionId and reversed $amount points', name: 'AdminService');
