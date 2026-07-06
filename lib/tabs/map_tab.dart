@@ -7,7 +7,10 @@ import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../services/territory_service.dart';
 import '../models/post.dart';
+import '../models/borough.dart';
+import '../widgets/territory_polygon_layer.dart';
 import '../screens/add_post_dialog.dart';
 import '../screens/spot_details_screen.dart';
 
@@ -55,6 +58,9 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
   List<Map<String, dynamic>> _onlineFriendsFeed = []; // All online friends for feed
 
 
+  final TerritoryService _territoryService = TerritoryService();
+  List<BoroughState> _boroughStates = [];
+
   String _selectedCategory = 'All';
   final List<String> _categories = ['All', 'Skatepark', 'Street', 'DIY', 'Shop', 'Other'];
   bool _hasExplicitlyNavigated = false; // Track if user has manually navigated
@@ -95,6 +101,7 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
     mapController = MapController();
     _addSampleMarkers();
     _loadUserPosts();
+    _loadTerritories();
     // Automatically get location and privacy settings
     _getCurrentLocation();
     _loadPrivacySettings();
@@ -110,6 +117,16 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
         navProvider.clearTargetLocation();
       }
     });
+  }
+
+  /// Load borough turf states (Territorial Capture) for the polygon layer.
+  Future<void> _loadTerritories() async {
+    final boroughs = await _territoryService.getBoroughStates();
+    if (mounted && boroughs.isNotEmpty) {
+      setState(() {
+        _boroughStates = boroughs;
+      });
+    }
   }
 
   Future<void> _loadUserPosts() async {
@@ -770,6 +787,7 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
           location: location,
           onPostAdded: () {
             _loadUserPosts();
+            _loadTerritories();
             setState(() {
               _isPinMode = false;
             });
@@ -838,6 +856,9 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
                         maxZoom: 19,
                       ),
                     ),
+                    // Borough turf polygons (Territorial Capture): crew colour
+                    // fades as destabilization rises (Fragile State).
+                    TerritoryPolygonLayer(boroughs: _boroughStates),
                     MarkerLayer(markers: nonClusterMarkers), // Add non-clustered markers (user location)
                     MarkerClusterLayerWidget(
                       options: MarkerClusterLayerOptions(

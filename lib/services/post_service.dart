@@ -3,6 +3,7 @@ import 'dart:io';
 import '../utils/logger.dart';
 import '../models/post.dart';
 import 'error_types.dart';
+import 'territory_service.dart';
 import '../config/service_locator.dart';
 
 /// Service responsible for map post operations
@@ -70,7 +71,17 @@ class PostService {
           .select()
           .single();
 
-      return MapPost.fromMap(response);
+      final post = MapPost.fromMap(response);
+
+      // Territorial Capture: report the new spot into the destabilization
+      // pipeline. Fire-and-forget — never blocks or fails post creation.
+      final postId = post.id;
+      if (postId != null) {
+        // ignore: unawaited_futures
+        TerritoryService(client: _client).reportSpotCreated(postId);
+      }
+
+      return post;
     } on SocketException catch (e) {
       throw AppNetworkException(
         'Network error while creating post',

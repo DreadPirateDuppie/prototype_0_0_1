@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/logger.dart';
 import '../models/trick_definition.dart';
 import '../models/spot_video.dart';
+import 'territory_service.dart';
 import '../config/service_locator.dart';
 
 class TrickService {
@@ -64,21 +65,33 @@ class TrickService {
     List<String> tags = const [],
   }) async {
     try {
-      await _client.from('spot_videos').insert({
-        'spot_id': spotId,
-        'submitted_by': userId,
-        'url': url,
-        'trick_name': trickName,
-        'skater_name': isOwnClip ? null : skaterName,
-        'description': description,
-        'is_own_clip': isOwnClip,
-        'stance': stance,
-        'difficulty_multiplier': difficultyMultiplier,
-        'tags': tags,
-        'status': 'approved', 
-        'created_at': DateTime.now().toIso8601String(),
-      });
-      
+      final inserted = await _client
+          .from('spot_videos')
+          .insert({
+            'spot_id': spotId,
+            'submitted_by': userId,
+            'url': url,
+            'trick_name': trickName,
+            'skater_name': isOwnClip ? null : skaterName,
+            'description': description,
+            'is_own_clip': isOwnClip,
+            'stance': stance,
+            'difficulty_multiplier': difficultyMultiplier,
+            'tags': tags,
+            'status': 'approved',
+            'created_at': DateTime.now().toIso8601String(),
+          })
+          .select('id')
+          .single();
+
+      // Territorial Capture: clip uploads feed the borough destabilization
+      // pipeline. Fire-and-forget — never blocks or fails the submission.
+      final videoId = inserted['id'] as String?;
+      if (videoId != null) {
+        // ignore: unawaited_futures
+        TerritoryService(client: _client).reportClipUpload(videoId);
+      }
+
       // If it's a new trick name not in our registry, we could optionally add it to a 'community_tricks' table
       // for review, but for now we just store it in spot_videos.
     } catch (e) {
