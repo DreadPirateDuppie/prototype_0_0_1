@@ -39,7 +39,6 @@ class Battle {
   final String? winnerId;
   final String currentTurnPlayerId;
   final int wagerAmount;
-  final int wagerAmount;
   final bool isQuickfire;
   final DateTime? turnDeadline;
   final bool wagerAccepted;
@@ -67,7 +66,6 @@ class Battle {
     this.completedAt,
     this.winnerId,
     required this.currentTurnPlayerId,
-    this.wagerAmount = 0,
     this.wagerAmount = 0,
     this.isQuickfire = false,
     this.turnDeadline,
@@ -139,7 +137,6 @@ class Battle {
       'winner_id': winnerId,
       'current_turn_player_id': currentTurnPlayerId,
       'wager_amount': wagerAmount,
-      'wager_amount': wagerAmount,
       'is_quickfire': isQuickfire,
       'turn_deadline': turnDeadline?.toIso8601String(),
       'wager_accepted': wagerAccepted,
@@ -179,7 +176,6 @@ class Battle {
       winnerId: map['winner_id'] as String?,
       currentTurnPlayerId: map['current_turn_player_id'] as String,
       wagerAmount: (map['wager_amount'] as num?)?.toInt() ?? 0,
-      wagerAmount: (map['wager_amount'] as num?)?.toInt() ?? 0,
       isQuickfire: map['is_quickfire'] as bool? ?? false,
       turnDeadline: map['turn_deadline'] != null
           ? DateTime.parse(map['turn_deadline'] as String)
@@ -212,7 +208,6 @@ class Battle {
     String? winnerId,
     String? currentTurnPlayerId,
     int? wagerAmount,
-    int? wagerAmount,
     bool? isQuickfire,
     DateTime? turnDeadline,
     bool? wagerAccepted,
@@ -240,7 +235,6 @@ class Battle {
       completedAt: completedAt ?? this.completedAt,
       winnerId: winnerId ?? this.winnerId,
       currentTurnPlayerId: currentTurnPlayerId ?? this.currentTurnPlayerId,
-      wagerAmount: wagerAmount ?? this.wagerAmount,
       wagerAmount: wagerAmount ?? this.wagerAmount,
       isQuickfire: isQuickfire ?? this.isQuickfire,
       turnDeadline: turnDeadline ?? this.turnDeadline,

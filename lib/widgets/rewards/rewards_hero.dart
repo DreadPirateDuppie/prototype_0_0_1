@@ -86,10 +86,10 @@ class RewardsHero extends StatelessWidget {
                       padding: const EdgeInsets.all(24.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -131,7 +131,7 @@ class RewardsHero extends StatelessWidget {
                               const SizedBox(height: 4),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphawageric,
+                                textBaseline: TextBaseline.alphabetic,
                                 children: [
                                   Text(
                                     points.toStringAsFixed(2),

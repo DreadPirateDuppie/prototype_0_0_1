@@ -22,7 +22,6 @@ class BattleService {
     required GameMode gameMode,
     String? customLetters,
     int wagerAmount = 0,
-    int wagerAmount = 0,
     bool isQuickfire = false,
   }) {
     return BattleStateService.createBattle(
@@ -30,7 +29,6 @@ class BattleService {
       player2Id: player2Id,
       gameMode: gameMode,
       customLetters: customLetters,
-      wagerAmount: wagerAmount,
       wagerAmount: wagerAmount,
       isQuickfire: isQuickfire,
     );

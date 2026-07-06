@@ -1,4 +1,4 @@
-/// Custom exception types for wagerter error categorization and user-friendly messages
+/// Custom exception types for better error categorization and user-friendly messages
 /// Base exception class for app-specific errors
 abstract class AppException implements Exception {
   final String message;

@@ -258,7 +258,7 @@ class _TrendCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Icon(icon, color: color.withValues(alpha: 0.8), size: 16),
               Container(
@@ -412,7 +412,7 @@ class _CyberMetricCardState extends State<_CyberMetricCard> with SingleTickerPro
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,7 +459,7 @@ class _CyberMetricCardState extends State<_CyberMetricCard> with SingleTickerPro
                       
                       // Decorative Right Side
                       Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                            _buildStatusLight(),
                            Icon(

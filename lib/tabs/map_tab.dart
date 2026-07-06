@@ -62,7 +62,7 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
   void moveToLocation(LatLng location) {
     _hasExplicitlyNavigated = true; // Mark that we've manually navigated
     if (_isMapReady) {
-      mapController.move(location, 17.0); // Increased zoom for wagerter detail
+      mapController.move(location, 17.0); // Increased zoom for better detail
     }
   }
 

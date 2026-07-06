@@ -24,7 +24,7 @@ serve(async (req) => {
 
     // 1. Verify Signature
     if (IPN_SECRET) {
-      // Sort keys alphawagerically
+      // Sort keys alphabetically
       const sortedKeys = Object.keys(body).sort()
       const sortedBody: Record<string, any> = {}
       sortedKeys.forEach(key => {

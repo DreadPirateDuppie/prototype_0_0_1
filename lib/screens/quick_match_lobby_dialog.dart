@@ -684,7 +684,7 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -749,7 +749,7 @@ class _QuickMatchLobbyDialogState extends State<QuickMatchLobbyDialog> with Sing
 
   Widget _buildSettingRow(String title, String subtitle, Widget trailing) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -58,7 +58,7 @@ class BattleHeader extends StatelessWidget {
 
   Widget _buildPlayersRow(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
           child: _buildPlayerInfo(

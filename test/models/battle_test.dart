@@ -171,7 +171,6 @@ void main() {
         currentTurnPlayerId: 'user-1',
         createdAt: now,
         wagerAmount: 100,
-        wagerAmount: 50,
         isQuickfire: true,
       );
 
@@ -183,7 +182,6 @@ void main() {
       expect(map['player1_letters'], 'SK');
       expect(map['player2_letters'], 'S');
       expect(map['wager_amount'], 100);
-      expect(map['wager_amount'], 50);
       expect(map['is_quickfire'], true);
     });
 
@@ -199,7 +197,6 @@ void main() {
         'current_turn_player_id': 'user-2',
         'created_at': now.toIso8601String(),
         'wager_amount': 200,
-        'wager_amount': 100,
         'is_quickfire': false,
         'wager_accepted': true,
       };
@@ -213,7 +210,6 @@ void main() {
       expect(battle.player1Letters, 'SKA');
       expect(battle.player2Letters, 'SK');
       expect(battle.wagerAmount, 200);
-      expect(battle.wagerAmount, 100);
       expect(battle.wagerAccepted, true);
     });
 

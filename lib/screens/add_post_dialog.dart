@@ -757,7 +757,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
               Text('${rating.toInt()}/5', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'monospace')),

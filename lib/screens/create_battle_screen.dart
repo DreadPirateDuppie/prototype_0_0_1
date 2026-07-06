@@ -27,7 +27,6 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
   GameMode _selectedMode = GameMode.skate;
   final _customLettersController = TextEditingController();
   final _opponentIdController = TextEditingController();
-  final _wagerController = TextEditingController();
   
   bool _isLoading = false;
   int _userPoints = 0;
@@ -69,7 +68,6 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
     _customLettersController.dispose();
     _opponentIdController.removeListener(_onUsernameChanged);
     _opponentIdController.dispose();
-    _wagerController.dispose();
     super.dispose();
   }
 
@@ -183,7 +181,6 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
 
     try {
       final opponentId = _selectedMutualFollowerId ?? _selectedUserId!;
-      final wagerAmount = int.tryParse(_wagerController.text) ?? 0;
 
       await BattleService.createBattle(
         player1Id: _myUserId,
@@ -192,7 +189,6 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
         customLetters: _selectedMode == GameMode.custom
             ? _customLettersController.text.toUpperCase()
             : null,
-        wagerAmount: wagerAmount,
         wagerAmount: _wagerAmount,
         isQuickfire: _isQuickfire,
       );
@@ -578,7 +574,7 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
           child: Column(
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Wager Points', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   Text('$_wagerAmount PTS', style: const TextStyle(color: ThemeColors.matrixGreen, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
@@ -603,7 +599,7 @@ class _CreateBattleScreenState extends State<CreateBattleScreen> with SingleTick
                 ),
               ),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Your Balance: $_userPoints', style: const TextStyle(color: Colors.white24, fontSize: 9)),
                   Text('Opponent: $_opponentPoints', style: const TextStyle(color: Colors.white24, fontSize: 9)),

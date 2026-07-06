@@ -167,10 +167,9 @@ CREATE TABLE IF NOT EXISTS public.battles (
     set_trick_video_url TEXT,
     attempt_video_url TEXT,
 
-    -- RPS & Wagerting
+    -- RPS & Wagering
     player1_rps_move TEXT CHECK (player1_rps_move IN ('rock', 'paper', 'scissors')),
     player2_rps_move TEXT CHECK (player2_rps_move IN ('rock', 'paper', 'scissors')),
-    wager_amount INTEGER DEFAULT 0,
     wager_amount INTEGER DEFAULT 0,
     wager_accepted BOOLEAN DEFAULT FALSE,
 

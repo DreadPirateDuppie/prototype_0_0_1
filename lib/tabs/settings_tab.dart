@@ -934,170 +934,147 @@ class _SettingsTabState extends State<SettingsTab> {
       ),
     );
   }
-}
-,
+
+  Future<void> _showSupportDialog() async {
+    final subjectController = TextEditingController();
+    final messageController = TextEditingController();
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: ThemeColors.matrixGreen, width: 1),
+            ),
+            title: Text(
+              '>_SUPPORT_CHANNEL',
+              style: TextStyle(
+                color: ThemeColors.matrixGreen,
+                fontFamily: 'monospace',
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Open a ticket with the core team. We respond as fast as we can.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: subjectController,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Subject...',
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: ThemeColors.matrixGreen.withValues(alpha: 0.3)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: ThemeColors.matrixGreen),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: messageController,
+                  maxLines: 4,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Describe the issue...',
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: ThemeColors.matrixGreen.withValues(alpha: 0.3)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: ThemeColors.matrixGreen),
+                    ),
+                  ),
+                ),
               ],
             ),
-          ),
-        ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                child: const Text('ABORT', style: TextStyle(color: Colors.white54, fontFamily: 'monospace')),
+              ),
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        final subject = subjectController.text.trim();
+                        final message = messageController.text.trim();
+                        if (subject.isEmpty || message.isEmpty) return;
+
+                        setState(() => isSubmitting = true);
+
+                        try {
+                          await SupabaseService.submitSupportTicket(
+                            subject: subject,
+                            message: message,
+                          );
+
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('TICKET_LOGGED: Support request received.'),
+                              backgroundColor: ThemeColors.matrixGreen,
+                            ),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          setState(() => isSubmitting = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('TICKET_FAILURE: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                child: isSubmitting
+                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: ThemeColors.matrixGreen))
+                    : Text('SUBMIT', style: TextStyle(color: ThemeColors.matrixGreen, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        '[$title]',
-        style: TextStyle(
-          color: ThemeColors.matrixGreen.withValues(alpha: 0.7),
-          fontFamily: 'monospace',
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 2,
-        ),
-      ),
+  Future<void> _launchSupportEmail() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'admin@pushinn.app',
+      query: 'subject=Pushinn App Support',
     );
-  }
-
-  Widget _buildGlassCard({required Widget child}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-          child: child,
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('EMAIL_FAILURE: Could not open mail client.'),
+          backgroundColor: Colors.red,
         ),
-      ),
-    );
-  }
-
-  Widget _buildSettingsItem(String title, IconData icon, {VoidCallback? onTap, Color? iconColor}) {
-    return ListTile(
-      onTap: onTap,
-      leading: Icon(icon, color: iconColor ?? Colors.white70, size: 20),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          fontFamily: 'monospace',
-        ),
-      ),
-      trailing: const Icon(Icons.chevron_right, color: Colors.white24, size: 16),
-      dense: true,
-    );
-  }
-
-  Widget _buildSwitchItem(String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
-    return SwitchListTile(
-      value: value,
-      onChanged: onChanged,
-      activeThumbColor: ThemeColors.matrixGreen,
-      title: Text(
-        title,
-        style: const TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace'),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
-      ),
-      dense: true,
-    );
-  }
-
-  Widget _buildDivider() {
-    return Divider(height: 1, color: Colors.white.withValues(alpha: 0.05), indent: 50);
-  }
-
-  void _showPolicyDialog(String title, String content) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.black,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: ThemeColors.matrixGreen, width: 1),
-        ),
-        title: Text(
-          '>_$title',
-          style: const TextStyle(
-            color: ThemeColors.matrixGreen,
-            fontFamily: 'monospace',
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Text(
-            content,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 13,
-              height: 1.5,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('DISMISS', style: TextStyle(color: ThemeColors.matrixGreen, fontFamily: 'monospace')),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAboutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.black,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: ThemeColors.matrixGreen, width: 1),
-        ),
-        title: Text(
-          '>_SYSTEM_INFO',
-          style: TextStyle(
-            color: ThemeColors.matrixGreen,
-            fontFamily: 'monospace',
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'PUSHINN_PROTOCOL',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'v1.0.0_stable_build',
-              style: TextStyle(color: ThemeColors.matrixGreen.withValues(alpha: 0.7), fontSize: 11, fontFamily: 'monospace'),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'A decentralized geographic intelligence network for the community.',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('ACKNOWLEDGE', style: TextStyle(color: ThemeColors.matrixGreen, fontFamily: 'monospace')),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 }

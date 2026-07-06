@@ -200,7 +200,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
                   // 5. Interaction Bar (Bottom)
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       VoteButtons(
                         postId: currentPost.id!,

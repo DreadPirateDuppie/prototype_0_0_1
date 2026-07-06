@@ -9,7 +9,7 @@ BEGIN
         NEW.id,
         COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1)),
         COALESCE(NEW.raw_user_meta_data->>'display_name', SPLIT_PART(NEW.email, '@', 1)),
-        'friends', -- Default to friends for wagerter privacy
+        'friends', -- Default to friends for better privacy
         NOW()
     )
     ON CONFLICT (id) DO UPDATE SET

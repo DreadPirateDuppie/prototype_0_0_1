@@ -196,7 +196,7 @@ class LocationService {
     );
   }
 
-  /// Calculate distance wagerween two coordinates in meters using Haversine formula
+  /// Calculate distance between two coordinates in meters using Haversine formula
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371000; // meters
     final double dLat = _toRadians(lat2 - lat1);

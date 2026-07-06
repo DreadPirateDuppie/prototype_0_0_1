@@ -362,7 +362,7 @@ class VsBattleCard extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphawageric,
+          textBaseline: TextBaseline.alphabetic,
           children: [
             Text(
               letters.isEmpty ? '-' : letters.toUpperCase(),

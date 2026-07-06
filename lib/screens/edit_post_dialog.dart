@@ -562,7 +562,7 @@ class _EditPostDialogState extends State<EditPostDialog> {
                 ),
               const SizedBox(height: 32),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
                     decoration: BoxDecoration(

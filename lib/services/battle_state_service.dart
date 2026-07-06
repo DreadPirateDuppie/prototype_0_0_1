@@ -22,7 +22,6 @@ class BattleStateService {
     required GameMode gameMode,
     String? customLetters,
     int wagerAmount = 0,
-    int wagerAmount = 0,
     bool isQuickfire = false,
   }) async {
     try {
@@ -58,7 +57,6 @@ class BattleStateService {
         customLetters: customLetters ?? '',
         createdAt: DateTime.now(),
         currentTurnPlayerId: '', // Empty string indicates waiting for RPS
-        wagerAmount: wagerAmount,
         wagerAmount: wagerAmount,
         isQuickfire: isQuickfire,
         turnDeadline: DateTime.now().add(timerDuration), // Initial deadline for RPS

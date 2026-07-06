@@ -7,5 +7,5 @@ UPDATE map_posts
 SET photo_urls = ARRAY[photo_url] 
 WHERE photo_url IS NOT NULL AND (photo_urls IS NULL OR array_length(photo_urls, 1) IS NULL);
 
--- Create index for wagerter performance (optional, but good practice if we query by photos)
+-- Create index for better performance (optional, but good practice if we query by photos)
 -- CREATE INDEX IF NOT EXISTS idx_map_posts_photo_urls ON map_posts USING GIN (photo_urls);

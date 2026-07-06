@@ -916,7 +916,7 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                   
                   // Trick Archive Header
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceWagerween,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'TRICK ARCHIVE',
