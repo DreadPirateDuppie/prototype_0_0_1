@@ -26,6 +26,12 @@ class MapPost {
   final String? mvpUserId;
   final int mvpScore;
 
+  /// Privacy-First Spot Architecture tier: 'public' | 'crew' | 'invite'.
+  final String visibilityLevel;
+
+  /// Owning crew for 'crew'-tier spots (null for public/invite spots).
+  final String? crewId;
+
   MapPost({
     this.id,
     required this.userId,
@@ -53,10 +59,16 @@ class MapPost {
     this.isUserVerified = false,
     this.mvpUserId,
     this.mvpScore = 0,
+    this.visibilityLevel = 'public',
+    this.crewId,
   }) : photoUrls = photoUrls ?? [];
 
   // Backward compatibility getter
   String? get photoUrl => photoUrls.isNotEmpty ? photoUrls.first : null;
+
+  bool get isPublic => visibilityLevel == 'public';
+  bool get isCrewOnly => visibilityLevel == 'crew';
+  bool get isInviteOnly => visibilityLevel == 'invite';
 
   Map<String, dynamic> toMap() {
     return {
@@ -84,6 +96,8 @@ class MapPost {
       'is_user_verified': isUserVerified,
       'mvp_user_id': mvpUserId,
       'mvp_score': mvpScore,
+      'visibility_level': visibilityLevel,
+      'crew_id': crewId,
     };
   }
 
@@ -127,6 +141,8 @@ class MapPost {
       isUserVerified: (map['is_user_verified'] as bool?) ?? userProfile?['is_verified'] as bool? ?? false,
       mvpUserId: map['mvp_user_id'] as String?,
       mvpScore: map['mvp_score'] as int? ?? 0,
+      visibilityLevel: map['visibility_level'] as String? ?? 'public',
+      crewId: map['crew_id'] as String?,
     );
   }
 }

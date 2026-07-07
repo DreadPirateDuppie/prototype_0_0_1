@@ -95,6 +95,8 @@ class SupabaseService {
     double? qualityRating,
     double? securityRating,
     double? popularityRating,
+    String visibilityLevel = 'public',
+    String? crewId,
   }) {
     return _postService.createMapPost(
         userId: userId,
@@ -111,6 +113,8 @@ class SupabaseService {
         qualityRating: qualityRating,
         securityRating: securityRating,
         popularityRating: popularityRating,
+        visibilityLevel: visibilityLevel,
+        crewId: crewId,
       );
   }
 

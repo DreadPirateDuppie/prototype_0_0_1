@@ -233,5 +233,62 @@ void main() {
 
       expect(json['created_at'], now.toIso8601String());
     });
+
+    test('defaults to public visibility with no crew when unspecified', () {
+      final post = MapPost(
+        userId: 'user-1',
+        title: 'Test',
+        description: 'Test',
+        latitude: 0.0,
+        longitude: 0.0,
+        createdAt: DateTime.now(),
+      );
+
+      expect(post.visibilityLevel, 'public');
+      expect(post.crewId, isNull);
+      expect(post.isPublic, isTrue);
+      expect(post.isCrewOnly, isFalse);
+      expect(post.isInviteOnly, isFalse);
+    });
+
+    test('fromMap() parses crew-tier visibility fields', () {
+      final json = {
+        'id': 'post-1',
+        'user_id': 'user-1',
+        'title': 'Secret Ledge',
+        'description': 'Crew only',
+        'latitude': 51.5,
+        'longitude': -0.1,
+        'created_at': '2024-01-15T10:30:00.000Z',
+        'visibility_level': 'crew',
+        'crew_id': 'crew-1',
+      };
+
+      final post = MapPost.fromMap(json);
+
+      expect(post.visibilityLevel, 'crew');
+      expect(post.crewId, 'crew-1');
+      expect(post.isCrewOnly, isTrue);
+      expect(post.isPublic, isFalse);
+    });
+
+    test('toMap() round-trips visibility_level and crew_id', () {
+      final post = MapPost(
+        userId: 'user-1',
+        title: 'Test',
+        description: 'Test',
+        latitude: 0.0,
+        longitude: 0.0,
+        createdAt: DateTime.now(),
+        visibilityLevel: 'invite',
+        crewId: null,
+      );
+
+      final json = post.toMap();
+
+      expect(json['visibility_level'], 'invite');
+      expect(json['crew_id'], isNull);
+      expect(post.isInviteOnly, isTrue);
+    });
   });
 }

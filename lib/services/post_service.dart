@@ -45,8 +45,23 @@ class PostService {
     double? qualityRating,
     double? securityRating,
     double? popularityRating,
+    String visibilityLevel = 'public',
+    String? crewId,
   }) async {
     try {
+      // Privacy-First Spot Architecture: a 'crew' tier post needs a crew_id.
+      // If the caller didn't supply one explicitly, fall back to the poster's
+      // own crew (same membership lookup TerritoryService.getMyCrew() uses).
+      String? resolvedCrewId = crewId;
+      if (visibilityLevel == 'crew' && resolvedCrewId == null) {
+        final membership = await _client
+            .from('crew_members')
+            .select('crew_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+        resolvedCrewId = membership?['crew_id'] as String?;
+      }
+
       final response = await _client
           .from('map_posts')
           .insert({
@@ -67,6 +82,8 @@ class PostService {
             'quality_rating': qualityRating,
             'security_rating': securityRating,
             'popularity_rating': popularityRating,
+            'visibility_level': visibilityLevel,
+            'crew_id': visibilityLevel == 'crew' ? resolvedCrewId : null,
           })
           .select()
           .single();
@@ -107,6 +124,17 @@ class PostService {
         originalError: e,
       );
     }
+  }
+
+  /// Privacy-First Spot Architecture (Invite Tier): grant one user access to
+  /// an 'invite'-visibility spot. Server enforces that only the spot owner
+  /// may invite (see supabase/migrations/20260707_privacy_spot_tiers.sql).
+  /// Schema/RPC-level support only — no invite-picker UI yet.
+  Future<void> inviteUserToSpot(String spotId, String invitedUserId) async {
+    await _client.rpc('invite_user_to_spot', params: {
+      'p_spot_id': spotId,
+      'p_invited_user_id': invitedUserId,
+    });
   }
 
   /// Get all map posts with optional filters and pagination

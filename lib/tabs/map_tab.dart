@@ -247,12 +247,24 @@ class MapTabState extends State<MapTab> with AutomaticKeepAliveClientMixin, Widg
         LatLng(post.latitude!, post.longitude!),
         post.title,
         post.description,
-        Colors.green,
+        _markerColorForVisibility(post),
         postId: post.id,
         post: post,
         activePushers: activePushers,
       );
     }
+  }
+
+  /// Privacy-First Spot Architecture: badge crew/invite-tier spots with a
+  /// distinct marker color so a "hidden" spot never looks identical to a
+  /// public one on the poster's own map. Server RLS is what actually keeps
+  /// these spots out of other users' queries (see
+  /// supabase/migrations/20260707_privacy_spot_tiers.sql) — this is a
+  /// client-side presentation layer on top of that.
+  Color _markerColorForVisibility(MapPost post) {
+    if (post.isCrewOnly) return Colors.purpleAccent;
+    if (post.isInviteOnly) return Colors.amber;
+    return Colors.green;
   }
 
   Future<void> _getCurrentLocation() async {

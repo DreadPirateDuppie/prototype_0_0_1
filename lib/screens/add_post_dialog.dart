@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/supabase_service.dart';
 import '../services/image_service.dart';
+import '../services/territory_service.dart';
 import '../utils/error_helper.dart';
 
 class AddPostDialog extends StatefulWidget {
@@ -33,6 +34,24 @@ class _AddPostDialogState extends State<AddPostDialog> {
   double _rating = 0.0; // Star rating (0-5)
   double _securityRating = 0.0;
   double _popularityRating = 0.0;
+
+  // Privacy-First Spot Architecture: 'public' | 'crew'. Invite tier is
+  // schema/RPC-only for now (no invite-picker UI), so it isn't offered here.
+  String _selectedVisibility = 'public';
+  bool _hasCrew = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCrewMembership();
+  }
+
+  Future<void> _loadCrewMembership() async {
+    final crew = await TerritoryService().getMyCrew();
+    if (mounted) {
+      setState(() => _hasCrew = crew != null);
+    }
+  }
 
   @override
   void dispose() {
@@ -231,6 +250,7 @@ class _AddPostDialogState extends State<AddPostDialog> {
         qualityRating: _rating,
         securityRating: _securityRating,
         popularityRating: _popularityRating,
+        visibilityLevel: _hasCrew ? _selectedVisibility : 'public',
       );
 
 
@@ -353,6 +373,10 @@ class _AddPostDialogState extends State<AddPostDialog> {
                                  _buildLocationPill(matrixGreen),
                                  const SizedBox(height: 20),
                                  _buildCategoryChips(matrixGreen),
+                                 if (_hasCrew) ...[
+                                   const SizedBox(height: 20),
+                                   _buildVisibilitySelector(matrixGreen),
+                                 ],
                                  const SizedBox(height: 24),
                                  const Text(
                                    '// SYSTEM_SENSORS_DATA_INPUT',
@@ -732,6 +756,68 @@ class _AddPostDialogState extends State<AddPostDialog> {
               );
             }).toList(),
           ),
+        ),
+      ],
+    );
+  }
+
+  /// Privacy-First Spot Architecture: only shown once we know the poster is
+  /// in a crew (otherwise there's no crew_id to tag a 'crew'-tier spot with).
+  Widget _buildVisibilitySelector(Color matrixGreen) {
+    final options = const {
+      'public': 'PUBLIC',
+      'crew': 'CREW ONLY',
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'VISIBILITY',
+          style: TextStyle(color: Colors.white24, fontFamily: 'monospace', fontSize: 10, letterSpacing: 2),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: options.entries.map((entry) {
+            final selected = _selectedVisibility == entry.key;
+            return Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: GestureDetector(
+                onTap: () => setState(() => _selectedVisibility = entry.key),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected ? matrixGreen.withValues(alpha: 0.1) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: selected ? matrixGreen : Colors.white12,
+                      width: selected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        entry.key == 'crew' ? Icons.groups_rounded : Icons.public_rounded,
+                        size: 14,
+                        color: selected ? matrixGreen : Colors.white38,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        entry.value,
+                        style: TextStyle(
+                          color: selected ? matrixGreen : Colors.white38,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
