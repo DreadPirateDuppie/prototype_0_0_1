@@ -16,6 +16,7 @@ import '../widgets/verified_badge.dart';
 import 'trick_archive_screen.dart';
 import '../widgets/hud_avatar.dart';
 import 'user_profile_screen.dart';
+import '../widgets/spot_status_panel.dart';
 
 class SpotDetailsScreen extends StatefulWidget {
   final MapPost post;
@@ -731,6 +732,13 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
+
+                  // Live Intelligence / Status Engine ("Eyes on the Street")
+                  if (currentPost.id != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: SpotStatusPanel(spotId: currentPost.id!),
+                    ),
 
                   // Description
                   Text(
