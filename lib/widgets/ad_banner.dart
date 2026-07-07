@@ -22,10 +22,22 @@ class _AdBannerState extends State<AdBanner> {
   late int _currentAdIndex;
   Timer? _adTimer;
 
-  // Test Ad Unit IDs
-  final String _adUnitId = Platform.isAndroid
-      ? 'ca-app-pub-7811826984903792/5751991911'
-      : 'ca-app-pub-3940256099942544/2934735716';
+  // AdMob banner ad unit IDs. Android already points at DPD's real banner
+  // unit (left untouched). iOS still defaults to Google's public TEST unit;
+  // to go live on iOS, pass the real unit ID at build time, e.g.:
+  //   flutter build ios --dart-define=ADMOB_BANNER_AD_UNIT_ID_IOS=ca-app-pub-XXXXXXXX/YYYYYYYYYY
+  // Get the real value from: AdMob console -> Apps -> (Pushinn) -> Ad units
+  // -> Banner -> copy the "Ad unit ID".
+  static const String _androidAdUnitId = String.fromEnvironment(
+    'ADMOB_BANNER_AD_UNIT_ID_ANDROID',
+    defaultValue: 'ca-app-pub-7811826984903792/5751991911',
+  );
+  static const String _iosAdUnitId = String.fromEnvironment(
+    'ADMOB_BANNER_AD_UNIT_ID_IOS',
+    defaultValue: 'ca-app-pub-3940256099942544/2934735716', // Google test ID
+  );
+
+  final String _adUnitId = Platform.isAndroid ? _androidAdUnitId : _iosAdUnitId;
 
   final List<Map<String, dynamic>> _advertisements = [
     {

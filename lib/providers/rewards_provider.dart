@@ -140,9 +140,16 @@ class RewardsProvider extends ChangeNotifier {
       return;
     }
 
-    await adService.showAd();
+    // showAd() only returns true once onUserEarnedReward has actually fired
+    // (see RewardedAdService.showAd) — do not report points earned if the
+    // user closed the ad before that point.
+    final rewardEarned = await adService.showAd();
     await loadData();
-    onRewardEarned(4.2.toInt()); // Standardizing to integer for UI but acknowledging the 4.2 value
+    if (rewardEarned) {
+      onRewardEarned(4.2.toInt()); // Standardizing to integer for UI but acknowledging the 4.2 value
+    } else {
+      onError('Ad closed before the reward was earned. Watch the full ad to get points.');
+    }
   }
 
   void clearError() {
