@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/social_service.dart';
 import '../services/location_service.dart';
 import '../services/trick_service.dart';
+import '../services/nbd_service.dart';
 
 
 
@@ -55,7 +56,9 @@ void setupServiceLocator() {
     () => TrickService(client: getIt<SupabaseClient>()),
   );
 
-
+  getIt.registerLazySingleton<NbdService>(
+    () => NbdService(client: getIt<SupabaseClient>()),
+  );
 }
 
 /// Set up the service locator for testing with mock dependencies.
@@ -102,7 +105,9 @@ Future<void> setupServiceLocatorForTesting({SupabaseClient? mockSupabaseClient})
     () => TrickService(client: mockSupabaseClient),
   );
 
-
+  getIt.registerLazySingleton<NbdService>(
+    () => NbdService(client: mockSupabaseClient),
+  );
 }
 
 /// Reset the service locator (useful for testing cleanup)

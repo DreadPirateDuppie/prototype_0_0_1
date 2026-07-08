@@ -374,6 +374,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         return Icons.sports_kabaddi;
       case 'battle_result':
         return Icons.emoji_events;
+      case 'nbd_approved':
+        return Icons.verified;
+      case 'nbd_rejected':
+        return Icons.gpp_bad;
       case 'system':
         return Icons.info;
       default:
@@ -393,6 +397,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         return Colors.orange.shade400;
       case 'battle_result':
         return Colors.amber.shade400;
+      case 'nbd_approved':
+        return Colors.amber.shade400;
+      case 'nbd_rejected':
+        return Colors.red.shade400;
       default:
         return matrixGreen;
     }
