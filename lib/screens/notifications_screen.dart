@@ -378,6 +378,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         return Icons.verified;
       case 'nbd_rejected':
         return Icons.gpp_bad;
+      case 'spot_mvp_crowned':
+        return Icons.workspace_premium;
+      case 'spot_mvp_dethroned':
+        return Icons.trending_down;
       case 'system':
         return Icons.info;
       default:
@@ -401,6 +405,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         return Colors.amber.shade400;
       case 'nbd_rejected':
         return Colors.red.shade400;
+      case 'spot_mvp_crowned':
+        return Colors.amber.shade400;
+      case 'spot_mvp_dethroned':
+        return Colors.orange.shade400;
       default:
         return matrixGreen;
     }
